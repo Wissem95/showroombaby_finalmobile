@@ -1,11 +1,10 @@
-import api from './api';
+import ApiService from './ApiService';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Interface pour les données d'inscription
 export interface RegisterData {
   email: string;
   password: string;
-  password_confirmation: string;
   username: string;
 }
 
@@ -31,127 +30,102 @@ export interface LoginResponse {
 }
 
 /**
- * Service d'authentification pour gérer l'inscription, la connexion et la déconnexion
+ * Service gérant l'authentification des utilisateurs
  */
-const authService = {
+class AuthService {
   /**
    * Inscrit un nouvel utilisateur
-   * @param data Données d'inscription
-   * @returns Promesse avec la réponse du serveur
+   * @param data - Données d'inscription
    */
-  register: async (data: RegisterData) => {
+  async register(data: RegisterData) {
     try {
-      console.log('Tentative d\'inscription avec les données:', data);
-      // S'assurer que le chemin d'API est correct selon la documentation
-      const response = await api.post('/auth/register', data);
-      console.log('Réponse d\'inscription:', response.data);
+      const response = await ApiService.post('/auth/register', data);
       return response.data;
-    } catch (error: any) {
-      console.error('Erreur brute lors de l\'inscription:', error);
-      
-      // Gestion améliorée des erreurs
-      if (error.response) {
-        // Erreur avec réponse du serveur
-        console.error('Détails de l\'erreur serveur:', {
-          status: error.response.status,
-          data: error.response.data
-        });
-        throw error;
-      } else if (error.request) {
-        // Erreur sans réponse du serveur (problème réseau)
-        console.error('Problème de connexion au serveur. Aucune réponse reçue.');
-        throw new Error('Problème de connexion au serveur. Veuillez vérifier votre connexion internet.');
-      } else {
-        // Autre type d'erreur
-        console.error('Erreur de configuration de la requête:', error.message);
-        throw new Error('Une erreur inattendue s\'est produite. Veuillez réessayer.');
-      }
+    } catch (error) {
+      console.error('Erreur lors de l\'inscription:', error);
+      throw error;
     }
-  },
+  }
 
   /**
    * Connecte un utilisateur
-   * @param data Données de connexion
-   * @returns Promesse avec la réponse du serveur
+   * @param data - Données de connexion
    */
-  login: async (data: LoginData) => {
+  async login(data: LoginData) {
     try {
-      const response = await api.post<LoginResponse>('/auth/login', data);
+      const response = await ApiService.post('/auth/login', data);
       
-      // Stocker le token d'authentification
+      // Stocke le token dans AsyncStorage
       if (response.data.access_token) {
         await AsyncStorage.setItem('auth_token', response.data.access_token);
-        await AsyncStorage.setItem('user', JSON.stringify(response.data.user));
+        
+        // Stocke également les données utilisateur
+        if (response.data.user) {
+          await AsyncStorage.setItem('auth_user', JSON.stringify(response.data.user));
+        }
       }
       
       return response.data;
-    } catch (error: any) {
-      // Gestion améliorée des erreurs
-      if (error.response) {
-        // Erreur avec réponse du serveur
-        throw error;
-      } else if (error.request) {
-        // Erreur sans réponse du serveur (problème réseau)
-        throw new Error('Problème de connexion au serveur. Veuillez vérifier votre connexion internet.');
-      } else {
-        // Autre type d'erreur
-        throw new Error('Une erreur inattendue s\'est produite. Veuillez réessayer.');
-      }
+    } catch (error) {
+      console.error('Erreur lors de la connexion:', error);
+      throw error;
     }
-  },
+  }
 
   /**
-   * Déconnecte l'utilisateur actuel
-   * @returns Promesse avec la réponse du serveur
+   * Déconnecte l'utilisateur
    */
-  logout: async () => {
+  async logout() {
     try {
-      const response = await api.post('/auth/logout');
+      // Appel API pour la déconnexion
+      await ApiService.post('/auth/logout');
       
-      // Supprimer le token d'authentification
+      // Supprime le token et les données utilisateur localement
       await AsyncStorage.removeItem('auth_token');
-      await AsyncStorage.removeItem('user');
+      await AsyncStorage.removeItem('auth_user');
       
-      return response.data;
-    } catch (error: any) {
-      // Même en cas d'erreur, on supprime les données locales
+      return { success: true };
+    } catch (error) {
+      console.error('Erreur lors de la déconnexion:', error);
+      
+      // Même en cas d'erreur API, on supprime les données locales
       await AsyncStorage.removeItem('auth_token');
-      await AsyncStorage.removeItem('user');
+      await AsyncStorage.removeItem('auth_user');
       
-      // Gestion améliorée des erreurs
-      if (error.response) {
-        // Erreur avec réponse du serveur
-        throw error;
-      } else if (error.request) {
-        // Erreur sans réponse du serveur (problème réseau)
-        throw new Error('Problème de connexion au serveur. Veuillez vérifier votre connexion internet.');
-      } else {
-        // Autre type d'erreur
-        throw new Error('Une erreur inattendue s\'est produite. Veuillez réessayer.');
-      }
+      throw error;
     }
-  },
+  }
 
   /**
    * Vérifie si l'utilisateur est connecté
-   * @returns Booléen indiquant si l'utilisateur est connecté
    */
-  isAuthenticated: async (): Promise<boolean> => {
+  async isAuthenticated(): Promise<boolean> {
     const token = await AsyncStorage.getItem('auth_token');
     return !!token;
-  },
+  }
 
   /**
-   * Récupère l'utilisateur connecté
-   * @returns Objet utilisateur ou null
+   * Récupère le token d'authentification
    */
-  getCurrentUser: async (): Promise<User | null> => {
-    const userStr = await AsyncStorage.getItem('user');
+  async getToken(): Promise<string | null> {
+    return await AsyncStorage.getItem('auth_token');
+  }
+
+  /**
+   * Récupère l'utilisateur actuellement connecté depuis le stockage local
+   */
+  async getCurrentUser(): Promise<User | null> {
+    const userStr = await AsyncStorage.getItem('auth_user');
     if (userStr) {
-      return JSON.parse(userStr);
+      try {
+        return JSON.parse(userStr);
+      } catch (error) {
+        console.error('Erreur lors du parsing des données utilisateur:', error);
+        return null;
+      }
     }
     return null;
   }
-};
+}
 
-export default authService; 
+export default new AuthService(); 
