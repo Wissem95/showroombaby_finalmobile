@@ -12,5 +12,9 @@
         "laravel-vite-plugin": "^1.2.0",
         "tailwindcss": "^4.0.0",
         "vite": "^6.0.11"
+    },
+    "dependencies": {
+        "@expo/vector-icons": "^14.0.4",
+        "@react-navigation/bottom-tabs": "^7.2.1"
     }
 }
