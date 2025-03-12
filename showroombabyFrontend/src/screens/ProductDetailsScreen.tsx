@@ -1,12 +1,16 @@
 import React, { useState, useEffect } from 'react';
-import { StyleSheet, View, ScrollView, Image, Share, ActivityIndicator } from 'react-native';
+import { StyleSheet, View, ScrollView, Image, Share, ActivityIndicator, Alert } from 'react-native';
 import { Button, Text, Card, Chip, Divider, IconButton, Dialog, Portal } from 'react-native-paper';
 import { Ionicons } from '@expo/vector-icons';
 import AuthService from '../services/auth';
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const API_URL = 'http://127.0.0.1:8000/api';
+// URL de l'API
+const API_URL = 'http://127.0.0.1:8000';
+
+// Importer l'image placeholder directement
+const placeholderImage = require('../../assets/placeholder.png');
 
 // Interface du produit (similaire à celle de ExploreScreen)
 interface Product {
@@ -22,9 +26,9 @@ interface Product {
   view_count: number;
   created_at: string;
   updated_at: string;
-  images?: string | null; // Peut contenir un JSON stringifié d'URLs
-  is_trending?: boolean;
-  is_featured?: boolean;
+  images?: string | string[] | { path: string; url?: string }[] | any[] | null;
+  is_trending?: boolean | number;
+  is_featured?: boolean | number;
   user_id: number;
 }
 
@@ -72,7 +76,7 @@ export default function ProductDetailsScreen({ route, navigation }: any) {
 
       try {
         setLoading(true);
-        const response = await axios.get(`${API_URL}/products/${productId}`);
+        const response = await axios.get(`${API_URL}/api/products/${productId}`);
         
         if (response.data) {
           const productData = response.data.data || response.data;
@@ -82,39 +86,41 @@ export default function ProductDetailsScreen({ route, navigation }: any) {
           if (productData.seller) {
             setSeller(productData.seller);
           } 
-          // Si le vendeur n'est pas inclus, essayer de l'obtenir par API (uniquement profile)
+          // Si le vendeur n'est pas inclus, essayer de l'obtenir par API
           else if (productData.user_id) {
-            // Vérifier si l'utilisateur est authentifié avant d'appeler l'API
-            if (AuthService.isAuthenticated()) {
-              try {
-                const token = await AsyncStorage.getItem('token');
-                const sellerResponse = await axios.get(`${API_URL}/users/profile`, {
-                  headers: { Authorization: `Bearer ${token}` }
-                });
-                if (sellerResponse.data) {
-                  setSeller(sellerResponse.data);
-                }
-              } catch (sellerError) {
-                console.error('Erreur lors du chargement des informations du vendeur:', sellerError);
-                // Créer un vendeur minimal avec l'ID uniquement
+            try {
+              const token = await AsyncStorage.getItem('token');
+              
+              if (!token) {
+                // Créer un vendeur minimal sans appeler l'API si pas de token
                 setSeller({
                   id: productData.user_id,
-                  name: "Vendeur",
+                  name: "Utilisateur",
                 });
+                return;
               }
-            } else {
-              // Si l'utilisateur n'est pas connecté, utiliser directement les infos minimales
+              
+              // Utiliser la route correcte pour récupérer les informations du vendeur
+              // D'après l'API, la route correcte pourrait être /api/users/profile pour l'utilisateur courant
+              // Comme il n'y a pas de route spécifique pour obtenir un autre utilisateur, nous créons un vendeur minimal
               setSeller({
                 id: productData.user_id,
-                name: "Vendeur",
+                name: `Vendeur #${productData.user_id}`,
+              });
+            } catch (sellerError) {
+              console.error('Erreur lors du chargement des informations du vendeur:', sellerError);
+              // Créer un vendeur minimal avec l'ID uniquement
+              setSeller({
+                id: productData.user_id,
+                name: "Utilisateur",
               });
             }
           }
         } else {
           setError('Produit non trouvé');
         }
-      } catch (error) {
-        console.error('Erreur lors du chargement des détails du produit:', error);
+      } catch (error: any) {
+        console.error('Erreur lors du chargement du produit:', error);
         setError('Impossible de charger les détails du produit');
       } finally {
         setLoading(false);
@@ -127,30 +133,41 @@ export default function ProductDetailsScreen({ route, navigation }: any) {
   // Vérifier si le produit est en favori
   useEffect(() => {
     const checkIfFavorite = async () => {
-      if (!product || !AuthService.isAuthenticated()) return;
-      
       try {
-        // Au lieu de chercher un favori par ID de produit, regardons la liste des favoris
-        const response = await axios.get(`${API_URL}/favorites`, {
-          headers: { Authorization: `Bearer ${await AsyncStorage.getItem('token')}` }
+        const token = await AsyncStorage.getItem('token');
+        
+        if (!token) {
+          console.log('Utilisateur non connecté, impossible de vérifier les favoris');
+          return;
+        }
+        
+        // Utiliser l'API pour récupérer la liste complète des favoris
+        const response = await axios.get(`${API_URL}/api/favorites`, {
+          headers: { Authorization: `Bearer ${token}` }
         });
         
-        // Chercher si ce produit est dans les favoris
-        const favorites = response.data.data || [];
-        const isFavorite = favorites.some((fav: any) => 
-          fav.product_id === product.id || 
-          (fav.product && fav.product.id === product.id)
-        );
+        // Vérifier si le produit actuel est dans la liste des favoris
+        let isFavorite = false;
+        
+        if (response.data && response.data.data && Array.isArray(response.data.data)) {
+          // Format API: { data: [ { product_id: 1, ... }, ... ] }
+          isFavorite = response.data.data.some((fav: any) => fav.product_id == productId);
+        } else if (response.data && Array.isArray(response.data)) {
+          // Format alternatif: [ { product_id: 1, ... }, ... ]
+          isFavorite = response.data.some((fav: any) => fav.product_id == productId);
+        }
         
         setFavorite(isFavorite);
-      } catch (error) {
+      } catch (error: any) {
         console.error('Erreur lors de la vérification des favoris:', error);
-        // Ne pas modifier l'état du favori en cas d'erreur
+        setFavorite(false);
       }
     };
 
-    checkIfFavorite();
-  }, [product]);
+    if (productId) {
+      checkIfFavorite();
+    }
+  }, [productId]);
 
   // Fonction pour partager le produit
   const handleShare = async () => {
@@ -166,37 +183,53 @@ export default function ProductDetailsScreen({ route, navigation }: any) {
     }
   };
 
-  // Fonction pour ajouter le produit aux favoris
+  // Fonction pour ajouter/supprimer le produit des favoris
   const handleFavorite = async () => {
     if (!product) return;
     
-    if (!AuthService.isAuthenticated()) {
+    const token = await AsyncStorage.getItem('token');
+    
+    if (!token) {
       setLoginDialogVisible(true);
       return;
     }
     
     try {
-      const token = await AsyncStorage.getItem('token');
-      
       if (favorite) {
         // Supprimer des favoris
-        await axios.delete(`${API_URL}/favorites/${product.id}`, {
+        await axios.delete(`${API_URL}/api/favorites/${product.id}`, {
           headers: { Authorization: `Bearer ${token}` }
         });
         setFavorite(false);
+        Alert.alert('Succès', 'Produit retiré des favoris');
       } else {
         // Ajouter aux favoris
-        await axios.post(`${API_URL}/favorites/${product.id}`, null, {
+        await axios.post(`${API_URL}/api/favorites/${product.id}`, {}, {
           headers: { Authorization: `Bearer ${token}` }
         });
         setFavorite(true);
+        Alert.alert('Succès', 'Produit ajouté aux favoris');
       }
     } catch (error: any) {
-      if (error.response && error.response.status === 422) {
-        // Le produit est déjà dans les favoris
-        setFavorite(true);
+      console.error('Erreur lors de la gestion des favoris:', error);
+      
+      if (error.response) {
+        if (error.response.status === 401) {
+          Alert.alert('Erreur', 'Vous devez être connecté pour gérer vos favoris');
+          setLoginDialogVisible(true);
+        } else if (error.response.status === 422) {
+          // Le produit est déjà dans les favoris
+          setFavorite(true);
+          Alert.alert('Information', 'Ce produit est déjà dans vos favoris');
+        } else if (error.response.status === 404) {
+          // Le produit n'est plus dans les favoris
+          setFavorite(false);
+          Alert.alert('Information', 'Ce produit a déjà été retiré des favoris');
+        } else {
+          Alert.alert('Erreur', 'Une erreur est survenue lors de la gestion des favoris');
+        }
       } else {
-        console.error('Erreur lors de la gestion des favoris:', error);
+        Alert.alert('Erreur', 'Impossible de se connecter au serveur');
       }
     }
   };
@@ -220,22 +253,84 @@ export default function ProductDetailsScreen({ route, navigation }: any) {
 
   // Obtenir l'image principale d'un produit
   const getProductImage = (product: Product | null) => {
-    if (!product) return 'https://via.placeholder.com/500?text=Produit';
-    
-    if (product.images) {
-      try {
-        // Essayer de parser le JSON s'il est stocké comme une chaîne
-        const parsedImages = JSON.parse(product.images);
-        if (Array.isArray(parsedImages) && parsedImages.length > 0) {
-          return parsedImages[0];
-        }
-      } catch (e) {
-        // Si ce n'est pas un JSON valide, utiliser comme URL directe
-        return product.images;
-      }
+    if (!product || !product.images) {
+      console.log('Produit sans images, utilisation du placeholder');
+      return placeholderImage;
     }
-    // Image par défaut si aucune n'est disponible
-    return `https://via.placeholder.com/500?text=${encodeURIComponent(product.title)}`;
+    
+    try {
+      console.log(`Produit ${product.id}: format des images:`, typeof product.images, product.images);
+      
+      // Si les images sont stockées sous forme de chaîne JSON
+      if (typeof product.images === 'string') {
+        try {
+          const parsedImages = JSON.parse(product.images);
+          console.log(`Produit ${product.id}: images JSON parsées:`, parsedImages);
+          
+          if (Array.isArray(parsedImages) && parsedImages.length > 0) {
+            // Vérifier si l'image contient un chemin complet ou juste un nom de fichier
+            const imageUrl = parsedImages[0].includes('http') 
+              ? parsedImages[0] 
+              : `${API_URL}/storage/${parsedImages[0]}`;
+            
+            console.log(`Produit ${product.id}: URL d'image utilisée:`, imageUrl);
+            return { uri: imageUrl };
+          }
+        } catch (e) {
+          // Si ce n'est pas un JSON valide, on utilise directement la chaîne
+          const imageUrl = product.images.includes('http') 
+            ? product.images 
+            : `${API_URL}/storage/${product.images}`;
+          
+          console.log(`Produit ${product.id}: URL d'image directe utilisée:`, imageUrl);
+          return { uri: imageUrl };
+        }
+      } 
+      // Si c'est déjà un tableau d'objets avec propriété "path"
+      else if (Array.isArray(product.images) && product.images.length > 0) {
+        // Vérifier si c'est un tableau d'objets avec une propriété path
+        if (typeof product.images[0] === 'object' && product.images[0] !== null) {
+          // Si l'objet contient un champ path ou url
+          if (product.images[0].path) {
+            const imageUrl = product.images[0].path.includes('http') 
+              ? product.images[0].path 
+              : `${API_URL}/storage/${product.images[0].path}`;
+            
+            console.log(`Produit ${product.id}: URL depuis path:`, imageUrl);
+            return { uri: imageUrl };
+          } else if (product.images[0].url) {
+            console.log(`Produit ${product.id}: URL depuis url:`, product.images[0].url);
+            return { uri: product.images[0].url };
+          } else {
+            // Essayer de récupérer directement la première valeur
+            const firstImage = product.images[0];
+            console.log(`Produit ${product.id}: Premier élément du tableau:`, firstImage);
+            
+            if (typeof firstImage === 'string') {
+              const imageUrl = firstImage.includes('http') 
+                ? firstImage 
+                : `${API_URL}/storage/${firstImage}`;
+              
+              console.log(`Produit ${product.id}: URL du premier élément:`, imageUrl);
+              return { uri: imageUrl };
+            }
+          }
+        } else if (typeof product.images[0] === 'string') {
+          // Si c'est un tableau de chaînes
+          const imageUrl = product.images[0].includes('http') 
+            ? product.images[0] 
+            : `${API_URL}/storage/${product.images[0]}`;
+          
+          console.log(`Produit ${product.id}: URL d'image du tableau:`, imageUrl);
+          return { uri: imageUrl };
+        }
+      }
+    } catch (error) {
+      console.error(`Produit ${product.id}: Erreur lors du traitement de l'image:`, error);
+    }
+    
+    console.log(`Produit ${product.id}: Aucune image valide trouvée, utilisation du placeholder`);
+    return placeholderImage;
   };
   
   // Traduire la condition du produit
@@ -283,11 +378,15 @@ export default function ProductDetailsScreen({ route, navigation }: any) {
 
   return (
     <ScrollView style={styles.container}>
-      <Image 
-        source={{ uri: getProductImage(product) }} 
-        style={styles.image}
-        resizeMode="cover"
-      />
+      <View style={styles.imageContainer}>
+        <Image 
+          source={getProductImage(product)} 
+          style={styles.image}
+          resizeMode="cover"
+          defaultSource={placeholderImage}
+          onError={() => console.log(`Erreur de chargement de l'image pour le produit ${product.id}`)}
+        />
+      </View>
       
       <View style={styles.header}>
         <Text style={styles.title}>{product.title}</Text>
@@ -427,10 +526,13 @@ const styles = StyleSheet.create({
   errorButton: {
     marginTop: 10,
   },
-  image: {
-    width: '100%',
+  imageContainer: {
     height: 300,
     backgroundColor: '#e1e1e1',
+  },
+  image: {
+    width: '100%',
+    height: '100%',
   },
   header: {
     padding: 16,

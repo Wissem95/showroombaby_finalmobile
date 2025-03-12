@@ -1,12 +1,26 @@
 import React, { useState, useEffect } from 'react';
-import { StyleSheet, View, FlatList, Image, TouchableOpacity, ActivityIndicator } from 'react-native';
-import { Text, Card, Button, Divider } from 'react-native-paper';
-import { Ionicons } from '@expo/vector-icons';
+import {
+  View,
+  Text,
+  StyleSheet,
+  FlatList,
+  TouchableOpacity,
+  Image,
+  Alert,
+  ActivityIndicator,
+  RefreshControl
+} from 'react-native';
+import { Card, Button, Searchbar, Divider } from 'react-native-paper';
+import { Ionicons, MaterialIcons } from '@expo/vector-icons';
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import AuthService from '../services/auth';
+import { StatusBar } from 'expo-status-bar';
 
-const API_URL = 'http://127.0.0.1:8000/api';
+// URL de l'API
+const API_URL = 'http://127.0.0.1:8000';
+
+// Importer l'image placeholder directement
+const placeholderImage = require('../../assets/placeholder.png');
 
 interface Product {
   id: number;
@@ -16,150 +30,234 @@ interface Product {
   condition: string;
   status: string;
   category_id: number;
+  user_id: number;
   city?: string;
   location?: string;
   view_count: number;
   created_at: string;
   updated_at: string;
-  images?: string | null;
-  is_trending?: boolean;
-  is_featured?: boolean;
+  images?: string | string[] | null;
 }
 
+// Après la définition du type Product, ajouter un type pour les favoris
 interface Favorite {
   id: number;
-  user_id: number;
   product_id: number;
+  user_id: number;
+  product: Product;
   created_at: string;
   updated_at: string;
-  product: Product;
 }
 
 export default function FavoritesScreen({ navigation }: any) {
-  const [favorites, setFavorites] = useState<Favorite[]>([]);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [favorites, setFavorites] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     loadFavorites();
   }, []);
 
-  // Fonction pour charger les favoris
   const loadFavorites = async () => {
-    if (!AuthService.isAuthenticated()) {
-      setLoading(false);
-      setError('Vous devez être connecté pour voir vos favoris');
-      return;
-    }
-
     try {
       setLoading(true);
-      const token = await AsyncStorage.getItem('token');
-      const response = await axios.get(`${API_URL}/favorites`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-
-      if (response.data && response.data.data) {
-        setFavorites(response.data.data);
-      } else {
-        setFavorites([]);
-      }
       setError(null);
-    } catch (err) {
-      console.error('Erreur lors du chargement des favoris:', err);
-      setError('Impossible de charger vos favoris');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Fonction pour supprimer un favori
-  const removeFavorite = async (productId: number) => {
-    try {
+      
       const token = await AsyncStorage.getItem('token');
-      await axios.delete(`${API_URL}/favorites/${productId}`, {
+      
+      if (!token) {
+        setError('Veuillez vous connecter pour voir vos favoris');
+        setLoading(false);
+        return;
+      }
+      
+      const response = await axios.get(`${API_URL}/api/favorites`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       
-      // Mettre à jour la liste des favoris
-      setFavorites(favorites.filter(fav => fav.product_id !== productId));
-    } catch (err) {
-      console.error('Erreur lors de la suppression du favori:', err);
+      // L'API renvoie un tableau d'objets de favoris avec les produits imbriqués
+      if (response.data && Array.isArray(response.data.data)) {
+        // Format API: { data: [ { product: {...}, product_id: 1, ... }, ... ] }
+        const extractedProducts = response.data.data
+          .filter((favorite: Favorite) => favorite && favorite.product)
+          .map((favorite: Favorite) => favorite.product);
+        
+        console.log('Produits favoris extraits:', extractedProducts.length);
+        setFavorites(extractedProducts);
+      } else if (response.data && Array.isArray(response.data)) {
+        // Format alternatif: [ { product: {...}, product_id: 1, ... }, ... ]
+        const extractedProducts = response.data
+          .filter((favorite: Favorite) => favorite && favorite.product)
+          .map((favorite: Favorite) => favorite.product);
+        
+        console.log('Produits favoris extraits (format alt):', extractedProducts.length);
+        setFavorites(extractedProducts);
+      } else {
+        console.warn('Format de données inattendu:', response.data);
+        setFavorites([]);
+      }
+    } catch (error) {
+      console.error('Erreur lors du chargement des favoris:', error);
+      setError('Impossible de charger vos favoris. Veuillez réessayer.');
+      setFavorites([]);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
     }
   };
 
-  // Obtenir l'image principale d'un produit
-  const getProductImage = (product: Product) => {
-    if (!product) return 'https://via.placeholder.com/500?text=Produit';
-    
-    if (product.images) {
-      try {
-        // Essayer de parser le JSON s'il est stocké comme une chaîne
-        const parsedImages = JSON.parse(product.images);
-        if (Array.isArray(parsedImages) && parsedImages.length > 0) {
-          return parsedImages[0];
-        }
-      } catch (e) {
-        // Si ce n'est pas un JSON valide, utiliser comme URL directe
-        return product.images;
+  const onRefresh = () => {
+    setRefreshing(true);
+    loadFavorites();
+  };
+
+  const handleSearch = (query: string) => {
+    setSearchQuery(query);
+  };
+
+  const removeFavorite = async (productId: number) => {
+    try {
+      const token = await AsyncStorage.getItem('token');
+      
+      if (!token) {
+        Alert.alert('Erreur', 'Vous devez être connecté pour gérer vos favoris');
+        return;
+      }
+      
+      await axios.delete(`${API_URL}/api/favorites/${productId}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      
+      setFavorites(favorites.filter(item => item.id !== productId));
+      
+      Alert.alert('Succès', 'Produit retiré des favoris');
+    } catch (error: any) {
+      console.error('Erreur lors de la suppression du favori:', error);
+      
+      if (error.response && error.response.status === 404) {
+        setFavorites(favorites.filter(item => item.id !== productId));
+        Alert.alert('Information', 'Ce produit a déjà été retiré de vos favoris');
+      } else {
+        Alert.alert('Erreur', 'Impossible de retirer ce produit des favoris. Veuillez réessayer.');
       }
     }
-    // Image par défaut si aucune n'est disponible
-    return `https://via.placeholder.com/500?text=${encodeURIComponent(product.title)}`;
   };
 
-  // Formater le prix
-  const formatPrice = (price: number) => {
-    if (price === undefined || price === null) {
-      return '0.00 €';
+  const confirmRemove = (productId: number, title: string) => {
+    Alert.alert(
+      'Confirmation',
+      `Voulez-vous retirer "${title}" de vos favoris ?`,
+      [
+        { text: 'Annuler', style: 'cancel' },
+        { text: 'Supprimer', onPress: () => removeFavorite(productId), style: 'destructive' }
+      ]
+    );
+  };
+
+  const getProductImage = (product: Product) => {
+    if (!product.images) {
+      return placeholderImage;
     }
-    return price.toFixed(2).replace(/\d(?=(\d{3})+\.)/g, '$& ') + ' €';
+    
+    let imageUrl;
+    
+    if (typeof product.images === 'string') {
+      try {
+        // Tenter de parser si c'est une chaîne JSON
+        const parsed = JSON.parse(product.images);
+        imageUrl = Array.isArray(parsed) && parsed.length > 0 ? parsed[0] : null;
+      } catch (e) {
+        // Si ce n'est pas un JSON valide, utiliser comme URL directe
+        imageUrl = product.images;
+      }
+    } else if (Array.isArray(product.images) && product.images.length > 0) {
+      imageUrl = product.images[0];
+    }
+    
+    if (imageUrl && typeof imageUrl === 'string') {
+      if (imageUrl.startsWith('http')) {
+        return { uri: imageUrl };
+      } else {
+        return { uri: `${API_URL}/storage/${imageUrl}` };
+      }
+    }
+    
+    return placeholderImage;
   };
 
-  // Rendu d'un élément favori
-  const renderFavoriteItem = ({ item }: { item: Favorite }) => (
-    <Card style={styles.favoriteCard}>
-      <TouchableOpacity
-        onPress={() => navigation.navigate('ProductDetails', { productId: item.product_id })}
-      >
-        <Card.Cover 
-          source={{ uri: getProductImage(item.product) }}
-          style={styles.productImage}
-          resizeMode="cover"
-        />
-        <Card.Content style={styles.productContent}>
-          <Text style={styles.productTitle} numberOfLines={1}>
-            {item.product.title}
-          </Text>
-          <Text style={styles.productPrice}>
-            {formatPrice(item.product.price)}
-          </Text>
-          {item.product.city && (
-            <Text style={styles.productLocation} numberOfLines={1}>
-              {item.product.city || item.product.location}
-            </Text>
-          )}
+  const formatPrice = (price: number) => {
+    return price.toLocaleString('fr-FR', {
+      style: 'currency',
+      currency: 'EUR'
+    });
+  };
+
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('fr-FR', {
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric'
+    });
+  };
+
+  const renderItem = ({ item }: { item: Product }) => (
+    <TouchableOpacity 
+      style={styles.productCard}
+      onPress={() => navigation.navigate('ProductDetails', { productId: item.id })}
+    >
+      <Card>
+        <Card.Cover source={getProductImage(item)} style={styles.productImage} />
+        <Card.Content style={styles.cardContent}>
+          <View style={styles.productInfo}>
+            <Text style={styles.productTitle}>{item.title}</Text>
+            <Text style={styles.productPrice}>{formatPrice(item.price)}</Text>
+            {item.location && (
+              <Text style={styles.productLocation}>
+                <Ionicons name="location-outline" size={14} color="#666" />
+                {' '}{item.location}
+              </Text>
+            )}
+            <Text style={styles.productDate}>Ajouté le {formatDate(item.created_at)}</Text>
+          </View>
+          <TouchableOpacity 
+            style={styles.removeButton}
+            onPress={() => confirmRemove(item.id, item.title)}
+          >
+            <Ionicons name="heart-dislike" size={24} color="#e75480" />
+          </TouchableOpacity>
         </Card.Content>
-      </TouchableOpacity>
-      <Card.Actions style={styles.cardActions}>
-        <Button
-          icon={() => <Ionicons name="trash-outline" size={20} color="#FF6B6B" />}
-          mode="text"
-          textColor="#FF6B6B"
-          onPress={() => removeFavorite(item.product_id)}
-        >
-          Supprimer
-        </Button>
-      </Card.Actions>
-    </Card>
+      </Card>
+    </TouchableOpacity>
   );
 
-  // Affichage en fonction de l'état
-  if (loading) {
+  const filteredProducts = favorites.filter(product => 
+    product && product.title ? product.title.toLowerCase().includes(searchQuery.toLowerCase()) : false
+  );
+
+  if (loading && !refreshing) {
     return (
       <View style={styles.centerContainer}>
-        <ActivityIndicator size="large" color="#ff6b9b" />
-        <Text style={styles.messageText}>Chargement de vos favoris...</Text>
+        <ActivityIndicator size="large" color="#e75480" />
+        <Text style={styles.loadingText}>Chargement de vos favoris...</Text>
+      </View>
+    );
+  }
+
+  if (error && !token) {
+    return (
+      <View style={styles.centerContainer}>
+        <Ionicons name="person-outline" size={64} color="#ccc" />
+        <Text style={styles.errorText}>{error}</Text>
+        <Button 
+          mode="contained" 
+          onPress={() => navigation.navigate('Login')}
+          style={styles.loginButton}
+        >
+          Se connecter
+        </Button>
       </View>
     );
   }
@@ -167,32 +265,14 @@ export default function FavoritesScreen({ navigation }: any) {
   if (error) {
     return (
       <View style={styles.centerContainer}>
-        <Ionicons name="alert-circle-outline" size={48} color="#ff6b9b" />
+        <Ionicons name="alert-circle-outline" size={64} color="#e74c3c" />
         <Text style={styles.errorText}>{error}</Text>
-        {!AuthService.isAuthenticated() && (
-          <Button 
-            mode="contained" 
-            style={styles.loginButton}
-            onPress={() => navigation.navigate('Connexion')}
-          >
-            Se connecter
-          </Button>
-        )}
-      </View>
-    );
-  }
-
-  if (favorites.length === 0) {
-    return (
-      <View style={styles.centerContainer}>
-        <Ionicons name="heart-outline" size={48} color="#ff6b9b" />
-        <Text style={styles.messageText}>Vous n'avez pas encore de favoris</Text>
         <Button 
           mode="contained" 
-          style={styles.exploreButton}
-          onPress={() => navigation.navigate('Explore')}
+          onPress={loadFavorites}
+          style={styles.retryButton}
         >
-          Explorer les produits
+          Réessayer
         </Button>
       </View>
     );
@@ -200,96 +280,190 @@ export default function FavoritesScreen({ navigation }: any) {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Mes Favoris</Text>
-      <Divider style={styles.divider} />
-      <FlatList
-        data={favorites}
-        renderItem={renderFavoriteItem}
-        keyExtractor={item => item.id.toString()}
-        contentContainerStyle={styles.listContainer}
-      />
+      <StatusBar style="dark" />
+      
+      <View style={styles.header}>
+        <Text style={styles.headerTitle}>Mes favoris</Text>
+        <Searchbar
+          placeholder="Rechercher dans vos favoris"
+          onChangeText={handleSearch}
+          value={searchQuery}
+          style={styles.searchBar}
+          inputStyle={styles.searchInput}
+        />
+      </View>
+      
+      {favorites.length === 0 ? (
+        <View style={styles.emptyContainer}>
+          <Ionicons name="heart-outline" size={80} color="#ccc" />
+          <Text style={styles.emptyText}>Vous n'avez pas encore de favoris</Text>
+          <Text style={styles.emptySubtext}>
+            Ajoutez des produits à vos favoris pour les retrouver facilement
+          </Text>
+          <Button 
+            mode="contained" 
+            onPress={() => navigation.navigate('Home')}
+            style={styles.browseButton}
+          >
+            Parcourir les produits
+          </Button>
+        </View>
+      ) : (
+        <FlatList
+          data={filteredProducts}
+          renderItem={renderItem}
+          keyExtractor={item => item.id.toString()}
+          contentContainerStyle={styles.listContent}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              colors={['#e75480']}
+              tintColor="#e75480"
+            />
+          }
+          ListEmptyComponent={
+            searchQuery ? (
+              <View style={styles.noResultsContainer}>
+                <Text style={styles.noResultsText}>
+                  Aucun résultat pour "{searchQuery}"
+                </Text>
+              </View>
+            ) : null
+          }
+        />
+      )}
     </View>
   );
 }
 
+// Récupérer le token AsyncStorage
+const token = AsyncStorage.getItem('token');
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: '#f8f8f8',
+  },
+  header: {
     padding: 16,
+    backgroundColor: '#fff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+  },
+  headerTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    marginBottom: 12,
+  },
+  searchBar: {
+    elevation: 0,
+    backgroundColor: '#f2f2f2',
+    borderRadius: 8,
+  },
+  searchInput: {
+    fontSize: 16,
   },
   centerContainer: {
     flex: 1,
-    backgroundColor: '#fff',
     justifyContent: 'center',
     alignItems: 'center',
     padding: 20,
   },
-  title: {
-    fontSize: 24,
+  loadingText: {
+    marginTop: 12,
+    fontSize: 16,
+    color: '#666',
+  },
+  errorText: {
+    marginTop: 12,
+    fontSize: 16,
+    color: '#666',
+    textAlign: 'center',
+  },
+  loginButton: {
+    marginTop: 20,
+    backgroundColor: '#e75480',
+  },
+  retryButton: {
+    marginTop: 20,
+    backgroundColor: '#e75480',
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  emptyText: {
+    marginTop: 16,
+    fontSize: 18,
     fontWeight: 'bold',
-    marginBottom: 8,
-    color: '#333',
+    color: '#444',
   },
-  divider: {
-    height: 1,
-    backgroundColor: '#e0e0e0',
+  emptySubtext: {
+    marginTop: 8,
+    fontSize: 16,
+    color: '#666',
+    textAlign: 'center',
+    marginBottom: 24,
+  },
+  browseButton: {
+    backgroundColor: '#e75480',
+  },
+  listContent: {
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    paddingBottom: 80,
+  },
+  productCard: {
     marginBottom: 16,
-  },
-  listContainer: {
-    paddingBottom: 20,
-  },
-  favoriteCard: {
-    marginBottom: 16,
-    borderRadius: 10,
-    overflow: 'hidden',
-    elevation: 2,
   },
   productImage: {
-    height: 180,
+    height: 200,
+    borderTopLeftRadius: 8,
+    borderTopRightRadius: 8,
   },
-  productContent: {
-    padding: 12,
+  cardContent: {
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  productInfo: {
+    flex: 1,
+    marginRight: 8,
   },
   productTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    marginBottom: 6,
+    fontSize: 16,
+    fontWeight: '500',
+    marginBottom: 4,
   },
   productPrice: {
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: 'bold',
-    color: '#ff6b9b',
-    marginBottom: 4,
+    color: '#e75480',
+    marginBottom: 6,
   },
   productLocation: {
     fontSize: 14,
-    color: '#777',
+    color: '#666',
+    marginBottom: 4,
   },
-  cardActions: {
-    justifyContent: 'flex-end',
-    paddingTop: 0,
+  productDate: {
+    fontSize: 12,
+    color: '#999',
   },
-  errorText: {
-    color: '#f44336',
-    fontSize: 18,
+  removeButton: {
+    padding: 8,
+  },
+  noResultsContainer: {
+    padding: 20,
+    alignItems: 'center',
+  },
+  noResultsText: {
+    fontSize: 16,
+    color: '#666',
     textAlign: 'center',
-    marginTop: 10,
-    marginBottom: 20,
-  },
-  messageText: {
-    fontSize: 18,
-    textAlign: 'center',
-    marginTop: 10,
-    marginBottom: 20,
-    color: '#555',
-  },
-  loginButton: {
-    marginTop: 16,
-    backgroundColor: '#ff6b9b',
-  },
-  exploreButton: {
-    marginTop: 16,
-    backgroundColor: '#ff6b9b',
   },
 }); 

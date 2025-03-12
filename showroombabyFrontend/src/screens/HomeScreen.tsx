@@ -1,15 +1,25 @@
 import React, { useState, useEffect } from 'react';
-import { StyleSheet, View, Image, ScrollView, TouchableOpacity, FlatList, Dimensions, ActivityIndicator } from 'react-native';
+import { StyleSheet, View, Image, ScrollView, TouchableOpacity, FlatList, Dimensions, ActivityIndicator, Alert, SafeAreaView } from 'react-native';
 import { Text, Searchbar, Chip, Card } from 'react-native-paper';
 import { Ionicons } from '@expo/vector-icons';
 import axios from 'axios';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { widthPercentageToDP as wp, heightPercentageToDP as hp } from 'react-native-responsive-screen';
 
 type Props = NativeStackScreenProps<any, 'Home'>;
+
+// URL de l'API
+const API_URL = 'http://127.0.0.1:8000';
+
+// URL des images par défaut
+const DEFAULT_IMAGE_URL = 'https://placehold.co/400x300/f8bbd0/ffffff?text=Showroom+Baby';
+const BANNER_IMAGE_URL = require('../../assets/images/IMG_3139-Photoroom.png');
 
 // Catégories à afficher
 const categories = [
   { id: 0, name: 'Tendance' },
+  { id: -1, name: 'Tous les produits' },
   { id: 1, name: 'Siège auto' },
   { id: 2, name: 'Chambre' },
   { id: 3, name: 'Chaussure' },
@@ -29,122 +39,17 @@ interface Product {
   view_count: number;
   created_at: string;
   updated_at: string;
-  images?: string | string[] | null;
-  is_trending?: boolean;
-  is_featured?: boolean;
+  images?: string | string[] | { path: string; url?: string }[] | any[] | null;
+  is_trending?: boolean | number;
+  is_featured?: boolean | number;
 }
 
-export default function HomeScreen({ navigation }: Props) {
-  const [products, setProducts] = useState<Product[]>([]);
-  const [trendingProducts, setTrendingProducts] = useState<Product[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [selectedCategory, setSelectedCategory] = useState(0);
-  const [searchQuery, setSearchQuery] = useState('');
-
-  useEffect(() => {
-    fetchProducts();
-  }, []);
-
-  const fetchProducts = async () => {
-    setIsLoading(true);
-    setError(null);
-    try {
-      const response = await axios.get('http://127.0.0.1:8000/api/products');
-      console.log('Request:', 'get', 'http://127.0.0.1:8000/api/products', undefined);
-      console.log('Response:', response.status, response.data);
-      
-      // Traiter les différents formats de réponse possibles
-      let productsData: Product[] = [];
-      if (response.data.items) {
-        console.log('Réponse API produits:', response.data);
-        productsData = response.data.items;
-      } else if (Array.isArray(response.data)) {
-        productsData = response.data;
-      }
-      
-      setProducts(productsData);
-      // Filtrer les produits tendance pour l'affichage principal
-      setTrendingProducts(
-        productsData.filter(product => product.is_trending || product.is_featured)
-      );
-      
-      setIsLoading(false);
-    } catch (err) {
-      console.error('Erreur lors du chargement des produits:', err);
-      setError('Impossible de charger les produits. Veuillez réessayer.');
-      setIsLoading(false);
-    }
-  };
-
-  const handleCategorySelect = (selectedId: number) => {
-    setSelectedCategory(selectedId);
-    // Ici, vous pourriez filtrer les produits en fonction de la catégorie sélectionnée
-    // Par exemple:
-    // if (selectedId > 0) {
-    //   const filteredProducts = products.filter(product => product.category_id === selectedId);
-    //   setTrendingProducts(filteredProducts);
-    // } else {
-    //   setTrendingProducts(products.filter(product => product.is_trending));
-    // }
-  };
-
-  const renderCategories = () => {
-    return (
-      <ScrollView 
-        horizontal 
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.categoriesContainer}
-      >
-        {categories.map(category => (
-          <Chip
-            key={category.id}
-            selected={selectedCategory === category.id}
-            style={[
-              styles.categoryChip,
-              selectedCategory === category.id ? styles.selectedCategoryChip : {}
-            ]}
-            textStyle={selectedCategory === category.id ? styles.selectedCategoryText : {}}
-            onPress={() => handleCategorySelect(category.id)}
-          >
-            {category.name}
-          </Chip>
-        ))}
-      </ScrollView>
-    );
-  };
-
-  const getProductImage = (product: Product) => {
-    // Image par défaut
-    const defaultImage = { uri: 'https://placehold.co/300' };
-
-    if (!product.images) return defaultImage;
-
-    try {
-      // Si images est une chaîne JSON, on essaie de l'analyser
-      if (typeof product.images === 'string') {
-        try {
-          const parsedImages = JSON.parse(product.images);
-          if (Array.isArray(parsedImages) && parsedImages.length > 0) {
-            return { uri: parsedImages[0] };
-          }
-        } catch (e) {
-          // Si ce n'est pas un JSON valide, on utilise directement la chaîne
-          return { uri: product.images };
-        }
-      } 
-      // Si c'est déjà un tableau
-      else if (Array.isArray(product.images) && product.images.length > 0) {
-        return { uri: product.images[0] };
-      }
-    } catch (e) {
-      // En cas d'erreur, on utilise l'image par défaut
-      console.log('Erreur de traitement des images:', e);
-    }
-
-    return defaultImage;
-  };
-
+// Composant d'élément de produit indépendant
+const ProductItem = React.memo(({ item, navigation }: { item: Product; navigation: any }) => {
+  const [imageLoading, setImageLoading] = useState(true);
+  const [imageError, setImageError] = useState(false);
+  const [isFavorite, setIsFavorite] = useState(false);
+  
   const formatPrice = (price: number) => {
     return price.toLocaleString('fr-FR', {
       style: 'currency',
@@ -152,16 +57,160 @@ export default function HomeScreen({ navigation }: Props) {
     });
   };
 
-  const renderTrendingItem = ({ item }: { item: Product }) => (
+  const getProductImage = (product: Product) => {
+    // Image par défaut
+    if (!product.images) {
+      return { uri: DEFAULT_IMAGE_URL };
+    }
+
+    try {
+      // Si images est une chaîne JSON, on essaie de l'analyser
+      if (typeof product.images === 'string') {
+        try {
+          const parsedImages = JSON.parse(product.images);
+          
+          if (Array.isArray(parsedImages) && parsedImages.length > 0) {
+            // Vérifier si l'image contient un chemin complet ou juste un nom de fichier
+            const imageUrl = parsedImages[0].includes('http') 
+              ? parsedImages[0] 
+              : `${API_URL}/storage/${parsedImages[0]}`;
+            
+            return { uri: imageUrl };
+          }
+        } catch (e) {
+          // Si ce n'est pas un JSON valide, on utilise directement la chaîne
+          const imageUrl = product.images.includes('http') 
+            ? product.images 
+            : `${API_URL}/storage/${product.images}`;
+          
+          return { uri: imageUrl };
+        }
+      } 
+      // Si c'est déjà un tableau d'objets avec propriété "path"
+      else if (Array.isArray(product.images) && product.images.length > 0) {
+        // Vérifier si c'est un tableau d'objets avec une propriété path
+        if (typeof product.images[0] === 'object' && product.images[0] !== null) {
+          // Si l'objet contient un champ path ou url
+          if (product.images[0].path) {
+            const imageUrl = product.images[0].path.includes('http') 
+              ? product.images[0].path 
+              : `${API_URL}/storage/${product.images[0].path}`;
+            
+            return { uri: imageUrl };
+          } else if (product.images[0].url) {
+            return { uri: product.images[0].url };
+          } else {
+            // Essayer de récupérer directement la première valeur
+            const firstImage = product.images[0];
+            
+            if (typeof firstImage === 'string') {
+              const imageUrl = firstImage.includes('http') 
+                ? firstImage 
+                : `${API_URL}/storage/${firstImage}`;
+              
+              return { uri: imageUrl };
+            }
+          }
+        } else if (typeof product.images[0] === 'string') {
+          // Si c'est un tableau de chaînes
+          const imageUrl = product.images[0].includes('http') 
+            ? product.images[0] 
+            : `${API_URL}/storage/${product.images[0]}`;
+          
+          return { uri: imageUrl };
+        }
+      }
+    } catch (e) {
+      // En cas d'erreur, on utilise l'image par défaut
+    }
+
+    return { uri: DEFAULT_IMAGE_URL };
+  };
+  
+  useEffect(() => {
+    const checkIfFavorite = async () => {
+      try {
+        const token = await AsyncStorage.getItem('token');
+        if (!token) return;
+        
+        const response = await axios.get(`${API_URL}/api/favorites`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        
+        let favorites = Array.isArray(response.data) ? response.data : response.data.data;
+        setIsFavorite(favorites.some((fav: any) => fav.product_id === item.id));
+      } catch (error) {
+        console.error('Erreur vérification favoris:', error);
+      }
+    };
+    checkIfFavorite();
+  }, [item.id]);
+
+  const handleFavorite = async () => {
+    try {
+      const token = await AsyncStorage.getItem('token');
+      if (!token) {
+        Alert.alert('Connexion requise', 'Vous devez être connecté pour gérer vos favoris');
+        navigation.navigate('Auth');
+        return;
+      }
+
+      if (isFavorite) {
+        await axios.delete(`${API_URL}/api/favorites/${item.id}`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        setIsFavorite(false);
+      } else {
+        await axios.post(`${API_URL}/api/favorites/${item.id}`, {}, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        setIsFavorite(true);
+      }
+    } catch (error) {
+      console.error('Erreur favoris:', error);
+      Alert.alert('Erreur', 'Impossible de gérer les favoris');
+    }
+  };
+
+  return (
     <Card
       style={styles.productCard}
       onPress={() => navigation.navigate('ProductDetails', { productId: item.id })}
     >
-      <Card.Cover 
-        source={getProductImage(item)} 
-        style={styles.productImage} 
-        resizeMode="cover"
-      />
+      <View style={styles.productImageContainer}>
+        <TouchableOpacity 
+          style={styles.favoriteButton}
+          onPress={handleFavorite}
+        >
+          <Ionicons 
+            name={isFavorite ? 'heart' : 'heart-outline'} 
+            size={24} 
+            color={isFavorite ? '#ff6b9b' : '#ffffff'} 
+          />
+        </TouchableOpacity>
+        {imageLoading && (
+          <View style={styles.imageLoadingContainer}>
+            <ActivityIndicator size="small" color="#ff6b9b" />
+          </View>
+        )}
+        <Image 
+          source={getProductImage(item)} 
+          style={styles.productImage}
+          resizeMode="cover"
+          onLoadStart={() => setImageLoading(true)}
+          onLoad={() => setImageLoading(false)}
+          onError={() => {
+            setImageLoading(false);
+            setImageError(true);
+          }}
+        />
+        {imageError && (
+          <View style={styles.imageErrorContainer}>
+            <Ionicons name="image-outline" size={24} color="#ff6b9b" />
+            <Text style={styles.imageErrorText}>Image indisponible</Text>
+          </View>
+        )}
+      </View>
       <Card.Content style={styles.productContent}>
         <Text style={styles.productTitle} numberOfLines={1}>
           {item.title || ""}
@@ -191,6 +240,80 @@ export default function HomeScreen({ navigation }: Props) {
       </Card.Content>
     </Card>
   );
+});
+
+const { width, height } = Dimensions.get('window');
+
+export default function HomeScreen({ navigation }: Props) {
+  const [products, setProducts] = useState<Product[]>([]);
+  const [trendingProducts, setTrendingProducts] = useState<Product[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [selectedCategory, setSelectedCategory] = useState(0);
+  const [searchQuery, setSearchQuery] = useState('');
+
+  useEffect(() => {
+    fetchProducts();
+    handleCategorySelect(0); // Ajout du chargement initial
+  }, []);
+
+  const fetchProducts = async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const response = await axios.get(`${API_URL}/api/products`, {
+        timeout: 10000,
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      let productsData = Array.isArray(response.data) ? response.data : response.data.items || [];
+      setProducts(productsData);
+      handleCategorySelect(selectedCategory);
+      setIsLoading(false);
+    } catch (err) {
+      console.error('Erreur API:', err);
+      setError('Impossible de charger les produits');
+      setIsLoading(false);
+    }
+  };
+
+  const handleCategorySelect = (selectedId: number) => {
+    setSelectedCategory(selectedId);
+    
+    // Filtrer les produits en fonction de la catégorie sélectionnée
+    if (selectedId === 0) {
+      // Pour la catégorie Tendance, si aucun produit n'est marqué comme tendance, afficher les 5 premiers produits
+      const trendingOnes = products.filter(product => 
+        !!product.is_trending || !!product.is_featured
+      );
+      setTrendingProducts(trendingOnes.length > 0 ? trendingOnes : products.slice(0, 5));
+    } else if (selectedId === -1) {
+      // Tous les produits: afficher tous les produits
+      setTrendingProducts(products);
+    } else {
+      // Catégorie spécifique: filtrer par category_id
+      console.log('Filtrage par catégorie dans handleCategorySelect:', selectedId);
+      
+      // Convertir les valeurs en chaînes pour la comparaison et éviter les problèmes de type
+      const categoryIdStr = String(selectedId);
+      const filteredProducts = products.filter(product => 
+        String(product.category_id) === categoryIdStr
+      );
+      console.log('Produits filtrés après sélection:', filteredProducts.length);
+      
+      setTrendingProducts(filteredProducts);
+    }
+  };
+
+  const formatPrice = (price: number) => {
+    return price.toLocaleString('fr-FR', {
+      style: 'currency',
+      currency: 'EUR',
+    });
+  };
 
   const renderContent = () => {
     // Afficher un indicateur de chargement
@@ -219,7 +342,7 @@ export default function HomeScreen({ navigation }: Props) {
     if (trendingProducts.length === 0) {
       return (
         <View style={styles.emptyContainer}>
-          <Text style={styles.emptyText}>Aucun produit tendance trouvé.</Text>
+          <Text style={styles.emptyText}>Aucun produit trouvé dans cette catégorie.</Text>
           <TouchableOpacity 
             style={styles.retryButton} 
             onPress={fetchProducts}
@@ -235,7 +358,7 @@ export default function HomeScreen({ navigation }: Props) {
         {/* Bannière principale */}
         <View style={styles.bannerContainer}>
           <Image 
-            source={{ uri: 'https://placehold.co/600x400/87CEEB/FFC0CB?text=Chambre+de+bébé' }}
+            source={BANNER_IMAGE_URL}
             style={styles.bannerImage}
             resizeMode="cover"
           />
@@ -244,11 +367,15 @@ export default function HomeScreen({ navigation }: Props) {
           </View>
         </View>
 
-        {/* Grille de produits tendance */}
-        <Text style={styles.sectionTitle}>Produits tendance</Text>
+        {/* Grille de produits */}
+        <Text style={styles.sectionTitle}>
+          {selectedCategory === 0 ? 'Produits tendance' : 
+           selectedCategory === -1 ? 'Tous les produits' :
+           categories.find(c => c.id === selectedCategory)?.name || 'Produits'}
+        </Text>
         <FlatList
           data={trendingProducts}
-          renderItem={renderTrendingItem}
+          renderItem={({ item }) => <ProductItem item={item} navigation={navigation} />}
           keyExtractor={item => item.id.toString()}
           numColumns={2}
           scrollEnabled={false}
@@ -258,27 +385,91 @@ export default function HomeScreen({ navigation }: Props) {
     );
   };
 
+  const renderCategories = () => {
+    return (
+      <ScrollView 
+        horizontal 
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.categoriesContainer}
+      >
+        {categories.map(category => (
+          <Chip
+            key={category.id}
+            selected={selectedCategory === category.id}
+            style={[
+              styles.categoryChip,
+              selectedCategory === category.id ? styles.selectedCategoryChip : {}
+            ]}
+            textStyle={[
+              styles.categoryText,
+              selectedCategory === category.id ? styles.selectedCategoryText : {}
+            ]}
+            onPress={() => handleCategorySelect(category.id)}
+          >
+            {category.name}
+          </Chip>
+        ))}
+      </ScrollView>
+    );
+  };
+
   return (
     <View style={styles.container}>
-      {/* Barre de recherche */}
-      <View style={styles.searchBarContainer}>
-        <Searchbar
-          placeholder="Rechercher"
-          style={styles.searchBar}
-          inputStyle={styles.searchInput}
-          value={searchQuery}
-          onChangeText={setSearchQuery}
-          icon={() => <Ionicons name="search-outline" size={24} color="#ffffff" />}
-        />
+      <Image 
+        source={require('../../assets/images/IMG_3139-Photoroom.png')}
+        style={styles.backgroundImage}
+      />
+      
+      <View style={styles.overlay}>
+        <View style={styles.searchBarContainer}>
+          <Searchbar
+            placeholder="Rechercher"
+            style={styles.searchBar}
+            inputStyle={styles.searchInput}
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            icon={() => null}
+            right={() => <Ionicons name="search-outline" size={20} color="#666" />}
+          />
+        </View>
+
+        <ScrollView 
+          horizontal 
+          showsHorizontalScrollIndicator={false}
+          style={styles.categoriesContainer}
+          contentContainerStyle={styles.categoriesContent}
+        >
+          {categories.map(category => (
+            <Chip
+              key={category.id}
+              selected={selectedCategory === category.id}
+              style={[
+                styles.categoryChip,
+                selectedCategory === category.id ? styles.selectedCategoryChip : {}
+              ]}
+              textStyle={[
+                styles.categoryText,
+                selectedCategory === category.id ? styles.selectedCategoryText : {}
+              ]}
+              onPress={() => handleCategorySelect(category.id)}
+            >
+              {category.name}
+            </Chip>
+          ))}
+        </ScrollView>
+
+        <View style={styles.contentContainer}>
+          <Text style={styles.bannerText}>Surfer sur les tendances !</Text>
+          <FlatList
+            data={trendingProducts}
+            renderItem={({ item }) => <ProductItem item={item} navigation={navigation} />}
+            keyExtractor={item => item.id.toString()}
+            numColumns={2}
+            scrollEnabled={false}
+            contentContainerStyle={styles.productsGrid}
+          />
+        </View>
       </View>
-
-      {/* Catégories */}
-      {renderCategories()}
-
-      <ScrollView showsVerticalScrollIndicator={false}>
-        {renderContent()}
-      </ScrollView>
-     
     </View>
   );
 }
@@ -286,101 +477,120 @@ export default function HomeScreen({ navigation }: Props) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#ffffff',
+    backgroundColor: 'transparent',
+  },
+  backgroundImage: {
+    position: 'absolute',
+    width: '100%',
+    height: hp('27%'),
+    top: -60,
+  },
+  overlay: {
+    flex: 1,
+    paddingTop: hp('2%'),
   },
   searchBarContainer: {
-    paddingHorizontal: 15,
-    paddingTop: 10,
-    paddingBottom: 5,
-    backgroundColor: '#ffffff',
+    paddingHorizontal: wp('4%'),
+    marginTop: 0,
   },
   searchBar: {
-    borderRadius: 25,
-    height: 45,
-    backgroundColor: '#ff6b9b',
+    borderRadius: 30,
+    height: hp('4.5%'),
+    backgroundColor: 'rgba(255, 255, 255, 0.75)',
+    borderWidth: 1,
+    borderColor: '#ffd4e5',
     elevation: 0,
   },
   searchInput: {
-    color: '#ffffff',
-    fontSize: 16,
+    fontSize: wp('3.2%'),
+    color: '#666',
+    textAlign: 'left',
   },
   categoriesContainer: {
-    paddingHorizontal: 15,
-    paddingVertical: 10,
+    marginTop: hp('1%'),
+    marginBottom: hp('1%'),
+  },
+  categoriesContent: {
+    paddingHorizontal: wp('4%'),
+    gap: wp('1.5%'),
   },
   categoryChip: {
-    marginRight: 8,
-    borderRadius: 20,
-    paddingHorizontal: 3,
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    borderRadius: 25,
+    height: hp('3.5%'),
+    marginRight: wp('1.5%'),
+    elevation: 1,
+  },
+  categoryText: {
+    fontSize: wp('3%'),
   },
   selectedCategoryChip: {
-    backgroundColor: '#ff6b9b',
+    backgroundColor: '#ffffff',
   },
   selectedCategoryText: {
-    color: '#ffffff',
-    fontWeight: 'bold',
+    color: '#ff6b9b',
   },
-  bannerContainer: {
-    margin: 15,
-    borderRadius: 15,
-    overflow: 'hidden',
-    height: 180,
-  },
-  bannerImage: {
-    width: '100%',
-    height: '100%',
-  },
-  bannerTextContainer: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    backgroundColor: 'rgba(255, 255, 255, 0.7)',
-    padding: 10,
+  contentContainer: {
+    flex: 1,
+    marginTop: hp('1%'),
+    backgroundColor: '#ffffff',
+    borderTopLeftRadius: 25,
+    borderTopRightRadius: 25,
+    paddingTop: hp('1%'),
   },
   bannerText: {
-    fontSize: 18,
-    fontWeight: 'bold',
+    fontSize: wp('5%'),
+    fontWeight: '600',
     textAlign: 'center',
+    marginBottom: hp('1%'),
+    color: '#333',
   },
   sectionTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginHorizontal: 15,
-    marginTop: 20,
-    marginBottom: 10,
+    fontSize: wp('5%'),
+    fontWeight: '600',
+    textAlign: 'center',
+    marginBottom: hp('1%'),
+    color: '#333',
   },
   productsGrid: {
-    paddingHorizontal: 7.5,
-    paddingBottom: 20,
+    paddingHorizontal: wp('2%'),
+    paddingTop: hp('1%'),
   },
   productCard: {
-    flex: 1,
-    margin: 7.5,
-    borderRadius: 10,
+    width: wp('44%'),
+    margin: wp('2%'),
+    backgroundColor: '#ffffff',
+    elevation: 2,
+    borderRadius: 12,
+    overflow: 'hidden',
+  },
+  productImageContainer: {
+    height: wp('44%'),
+    backgroundColor: '#f5f5f5',
+    borderRadius: 0,
   },
   productImage: {
-    height: 150,
-    borderTopLeftRadius: 10,
-    borderTopRightRadius: 10,
+    height: '100%',
+    width: '100%',
   },
   productContent: {
-    padding: 8,
+    padding: wp('3%'),
   },
   productTitle: {
-    fontSize: 14,
-    fontWeight: 'bold',
-    marginBottom: 4,
+    fontSize: wp('3.5%'),
+    fontWeight: '500',
+    color: '#333',
+    marginBottom: hp('0.5%'),
   },
   productPrice: {
-    fontSize: 16,
+    fontSize: wp('4%'),
     fontWeight: 'bold',
     color: '#ff6b9b',
   },
   productLocation: {
-    fontSize: 12,
+    fontSize: wp('3%'),
     color: '#666',
-    marginTop: 2,
+    marginTop: hp('0.5%'),
   },
   badgeContainer: {
     flexDirection: 'row',
@@ -442,5 +652,60 @@ const styles = StyleSheet.create({
     color: '#666',
     fontSize: 16,
     textAlign: 'center',
+  },
+  imageLoadingContainer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(245, 245, 245, 0.7)',
+  },
+  imageErrorContainer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(245, 245, 245, 0.9)',
+  },
+  imageErrorText: {
+    color: '#ff6b9b',
+    marginTop: 5,
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
+  favoriteButton: {
+    position: 'absolute',
+    top: wp('2%'),
+    right: wp('2%'),
+    zIndex: 2,
+    backgroundColor: 'rgba(255,255,255,0.9)',
+    borderRadius: wp('6%'),
+    padding: wp('2%'),
+  },
+  bannerContainer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: hp('40%'),
+  },
+  bannerImage: {
+    width: '100%',
+    height: '100%',
+    resizeMode: 'cover',
+  },
+  bannerTextContainer: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: 'rgba(255, 255, 255, 0.85)',
+    padding: 12,
   },
 }); 

@@ -13,6 +13,7 @@ import ProductDetailsScreen from '../screens/ProductDetailsScreen';
 import { Button } from 'react-native-paper';
 import { View, Text, TouchableOpacity, StyleSheet, SafeAreaView, Alert } from 'react-native';
 import FavoritesScreen from '../screens/FavoritesScreen';
+import AjouterProduitScreen from '../screens/AjouterProduitScreen';
 
 // Définir les types pour les navigateurs
 const Stack = createNativeStackNavigator();
@@ -38,16 +39,6 @@ function FavorisScreen() {
     <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
       <Text style={{ fontSize: 20, marginBottom: 20 }}>Mes favoris</Text>
       <Text style={{ marginBottom: 20 }}>Liste de vos articles favoris</Text>
-    </View>
-  );
-}
-
-// Écran temporaire pour Ajouter un produit
-function AjouterProduitScreen() {
-  return (
-    <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-      <Text style={{ fontSize: 20, marginBottom: 20 }}>Ajouter un produit</Text>
-      <Text style={{ marginBottom: 20 }}>Formulaire pour vendre un article</Text>
     </View>
   );
 }
@@ -188,10 +179,9 @@ function CustomFavorisScreen({ navigation }: { navigation: any }) {
 // Ajouter produit avec barre de navigation personnalisée
 function CustomAjouterProduitScreen({ navigation }: { navigation: any }) {
   return (
-    <SafeAreaView style={{ flex: 1 }}>
-      <AjouterProduitScreen />
-      <CustomBottomBar navigation={navigation} activeRoute="AjouterProduit" />
-    </SafeAreaView>
+    <>
+      <AjouterProduitScreen navigation={navigation} />
+    </>
   );
 }
 
@@ -258,7 +248,7 @@ export default function AppNavigator() {
           {(props) => (
             <SafeAreaView style={{ flex: 1 }}>
               <View style={{ flex: 1 }}>
-                <AjouterProduitScreen />
+                <CustomAjouterProduitScreen {...props} />
               </View>
               <CustomBottomBar navigation={props.navigation} activeRoute="AjouterProduit" />
             </SafeAreaView>
