@@ -118,3 +118,6 @@ Route::prefix('monitoring')->group(function () {
         return response()->json(['message' => 'Metrics endpoint']);
     });
 });
+
+// Route pour récupérer les produits de l'utilisateur connecté
+Route::get('/users/me/products', [App\Http\Controllers\API\ProductController::class, 'getUserProducts'])->middleware('auth:sanctum');

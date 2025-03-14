@@ -9,6 +9,7 @@ use App\Models\Category;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use Illuminate\Support\Facades\Auth;
 
 class ProductController extends Controller
 {
@@ -321,5 +322,39 @@ class ProductController extends Controller
             ->get();
 
         return response()->json(['data' => $similarProducts]);
+    }
+
+    /**
+     * Récupère tous les produits de l'utilisateur connecté
+     *
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function getUserProducts()
+    {
+        try {
+            $user = Auth::user();
+            if (!$user) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Utilisateur non authentifié'
+                ], 401);
+            }
+
+            $products = Product::where('user_id', $user->id)
+                ->orderBy('created_at', 'desc')
+                ->with(['images', 'category'])
+                ->get();
+
+            return response()->json([
+                'status' => 'success',
+                'data' => $products
+            ]);
+        } catch (\Exception $e) {
+            \Log::error('Erreur lors de la récupération des produits: ' . $e->getMessage());
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Erreur lors de la récupération des produits'
+            ], 500);
+        }
     }
 }

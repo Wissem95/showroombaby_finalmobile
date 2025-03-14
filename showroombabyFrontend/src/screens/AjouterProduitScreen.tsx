@@ -61,7 +61,8 @@ const MAX_IMAGE_SIZE = 5 * 1024 * 1024; // 5MB
 const MAX_IMAGES = 5;
 const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png'];
 
-export default function AjouterProduitScreen({ navigation }: any) {
+export default function AjouterProduitScreen({ navigation, route }: any) {
+  const productId = route.params?.productId;
   const [currentStep, setCurrentStep] = useState<Step>(Step.PHOTOS);
   const [isLoading, setIsLoading] = useState(false);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -94,7 +95,16 @@ export default function AjouterProduitScreen({ navigation }: any) {
     fetchCategories();
     checkPermissions();
     getUserInfo();
-  }, []);
+    if (productId) {
+      fetchProductDetails();
+    }
+  }, [productId]);
+
+  useEffect(() => {
+    navigation.setOptions({
+      headerShown: false,
+    });
+  }, [navigation]);
 
   // Reset form when screen loses focus
   useFocusEffect(
@@ -133,7 +143,7 @@ export default function AjouterProduitScreen({ navigation }: any) {
         <TouchableOpacity 
           onPress={() => {
             if (currentStep > 0) {
-              handleBack();
+              handleBackPress();
             } else {
               Alert.alert(
                 'Quitter',
@@ -158,6 +168,29 @@ export default function AjouterProduitScreen({ navigation }: any) {
       headerTitleStyle: styles.headerTitle,
     });
   }, [navigation, currentStep]);
+
+  const handleClosePress = () => {
+    Alert.alert(
+      'Quitter',
+      'Voulez-vous vraiment quitter ? Les modifications non enregistrées seront perdues.',
+      [
+        { text: 'Annuler', style: 'cancel' },
+        { 
+          text: 'Quitter', 
+          style: 'destructive',
+          onPress: () => navigation.goBack()
+        }
+      ]
+    );
+  };
+
+  const handleBackPress = () => {
+    if (currentStep > 0) {
+      setCurrentStep(currentStep - 1);
+    } else {
+      handleClosePress();
+    }
+  };
 
   const getUserInfo = async () => {
     try {
@@ -371,14 +404,6 @@ export default function AjouterProduitScreen({ navigation }: any) {
     }
   };
 
-  const handleBack = () => {
-    if (currentStep > 0) {
-      setCurrentStep(currentStep - 1);
-    } else {
-      navigation.goBack();
-    }
-  };
-
   const submitProduct = async () => {
     if (!validateStep()) {
       Alert.alert('Erreur', 'Veuillez corriger les erreurs avant de continuer.');
@@ -415,38 +440,44 @@ export default function AjouterProduitScreen({ navigation }: any) {
       if (productData.images && productData.images.length > 0) {
         for (let i = 0; i < productData.images.length; i++) {
           const image = productData.images[i];
-          const uri = Platform.OS === 'ios' ? image.uri.replace('file://', '') : image.uri;
-          
-          formData.append('images[]', {
-            uri: uri,
-            type: 'image/jpeg',
-            name: 'photo.jpg'
-          } as any);
+          // Ne pas renvoyer les images déjà sur le serveur
+          if (!image.uri.includes(API_URL)) {
+            const uri = Platform.OS === 'ios' ? image.uri.replace('file://', '') : image.uri;
+            formData.append('images[]', {
+              uri: uri,
+              type: 'image/jpeg',
+              name: 'photo.jpg'
+            } as any);
+          }
         }
       }
 
-      console.log('Envoi des données:', JSON.stringify({
-        title: productData.title,
-        description: productData.description,
-        price: productData.price,
-        condition: productData.condition,
-        categoryId: productData.category_id,
-        images: productData.images.length
-      }));
-
-      const response = await axios.post(`${API_URL}/api/products`, formData, {
-        headers: {
-          'Accept': 'application/json',
-          'Content-Type': 'multipart/form-data',
-          'Authorization': `Bearer ${token}`
-        }
-      });
+      let response;
+      if (productId) {
+        // Mise à jour d'un produit existant
+        response = await axios.post(`${API_URL}/api/products/${productId}`, formData, {
+          headers: {
+            'Accept': 'application/json',
+            'Content-Type': 'multipart/form-data',
+            'Authorization': `Bearer ${token}`
+          }
+        });
+      } else {
+        // Création d'un nouveau produit
+        response = await axios.post(`${API_URL}/api/products`, formData, {
+          headers: {
+            'Accept': 'application/json',
+            'Content-Type': 'multipart/form-data',
+            'Authorization': `Bearer ${token}`
+          }
+        });
+      }
 
       console.log('Réponse du serveur:', response.data);
 
       if (response.data && (response.data.id || (response.data.data && response.data.data.id))) {
-        const productId = response.data.id || response.data.data.id;
-        setPublishedProductId(productId);
+        const responseProductId = response.data.id || response.data.data.id;
+        setPublishedProductId(responseProductId);
         setShowSuccessPage(true);
       } else {
         throw new Error('Réponse invalide du serveur');
@@ -474,6 +505,44 @@ export default function AjouterProduitScreen({ navigation }: any) {
       }
       
       Alert.alert('Erreur', message);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const fetchProductDetails = async () => {
+    try {
+      setIsLoading(true);
+      const token = await AsyncStorage.getItem('token');
+      const response = await axios.get(`${API_URL}/api/products/${productId}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      const product = response.data.data;
+      
+      setProductData({
+        title: product.title || '',
+        description: product.description || '',
+        price: product.price?.toString() || '',
+        condition: product.condition || '',
+        size: product.size || '',
+        color: product.color || '',
+        warranty: product.warranty || '',
+        category_id: product.category_id || null,
+        subcategory_id: product.subcategory_id || null,
+        location: product.city ? `${product.city}, ${product.zip_code}` : '',
+        telephone: product.phone || '',
+        hide_phone: product.hide_phone || false,
+        images: product.images?.map((img: any) => ({
+          uri: `${API_URL}/storage/${img.path}`,
+          type: 'image/jpeg',
+          name: 'photo.jpg'
+        })) || [],
+        user_id: product.user_id || null,
+      });
+    } catch (error) {
+      console.error('Erreur lors de la récupération du produit:', error);
+      Alert.alert('Erreur', 'Impossible de charger les données du produit');
     } finally {
       setIsLoading(false);
     }
@@ -736,12 +805,10 @@ export default function AjouterProduitScreen({ navigation }: any) {
   };
 
   const getButtonLabel = () => {
-    switch (currentStep) {
-      case Step.DETAILS:
-        return 'Publier mon annonce';
-      default:
-        return 'Continuer';
+    if (currentStep === Step.DETAILS) {
+      return productId ? 'Modifier l\'annonce' : 'Publier mon annonce';
     }
+    return 'Continuer';
   };
 
   // Modale pour les sélections
@@ -890,18 +957,19 @@ export default function AjouterProduitScreen({ navigation }: any) {
       <StatusBar style="dark" />
       
       <View style={styles.header}>
-        <TouchableOpacity style={styles.backButton} onPress={handleBack}>
+        <TouchableOpacity style={styles.backButton} onPress={handleBackPress}>
           <Ionicons name="arrow-back" size={24} color="#333" />
         </TouchableOpacity>
         
         <Text style={styles.headerTitle}>
-          {currentStep === Step.PHOTOS ? 'Ajouter des photos' :
+          {productId ? 'Modifier l\'annonce' : 
+          currentStep === Step.PHOTOS ? 'Ajouter des photos' :
           currentStep === Step.LOCATION ? 'Localisation' :
           currentStep === Step.CHARACTERISTICS ? 'Caractéristiques' :
           'Détails du produit'}
         </Text>
         
-        <TouchableOpacity style={styles.closeButton} onPress={() => navigation.goBack()}>
+        <TouchableOpacity style={styles.closeButton} onPress={handleClosePress}>
           <Ionicons name="close" size={24} color="#333" />
         </TouchableOpacity>
       </View>
@@ -941,7 +1009,7 @@ export default function AjouterProduitScreen({ navigation }: any) {
         {currentStep > 0 && (
           <TouchableOpacity 
             style={[styles.button, styles.secondaryButton]} 
-            onPress={handleBack}
+            onPress={handleBackPress}
           >
             <Text style={styles.secondaryButtonText}>Retour</Text>
           </TouchableOpacity>
@@ -986,7 +1054,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingTop: Platform.OS === 'ios' ? 50 : 12, // Ajout de padding supplémentaire pour iOS
+    paddingBottom: 12,
     borderBottomWidth: 1,
     borderBottomColor: '#eee',
     backgroundColor: '#fff',
@@ -998,15 +1067,21 @@ const styles = StyleSheet.create({
   },
   backButton: {
     padding: 8,
+    width: 40, // Largeur fixe pour aligner
+    alignItems: 'center',
   },
   closeButton: {
-    padding: 10,
-    marginLeft: 10,
+    padding: 8,
+    width: 40, // Largeur fixe pour aligner
+    alignItems: 'center',
   },
   headerTitle: {
     fontSize: 18,
     fontWeight: '600',
     color: '#000',
+    flex: 1,
+    textAlign: 'center',
+    marginHorizontal: 8, // Espacement entre le titre et les boutons
   },
   stepContainer: {
     padding: 16,
