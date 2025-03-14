@@ -63,6 +63,7 @@ Route::prefix('categories')->group(function () {
 // Routes des utilisateurs
 Route::middleware('auth:sanctum')->prefix('users')->group(function () {
     Route::get('/profile', [UserController::class, 'profile']);
+    Route::get('/profile/{id}', [UserController::class, 'showProfile']);
     Route::put('/profile', [UserController::class, 'updateProfile']);
     Route::post('/change-password', [UserController::class, 'changePassword']);
     Route::delete('/account', [UserController::class, 'deleteAccount']);

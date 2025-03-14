@@ -5,6 +5,8 @@ import { Ionicons } from '@expo/vector-icons';
 import AuthService from '../services/auth';
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useNavigation } from '@react-navigation/native';
+import { widthPercentageToDP as wp, heightPercentageToDP as hp } from 'react-native-responsive-screen';
 
 // URL de l'API
 const API_URL = 'http://127.0.0.1:8000';
@@ -51,6 +53,9 @@ export default function ProductDetailsScreen({ route, navigation }: any) {
   const [error, setError] = useState('');
   const [favorite, setFavorite] = useState(false);
   const [loginDialogVisible, setLoginDialogVisible] = useState(false);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+
+  const navigationNative = useNavigation();
 
   // Charger les détails du produit
   useEffect(() => {
@@ -169,6 +174,14 @@ export default function ProductDetailsScreen({ route, navigation }: any) {
     }
   }, [productId]);
 
+  useEffect(() => {
+    const checkAuth = async () => {
+      const token = await AsyncStorage.getItem('token');
+      setIsAuthenticated(!!token);
+    };
+    checkAuth();
+  }, []);
+
   // Fonction pour partager le produit
   const handleShare = async () => {
     if (!product) return;
@@ -235,18 +248,31 @@ export default function ProductDetailsScreen({ route, navigation }: any) {
   };
 
   // Fonction pour contacter le vendeur
-  const handleContact = () => {
+  const handleContact = async () => {
     if (!product) return;
     
-    if (!AuthService.isAuthenticated()) {
-      setLoginDialogVisible(true);
+    const token = await AsyncStorage.getItem('token');
+    if (!token) {
+      Alert.alert(
+        'Connexion requise',
+        'Vous devez être connecté pour contacter le vendeur',
+        [
+          { 
+            text: 'Se connecter', 
+            onPress: () => navigation.navigate('Auth')
+          },
+          {
+            text: 'Annuler',
+            style: 'cancel'
+          }
+        ]
+      );
       return;
     }
     
-    // Navigation vers l'écran de messagerie
     navigation.navigate('Chat', { 
+      receiverId: product.user_id,
       productId: product.id,
-      sellerId: product.user_id,
       productTitle: product.title
     });
   };
@@ -464,14 +490,20 @@ export default function ProductDetailsScreen({ route, navigation }: any) {
         </>
       )}
 
-      <View style={styles.buttonContainer}>
+      <View style={styles.actionButtons}>
         <Button 
           mode="contained" 
-          style={styles.contactButton}
+          style={[styles.actionButton, styles.contactButton]}
           onPress={handleContact}
-          icon="message-text"
         >
           Contacter le vendeur
+        </Button>
+        <Button 
+          mode="outlined" 
+          style={styles.actionButton}
+          onPress={handleFavorite}
+        >
+          {favorite ? 'Retirer des favoris' : 'Ajouter aux favoris'}
         </Button>
       </View>
 
@@ -486,7 +518,7 @@ export default function ProductDetailsScreen({ route, navigation }: any) {
             <Button onPress={() => setLoginDialogVisible(false)}>Annuler</Button>
             <Button onPress={() => {
               setLoginDialogVisible(false);
-              navigation.navigate('Connexion');
+              navigationNative.navigate('Connexion');
             }}>Se connecter</Button>
           </Dialog.Actions>
         </Dialog>
@@ -620,12 +652,14 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#666',
   },
-  buttonContainer: {
-    padding: 16,
-    marginTop: 8,
-    marginBottom: 24,
+  actionButtons: {
+    padding: wp('4%'),
+    gap: hp('2%'),
+  },
+  actionButton: {
+    borderRadius: 25,
   },
   contactButton: {
-    paddingVertical: 8,
+    backgroundColor: '#ff6b9b',
   },
 }); 

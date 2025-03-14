@@ -254,24 +254,16 @@ export default function HomeScreen({ navigation }: Props) {
 
   useEffect(() => {
     fetchProducts();
-    handleCategorySelect(0); // Ajout du chargement initial
   }, []);
 
   const fetchProducts = async () => {
     setIsLoading(true);
     setError(null);
     try {
-      const response = await axios.get(`${API_URL}/api/products`, {
-        timeout: 10000,
-        headers: {
-          'Accept': 'application/json',
-          'Content-Type': 'application/json'
-        }
-      });
-      
+      const response = await axios.get(`${API_URL}/api/products`);
       let productsData = Array.isArray(response.data) ? response.data : response.data.items || [];
       setProducts(productsData);
-      handleCategorySelect(selectedCategory);
+      setTrendingProducts(productsData);
       setIsLoading(false);
     } catch (err) {
       console.error('Erreur API:', err);
@@ -378,7 +370,7 @@ export default function HomeScreen({ navigation }: Props) {
           renderItem={({ item }) => <ProductItem item={item} navigation={navigation} />}
           keyExtractor={item => item.id.toString()}
           numColumns={2}
-          scrollEnabled={false}
+          scrollEnabled={true}
           contentContainerStyle={styles.productsGrid}
         />
       </>
@@ -415,12 +407,13 @@ export default function HomeScreen({ navigation }: Props) {
 
   return (
     <View style={styles.container}>
-      <Image 
-        source={require('../../assets/images/IMG_3139-Photoroom.png')}
-        style={styles.backgroundImage}
-      />
-      
-      <View style={styles.overlay}>
+      <View style={styles.headerSection}>
+        <Image 
+          source={require('../../assets/images/IMG_3139-Photoroom.png')}
+          style={styles.backgroundImage}
+          resizeMode="cover"
+        />
+        
         <View style={styles.searchBarContainer}>
           <Searchbar
             placeholder="Rechercher"
@@ -457,18 +450,17 @@ export default function HomeScreen({ navigation }: Props) {
             </Chip>
           ))}
         </ScrollView>
+      </View>
 
-        <View style={styles.contentContainer}>
-          <Text style={styles.bannerText}>Surfer sur les tendances !</Text>
-          <FlatList
-            data={trendingProducts}
-            renderItem={({ item }) => <ProductItem item={item} navigation={navigation} />}
-            keyExtractor={item => item.id.toString()}
-            numColumns={2}
-            scrollEnabled={false}
-            contentContainerStyle={styles.productsGrid}
-          />
-        </View>
+      <View style={styles.mainContent}>
+        <Text style={styles.bannerText}>Surfer sur les tendances !</Text>
+        <FlatList
+          data={trendingProducts}
+          renderItem={({ item }) => <ProductItem item={item} navigation={navigation} />}
+          keyExtractor={item => item.id.toString()}
+          numColumns={2}
+          contentContainerStyle={styles.productsGrid}
+        />
       </View>
     </View>
   );
@@ -477,73 +469,54 @@ export default function HomeScreen({ navigation }: Props) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: '#ffffff',
+  },
+  headerSection: {
+    height: hp('28%'),
     backgroundColor: 'transparent',
   },
   backgroundImage: {
     position: 'absolute',
     width: '100%',
-    height: hp('27%'),
-    top: -60,
-  },
-  overlay: {
-    flex: 1,
-    paddingTop: hp('2%'),
+    height: '120%',
+    top: -hp('7%'),
   },
   searchBarContainer: {
     paddingHorizontal: wp('4%'),
-    marginTop: 0,
+    marginTop: hp('2%'),
   },
   searchBar: {
     borderRadius: 30,
-    height: hp('4.5%'),
-    backgroundColor: 'rgba(255, 255, 255, 0.75)',
+    height: hp('5.5%'),
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
     borderWidth: 1,
     borderColor: '#ffd4e5',
     elevation: 0,
   },
   searchInput: {
-    fontSize: wp('3.2%'),
+    fontSize: wp('3.5%'),
     color: '#666',
-    textAlign: 'left',
   },
   categoriesContainer: {
     marginTop: hp('1%'),
-    marginBottom: hp('1%'),
   },
   categoriesContent: {
     paddingHorizontal: wp('4%'),
-    gap: wp('1.5%'),
+    gap: wp('2%'),
   },
-  categoryChip: {
-    backgroundColor: 'rgba(255, 255, 255, 0.9)',
-    borderRadius: 25,
-    height: hp('3.5%'),
-    marginRight: wp('1.5%'),
-    elevation: 1,
-  },
-  categoryText: {
-    fontSize: wp('3%'),
-  },
-  selectedCategoryChip: {
-    backgroundColor: '#ffffff',
-  },
-  selectedCategoryText: {
-    color: '#ff6b9b',
-  },
-  contentContainer: {
+  mainContent: {
     flex: 1,
-    marginTop: hp('1%'),
     backgroundColor: '#ffffff',
-    borderTopLeftRadius: 25,
-    borderTopRightRadius: 25,
-    paddingTop: hp('1%'),
+    borderTopLeftRadius: 0,
+    borderTopRightRadius: 0,
+    marginTop: -hp('2%'),
   },
   bannerText: {
     fontSize: wp('5%'),
     fontWeight: '600',
     textAlign: 'center',
-    marginBottom: hp('1%'),
     color: '#333',
+    marginTop: hp('2%'),
   },
   sectionTitle: {
     fontSize: wp('5%'),
@@ -554,20 +527,18 @@ const styles = StyleSheet.create({
   },
   productsGrid: {
     paddingHorizontal: wp('2%'),
-    paddingTop: hp('1%'),
   },
   productCard: {
     width: wp('44%'),
     margin: wp('2%'),
     backgroundColor: '#ffffff',
     elevation: 2,
-    borderRadius: 12,
+    borderRadius: 0,
     overflow: 'hidden',
   },
   productImageContainer: {
     height: wp('44%'),
     backgroundColor: '#f5f5f5',
-    borderRadius: 0,
   },
   productImage: {
     height: '100%',
@@ -706,6 +677,22 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     backgroundColor: 'rgba(255, 255, 255, 0.85)',
-    padding: 12,
+    padding: 1,
+  },
+  categoryChip: {
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    borderRadius: 25,
+    height: hp('4%'),
+    marginRight: wp('2%'),
+  },
+  categoryText: {
+    fontSize: wp('3.2%'),
+    color: '#666',
+  },
+  selectedCategoryChip: {
+    backgroundColor: '#ff6b9b',
+  },
+  selectedCategoryText: {
+    color: '#ffffff',
   },
 }); 

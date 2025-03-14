@@ -124,4 +124,27 @@ class UserController extends Controller
 
         return response()->json(['message' => 'Compte supprimé avec succès']);
     }
+
+    /**
+     * Affiche le profil d'un utilisateur spécifique
+     *
+     * @param Request $request
+     * @param int $id
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function showProfile($id)
+    {
+        $user = User::find($id);
+
+        if (!$user) {
+            return response()->json([
+                'message' => 'Utilisateur non trouvé'
+            ], 404);
+        }
+
+        // On ne renvoie pas le mot de passe
+        $user->makeHidden(['password']);
+
+        return response()->json($user);
+    }
 }

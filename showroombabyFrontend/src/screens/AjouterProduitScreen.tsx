@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, Image, TouchableOpacity, TextInput, Switch, Alert, ActivityIndicator, Modal, FlatList } from 'react-native';
+import React, { useState, useEffect, useCallback } from 'react';
+import { View, Text, StyleSheet, ScrollView, Image, TouchableOpacity, TextInput, Switch, Alert, ActivityIndicator, Modal, FlatList, Platform } from 'react-native';
 import { Button, Card, Checkbox, Divider, HelperText, Searchbar } from 'react-native-paper';
 import { Ionicons, MaterialIcons, Entypo, AntDesign } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
@@ -7,6 +7,7 @@ import * as Location from 'expo-location';
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { StatusBar } from 'expo-status-bar';
+import { useFocusEffect } from '@react-navigation/native';
 
 // URL de l'API
 const API_URL = 'http://127.0.0.1:8000';
@@ -56,6 +57,10 @@ const WARRANTIES = [
   { id: '24_months', label: '24 mois' },
 ];
 
+const MAX_IMAGE_SIZE = 5 * 1024 * 1024; // 5MB
+const MAX_IMAGES = 5;
+const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png'];
+
 export default function AjouterProduitScreen({ navigation }: any) {
   const [currentStep, setCurrentStep] = useState<Step>(Step.PHOTOS);
   const [isLoading, setIsLoading] = useState(false);
@@ -90,6 +95,69 @@ export default function AjouterProduitScreen({ navigation }: any) {
     checkPermissions();
     getUserInfo();
   }, []);
+
+  // Reset form when screen loses focus
+  useFocusEffect(
+    useCallback(() => {
+      return () => {
+        setProductData({
+          title: '',
+          description: '',
+          price: '',
+          condition: '',
+          size: '',
+          color: '',
+          warranty: '',
+          category_id: null,
+          subcategory_id: null,
+          location: '',
+          telephone: '',
+          hide_phone: false,
+          images: [],
+          user_id: null,
+        });
+        setCurrentStep(Step.PHOTOS);
+        setErrors({});
+        setTermsAccepted(false);
+        setModalVisible(null);
+        setShowSuccessPage(false);
+        setPublishedProductId(null);
+      };
+    }, [])
+  );
+
+  // Add close button in header
+  useEffect(() => {
+    navigation.setOptions({
+      headerLeft: () => (
+        <TouchableOpacity 
+          onPress={() => {
+            if (currentStep > 0) {
+              handleBack();
+            } else {
+              Alert.alert(
+                'Quitter',
+                'Voulez-vous vraiment quitter ? Les modifications non enregistrées seront perdues.',
+                [
+                  { text: 'Annuler', style: 'cancel' },
+                  { 
+                    text: 'Quitter', 
+                    style: 'destructive',
+                    onPress: () => navigation.goBack() 
+                  }
+                ]
+              );
+            }
+          }}
+          style={styles.closeButton}
+        >
+          <Ionicons name="close" size={24} color="#000" />
+        </TouchableOpacity>
+      ),
+      headerTitle: 'Ajouter un produit',
+      headerTitleStyle: styles.headerTitle,
+    });
+  }, [navigation, currentStep]);
 
   const getUserInfo = async () => {
     try {
@@ -158,32 +226,70 @@ export default function AjouterProduitScreen({ navigation }: any) {
     }
   };
 
+  const validateImage = async (imageUri: string): Promise<boolean> => {
+    try {
+      const response = await fetch(imageUri);
+      const blob = await response.blob();
+      
+      // Vérifier la taille
+      if (blob.size > MAX_IMAGE_SIZE) {
+        Alert.alert('Erreur', 'L\'image est trop volumineuse (max 5MB)');
+        return false;
+      }
+
+      // Vérifier le type
+      if (!ALLOWED_IMAGE_TYPES.includes(blob.type)) {
+        Alert.alert('Erreur', 'Format d\'image non supporté (JPG/PNG uniquement)');
+        return false;
+      }
+
+      return true;
+    } catch (error) {
+      console.error('Erreur lors de la validation de l\'image:', error);
+      Alert.alert('Erreur', 'Impossible de valider l\'image');
+      return false;
+    }
+  };
+
   const pickImage = async () => {
-    if (productData.images.length >= 5) {
-      Alert.alert('Maximum atteint', 'Vous ne pouvez pas ajouter plus de 5 photos.');
+    if (productData.images.length >= MAX_IMAGES) {
+      Alert.alert('Maximum atteint', `Vous ne pouvez pas ajouter plus de ${MAX_IMAGES} photos.`);
       return;
     }
 
-    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    
-    if (status !== 'granted') {
-      Alert.alert('Permission refusée', 'Nous avons besoin de la permission pour accéder à votre galerie.');
-      return;
-    }
+    try {
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      
+      if (status !== 'granted') {
+        Alert.alert('Permission refusée', 'Nous avons besoin de la permission pour accéder à votre galerie.');
+        return;
+      }
 
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: 'images',
-      allowsEditing: true,
-      aspect: [4, 3],
-      quality: 0.5,
-      exif: false
-    });
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [4, 3],
+        quality: 0.8,
+        base64: true
+      });
 
-    if (!result.canceled && result.assets && result.assets.length > 0) {
-      setProductData(prev => ({
-        ...prev,
-        images: [...prev.images, result.assets[0]]
-      }));
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        const asset = result.assets[0];
+        const isValid = await validateImage(asset.uri);
+        if (isValid) {
+          setProductData(prev => ({
+            ...prev,
+            images: [...prev.images, {
+              uri: asset.uri,
+              type: 'image/jpeg',
+              name: asset.uri.split('/').pop() || 'photo.jpg'
+            }]
+          }));
+        }
+      }
+    } catch (error) {
+      console.error('Erreur lors de la sélection de l\'image:', error);
+      Alert.alert('Erreur', 'Impossible de sélectionner l\'image');
     }
   };
 
@@ -193,7 +299,7 @@ export default function AjouterProduitScreen({ navigation }: any) {
     setProductData(prev => ({ ...prev, images: newImages }));
   };
 
-  const validateStep = (): boolean => {
+  const validateStep = useCallback((): boolean => {
     const newErrors: Record<string, string> = {};
     
     switch (currentStep) {
@@ -202,52 +308,58 @@ export default function AjouterProduitScreen({ navigation }: any) {
           newErrors.images = 'Veuillez ajouter au moins une photo.';
         }
         break;
+        
       case Step.LOCATION:
-        if (!productData.location) {
+        if (!productData.location?.trim()) {
           newErrors.location = 'Veuillez indiquer la localisation du produit.';
         }
-        if (!productData.telephone) {
+        if (!productData.telephone?.trim()) {
           newErrors.telephone = 'Veuillez saisir votre numéro de téléphone.';
+        } else if (!/^[0-9]{10}$/.test(productData.telephone.trim())) {
+          newErrors.telephone = 'Numéro de téléphone invalide (10 chiffres)';
         }
         if (!termsAccepted) {
           newErrors.terms = 'Veuillez accepter les conditions générales.';
         }
         break;
+        
       case Step.CHARACTERISTICS:
-        if (!productData.size) {
+        if (!productData.size?.trim()) {
           newErrors.size = 'Veuillez sélectionner une taille.';
         }
-        if (!productData.color) {
+        if (!productData.color?.trim()) {
           newErrors.color = 'Veuillez sélectionner une couleur.';
         }
-        if (!productData.condition) {
+        if (!productData.condition?.trim()) {
           newErrors.condition = 'Veuillez sélectionner l\'état du produit.';
         }
         break;
+        
       case Step.DETAILS:
-        if (!productData.title) {
+        if (!productData.title?.trim()) {
           newErrors.title = 'Veuillez saisir un titre.';
+        } else if (productData.title.length < 3) {
+          newErrors.title = 'Le titre doit contenir au moins 3 caractères.';
         }
         if (!productData.category_id) {
           newErrors.category = 'Veuillez sélectionner une catégorie.';
         }
-        if (!productData.warranty) {
-          newErrors.warranty = 'Veuillez sélectionner une garantie.';
-        }
-        if (!productData.price) {
+        if (!productData.price?.trim()) {
           newErrors.price = 'Veuillez indiquer un prix.';
         } else if (isNaN(Number(productData.price)) || Number(productData.price) <= 0) {
           newErrors.price = 'Veuillez saisir un prix valide.';
         }
-        if (!productData.description) {
+        if (!productData.description?.trim()) {
           newErrors.description = 'Veuillez ajouter une description.';
+        } else if (productData.description.length < 20) {
+          newErrors.description = 'La description doit contenir au moins 20 caractères.';
         }
         break;
     }
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
-  };
+  }, [currentStep, productData, termsAccepted]);
 
   const handleNext = () => {
     if (validateStep()) {
@@ -268,8 +380,11 @@ export default function AjouterProduitScreen({ navigation }: any) {
   };
 
   const submitProduct = async () => {
-    if (!validateStep()) return;
-    
+    if (!validateStep()) {
+      Alert.alert('Erreur', 'Veuillez corriger les erreurs avant de continuer.');
+      return;
+    }
+
     setIsLoading(true);
     
     try {
@@ -277,199 +392,90 @@ export default function AjouterProduitScreen({ navigation }: any) {
       
       if (!token) {
         Alert.alert('Erreur', 'Vous devez être connecté pour publier une annonce.');
-        navigation.navigate('Login');
-        setIsLoading(false);
+        navigation.navigate('Auth');
         return;
       }
-      
-      // Préparer les données de localisation
-      const [city, zipCode] = (productData.location || '').split(',').map(part => part.trim());
-      
-      // Vérifier si un code postal existe
-      const postalCode = zipCode || ''; 
-      const zipCodePattern = /\d{5}/; // Format français: 5 chiffres
-      const extractedZipCode = postalCode.match(zipCodePattern)?.[0] || '75000'; // Code postal par défaut de Paris
-      
-      // Préparer les images pour l'upload
+
       const formData = new FormData();
       
-      // Ajouter les données essentielles du produit
+      // Ajout des données du produit
       formData.append('title', productData.title);
       formData.append('description', productData.description);
       formData.append('price', productData.price);
       formData.append('condition', productData.condition);
-      formData.append('user_id', String(productData.user_id || ''));
-      formData.append('status', 'PUBLISHED'); // S'assurer que le statut est défini
-      
-      // Ajouter les données de catégorie
-      formData.append('category_id', String(productData.category_id || ''));
-      formData.append('categoryId', String(productData.category_id || ''));
-      
-      if (productData.subcategory_id) {
-        formData.append('subcategory_id', String(productData.subcategory_id));
-        formData.append('subcategoryId', String(productData.subcategory_id));
-      }
-      
-      // Ajouter les données de localisation (dans tous les formats possibles)
-      formData.append('location', productData.location);
+      formData.append('categoryId', productData.category_id?.toString() || '');
+      formData.append('latitude', '48.8566');
+      formData.append('longitude', '2.3522');
       formData.append('address', productData.location);
-      formData.append('city', city || '');
-      
-      // Envoyer le code postal dans le format attendu par le backend
-      formData.append('zipCode', extractedZipCode);
-      
-      // Ajouter les coordonnées par défaut
-      formData.append('latitude', '0');
-      formData.append('longitude', '0');
-      
-      // Ajouter les autres informations du produit
-      formData.append('size', productData.size);
-      formData.append('color', productData.color);
-      formData.append('warranty', productData.warranty);
+      formData.append('city', productData.location.split(',')[0] || 'Paris');
+      formData.append('zipCode', productData.location.split(',')[1]?.trim() || '75000');
       formData.append('phone', productData.telephone);
-      formData.append('hide_phone', String(productData.hide_phone));
-      formData.append('view_count', '0');
-      
-      // Vérifier si les images ne sont pas trop nombreuses
-      if (productData.images.length > 5) {
-        Alert.alert('Erreur', 'Vous ne pouvez pas ajouter plus de 5 images.');
-        setIsLoading(false);
-        return;
-      }
-      
-      // Ajouter toutes les images (max 5)
-      for (let i = 0; i < productData.images.length; i++) {
-        const image = productData.images[i];
-        const uri = image.uri;
-        const name = uri.split('/').pop() || `image_${i}.jpg`;
-        
-        // Détecter le type de l'image à partir de l'extension
-        let type = 'image/jpeg'; // Type par défaut
-        if (name.toLowerCase().endsWith('.png')) {
-          type = 'image/png';
-        } else if (name.toLowerCase().endsWith('.gif')) {
-          type = 'image/gif';
-        } else if (name.toLowerCase().endsWith('.webp')) {
-          type = 'image/webp';
+
+      // Ajout des images
+      if (productData.images && productData.images.length > 0) {
+        for (let i = 0; i < productData.images.length; i++) {
+          const image = productData.images[i];
+          const uri = Platform.OS === 'ios' ? image.uri.replace('file://', '') : image.uri;
+          
+          formData.append('images[]', {
+            uri: uri,
+            type: 'image/jpeg',
+            name: 'photo.jpg'
+          } as any);
         }
-        
-        console.log(`Envoi de l'image ${i}:`, { uri, name, type });
-        
-        // Ajouter l'image au formData
-        formData.append('images[]', {
-          uri,
-          name,
-          type,
-        } as any);
       }
 
-      try {
-        console.log('Envoi des données au serveur');
-        
-        const response = await axios.post(`${API_URL}/api/products`, formData, {
-          headers: {
-            'Content-Type': 'multipart/form-data',
-            'Authorization': `Bearer ${token}`
-          }
-        });
-  
-        if (response.data && response.data.id) {
-          // Afficher la page de confirmation au lieu d'une alerte
-          setPublishedProductId(response.data.id);
-          setShowSuccessPage(true);
-          setIsLoading(false);
+      console.log('Envoi des données:', JSON.stringify({
+        title: productData.title,
+        description: productData.description,
+        price: productData.price,
+        condition: productData.condition,
+        categoryId: productData.category_id,
+        images: productData.images.length
+      }));
+
+      const response = await axios.post(`${API_URL}/api/products`, formData, {
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'multipart/form-data',
+          'Authorization': `Bearer ${token}`
         }
-      } catch (error: any) {
-        // Si l'erreur est 413 (Payload too large)
-        if (error.response && error.response.status === 413) {
-          Alert.alert(
-            'Erreur de taille de données',
-            'Les images sont trop volumineuses. Veuillez réduire leur taille ou en sélectionner moins.',
-            [{ text: 'OK' }]
-          );
-        } else if (error.response && error.response.status === 422) {
-          // Erreur de validation
-          console.log('Erreur de validation:', error.response.data);
-          let validationErrors = 'Erreur de validation:';
-          
-          if (error.response.data.errors) {
-            Object.entries(error.response.data.errors).forEach(([field, messages]: [string, any]) => {
-              validationErrors += `\n- ${field}: ${messages[0]}`;
-            });
-          }
-          
-          Alert.alert('Erreur de validation', validationErrors);
-        } else if (error.response && error.response.status === 500) {
-          // Erreur serveur
-          console.error('Erreur serveur:', error.response.data);
-          
-          // Vérifier si c'est une erreur de base de données liée aux colonnes
-          const errorMessage = error.response.data && error.response.data.message || '';
-          const isColumnError = errorMessage.includes('no column named');
-          
-          if (isColumnError) {
-            // Extraire le nom de colonne manquante pour affichage
-            const columnMatch = errorMessage.match(/no column named ([^\s]+)/);
-            const columnName = columnMatch ? columnMatch[1] : 'unknown';
-            
-            // Ajouter le champ manquant directement si possible
-            try {
-              if (columnName && columnName !== 'unknown') {
-                // Utiliser le code postal extrait comme valeur par défaut pour tout champ manquant lié au code postal
-                if (columnName.toLowerCase().includes('zip') || columnName.toLowerCase().includes('code')) {
-                  formData.append(columnName, extractedZipCode);
-                  
-                  // Réessayer immédiatement avec le champ ajouté
-                  const retryResponse = await axios.post(`${API_URL}/api/products`, formData, {
-                    headers: {
-                      'Content-Type': 'multipart/form-data',
-                      'Authorization': `Bearer ${token}`
-                    }
-                  });
-                  
-                  if (retryResponse.data && retryResponse.data.id) {
-                    Alert.alert(
-                      'Succès',
-                      'Votre annonce a été publiée avec succès !',
-                      [{ text: 'OK', onPress: () => navigation.navigate('Home') }]
-                    );
-                    return;
-                  }
-                }
-              }
-            } catch (retryError) {
-              console.error('Échec de la seconde tentative:', retryError);
-            }
-            
-            Alert.alert(
-              'Erreur technique',
-              `Problème de structure de données : colonne "${columnName}" manquante. L'équipe technique a été notifiée.`,
-              [{ text: 'OK' }]
-            );
-          } else {
-            Alert.alert(
-              'Erreur serveur',
-              'Une erreur est survenue sur le serveur. Veuillez réessayer plus tard.',
-              [{ text: 'OK' }]
-            );
-          }
-        } else {
-          throw error; // Relancer l'erreur pour être gérée par le catch extérieur
-        }
+      });
+
+      console.log('Réponse du serveur:', response.data);
+
+      if (response.data && (response.data.id || (response.data.data && response.data.data.id))) {
+        const productId = response.data.id || response.data.data.id;
+        setPublishedProductId(productId);
+        setShowSuccessPage(true);
+      } else {
+        throw new Error('Réponse invalide du serveur');
       }
+
     } catch (error: any) {
-      console.error('Erreur lors de la publication de l\'annonce:', error);
+      console.error('Erreur complète:', error);
       
-      let errorMessage = 'Une erreur est survenue lors de la publication de l\'annonce.';
-      if (error.response && error.response.data && error.response.data.message) {
-        errorMessage = error.response.data.message;
+      let message = 'Une erreur est survenue lors de la publication.';
+      
+      if (error.response) {
+        console.error('Erreur de réponse:', error.response.data);
+        const errors = error.response.data.errors;
+        if (errors) {
+          message = Object.values(errors).flat().join('\n');
+        } else {
+          message = error.response.data.message || error.response.data.error || message;
+        }
+      } else if (error.request) {
+        console.error('Erreur de requête:', error.request);
+        message = 'Impossible de contacter le serveur';
+      } else {
+        console.error('Erreur:', error.message);
+        message = error.message;
       }
       
-      Alert.alert('Erreur', errorMessage);
+      Alert.alert('Erreur', message);
     } finally {
-      if (!showSuccessPage) {
-        setIsLoading(false);
-      }
+      setIsLoading(false);
     }
   };
 
@@ -690,39 +696,6 @@ export default function AjouterProduitScreen({ navigation }: any) {
         <Entypo name="chevron-down" size={24} color="black" style={styles.dropdownIcon} />
       </TouchableOpacity>
       {errors.category && <Text style={styles.errorText}>{errors.category}</Text>}
-      
-      <Text style={styles.inputLabel}>À quelle sous-catégorie appartient-elle ?</Text>
-      <TouchableOpacity 
-        style={styles.dropdown}
-        onPress={() => productData.category_id && showSelectionModal('subcategory')}
-        disabled={!productData.category_id}
-      >
-        <TextInput
-          style={[styles.input, !productData.category_id && styles.disabledInput]}
-          placeholder={productData.category_id ? "Choisissez dans la liste" : "Sélectionnez d'abord une catégorie"}
-          value={productData.subcategory_id ? 
-            categories?.find(c => c.id === productData.category_id)?.subcategories?.find(
-              sc => sc.id === productData.subcategory_id
-            )?.name || '' : 
-            ''}
-          editable={false}
-        />
-        <Entypo name="chevron-down" size={24} color={productData.category_id ? "black" : "#aaa"} style={styles.dropdownIcon} />
-      </TouchableOpacity>
-      
-      <Text style={styles.inputLabel}>Garantie</Text>
-      <TouchableOpacity 
-        style={styles.dropdown}
-        onPress={() => showSelectionModal('warranty')}
-      >
-        <TextInput
-          style={styles.input}
-          placeholder="Sélectionnez la garantie"
-          value={productData.warranty}
-          editable={false}
-        />
-        <Entypo name="chevron-down" size={24} color="black" style={styles.dropdownIcon} />
-      </TouchableOpacity>
       
       <Text style={styles.inputLabel}>Prix (€)</Text>
       <TextInput
@@ -1027,12 +1000,13 @@ const styles = StyleSheet.create({
     padding: 8,
   },
   closeButton: {
-    padding: 8,
+    padding: 10,
+    marginLeft: 10,
   },
   headerTitle: {
     fontSize: 18,
-    fontWeight: 'bold',
-    color: '#333',
+    fontWeight: '600',
+    color: '#000',
   },
   stepContainer: {
     padding: 16,

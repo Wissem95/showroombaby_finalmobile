@@ -66,58 +66,23 @@ class AuthService {
     }
   }
 
-  async login(credentials: LoginCredentials) {
+  async login(credentials: LoginCredentials): Promise<any> {
     try {
-      // Ajouter le device_name si non spécifié
-      const loginData = {
-        ...credentials,
-        device_name: credentials.device_name || 'mobile'
-      };
+      const response = await axios.post(`${API_URL}/auth/login`, {
+        email: credentials.email,
+        password: credentials.password
+      });
 
-      console.log('Tentative de connexion avec:', loginData);
-      
-      const response = await axios.post(`${API_URL}/auth/login`, loginData);
-      
-      // Vérifier si la réponse contient un token (access_token ou token)
-      if (!response.data.access_token && !response.data.token) {
-        console.error('Pas de token dans la réponse:', response.data);
-        throw new Error('Aucun token reçu du serveur');
-      }
-      
-      this.token = response.data.access_token || response.data.token;
-      await AsyncStorage.setItem('token', this.token || '');
-      
-      // Si les informations utilisateur sont déjà dans la réponse, les utiliser directement
-      if (response.data.user) {
+      if (response.data.access_token) {
+        await AsyncStorage.setItem('token', response.data.access_token);
+        await AsyncStorage.setItem('userId', response.data.user.id.toString());
         this.user = response.data.user;
-        return this.user;
+        return response.data;
       }
-      
-      // Sinon récupérer les informations de l'utilisateur
-      try {
-        const userResponse = await axios.get(`${API_URL}/users/profile`, {
-          headers: { Authorization: `Bearer ${this.token}` }
-        });
-        this.user = userResponse.data;
-        return this.user;
-      } catch (profileError) {
-        console.error('Erreur lors de la récupération du profil:', profileError);
-        throw new Error('Erreur lors de la récupération du profil utilisateur');
-      }
+      throw new Error('Token non reçu');
     } catch (error: any) {
       console.error('Erreur de connexion:', error);
-      
-      // Message d'erreur plus détaillé
-      let errorMsg = 'Erreur de connexion';
-      if (error.response) {
-        if (error.response.status === 401) {
-          errorMsg = 'Email ou mot de passe incorrect';
-        } else if (error.response.data && error.response.data.message) {
-          errorMsg = error.response.data.message;
-        }
-      }
-      
-      throw new Error(errorMsg);
+      throw new Error('Email ou mot de passe incorrect');
     }
   }
 
@@ -182,7 +147,22 @@ class AuthService {
   }
 
   isAuthenticated(): boolean {
-    return !!this.token && !!this.user;
+    return !!this.token;
+  }
+
+  async setToken(token: string) {
+    this.token = token;
+    await AsyncStorage.setItem('token', token);
+    try {
+      const response = await axios.get(`${API_URL}/users/profile`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      this.user = response.data;
+      return this.user;
+    } catch (error) {
+      console.error('Erreur lors de la récupération du profil:', error);
+      throw new Error('Erreur lors de la récupération du profil utilisateur');
+    }
   }
 }
 

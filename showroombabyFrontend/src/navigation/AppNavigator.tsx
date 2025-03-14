@@ -3,7 +3,7 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { useEffect, useState } from 'react';
 import { Ionicons } from '@expo/vector-icons';
-import { NavigationProp, ParamListBase } from '@react-navigation/native';
+import { NavigationProp, ParamListBase, CommonActions } from '@react-navigation/native';
 import AuthService from '../services/auth';
 import LoginScreen from '../screens/LoginScreen';
 import RegisterScreen from '../screens/RegisterScreen';
@@ -14,9 +14,17 @@ import { Button } from 'react-native-paper';
 import { View, Text, TouchableOpacity, StyleSheet, SafeAreaView, Alert } from 'react-native';
 import FavoritesScreen from '../screens/FavoritesScreen';
 import AjouterProduitScreen from '../screens/AjouterProduitScreen';
+import ChatScreen from '../screens/ChatScreen';
+import MessagesScreen from '../screens/MessagesScreen';
+import axios from 'axios';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+
+const API_URL = 'http://127.0.0.1:8000';
 
 // Définir les types pour les navigateurs
 const Stack = createNativeStackNavigator();
+const Tab = createBottomTabNavigator();
 
 // Interface pour les composants de navigation
 interface NavigationProps {
@@ -43,16 +51,6 @@ function FavorisScreen() {
   );
 }
 
-// Écran temporaire pour Messages
-function MessagesScreen() {
-  return (
-    <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-      <Text style={{ fontSize: 20, marginBottom: 20 }}>Messages</Text>
-      <Text style={{ marginBottom: 20 }}>Vos conversations</Text>
-    </View>
-  );
-}
-
 // Composant de navigation pour les écrans d'authentification
 function AuthNavigator() {
   return (
@@ -73,6 +71,30 @@ interface CustomBottomBarProps {
 function CustomBottomBar({ navigation, activeRoute }: CustomBottomBarProps) {
   const isAuthenticated = AuthService.isAuthenticated();
   const user = AuthService.getUser();
+  const [unreadCount, setUnreadCount] = useState(0);
+  
+  useEffect(() => {
+    if (isAuthenticated) {
+      loadUnreadMessages();
+      const interval = setInterval(loadUnreadMessages, 30000);
+      return () => clearInterval(interval);
+    }
+  }, [isAuthenticated]);
+
+  const loadUnreadMessages = async () => {
+    try {
+      const token = await AsyncStorage.getItem('token');
+      if (!token) return;
+      
+      const response = await axios.get(`${API_URL}/api/messages/unread/count`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      
+      setUnreadCount(response.data.count);
+    } catch (error) {
+      console.error('Erreur chargement messages non lus:', error);
+    }
+  };
   
   const handleNavigate = (screen: string) => {
     // Si l'utilisateur n'est pas connecté et essaie d'accéder à une fonctionnalité protégée
@@ -87,7 +109,12 @@ function CustomBottomBar({ navigation, activeRoute }: CustomBottomBarProps) {
         [{ text: 'OK' }]
       );
     } else {
-      navigation.navigate(screen);
+      navigation.dispatch(
+        CommonActions.reset({
+          index: 0,
+          routes: [{ name: screen }],
+        })
+      );
     }
   };
   
@@ -119,11 +146,18 @@ function CustomBottomBar({ navigation, activeRoute }: CustomBottomBarProps) {
       <TouchableOpacity 
         style={styles.iconItem}
         onPress={() => handleNavigate('Messages')}>
-        <Ionicons 
-          name={activeRoute === 'Messages' ? 'chatbubble-ellipses' : 'chatbubble-ellipses-outline'} 
-          size={24} 
-          color={activeRoute === 'Messages' ? '#ff6b9b' : '#888'} 
-        />
+        <View>
+          <Ionicons 
+            name={activeRoute === 'Messages' ? 'chatbubble-ellipses' : 'chatbubble-ellipses-outline'} 
+            size={24} 
+            color={activeRoute === 'Messages' ? '#ff6b9b' : '#888'} 
+          />
+          {unreadCount > 0 && (
+            <View style={styles.badge}>
+              <Text style={styles.badgeText}>{unreadCount}</Text>
+            </View>
+          )}
+        </View>
       </TouchableOpacity>
       <TouchableOpacity 
         style={styles.iconItem}
@@ -189,7 +223,9 @@ function CustomAjouterProduitScreen({ navigation }: { navigation: any }) {
 function CustomMessagesScreen({ navigation }: { navigation: any }) {
   return (
     <SafeAreaView style={{ flex: 1 }}>
-      <MessagesScreen />
+      <View style={{ flex: 1 }}>
+        <MessagesScreen navigation={navigation} />
+      </View>
       <CustomBottomBar navigation={navigation} activeRoute="Messages" />
     </SafeAreaView>
   );
@@ -219,10 +255,20 @@ export default function AppNavigator() {
     <NavigationContainer>
       <Stack.Navigator 
         initialRouteName="Home"
-        screenOptions={{ 
+        screenOptions={({ navigation }) => ({ 
           headerShown: false,
-          contentStyle: { backgroundColor: '#ffffff' }
-        }}
+          contentStyle: { backgroundColor: '#ffffff' },
+          presentation: 'card',
+          animation: 'fade',
+          headerLeft: () => (
+            <TouchableOpacity 
+              onPress={() => navigation.goBack()}
+              style={{ marginLeft: 10 }}
+            >
+              <Ionicons name="close" size={28} color="#333" />
+            </TouchableOpacity>
+          ),
+        })}
       >
         <Stack.Screen name="Home">
           {(props) => (
@@ -236,31 +282,35 @@ export default function AppNavigator() {
         <Stack.Screen name="Favoris">
           {(props) => (
             <SafeAreaView style={{ flex: 1 }}>
-              <View style={{ flex: 1 }}>
-                <FavoritesScreen {...props} />
-              </View>
+              <FavoritesScreen {...props} />
               <CustomBottomBar navigation={props.navigation} activeRoute="Favoris" />
             </SafeAreaView>
           )}
         </Stack.Screen>
         
-        <Stack.Screen name="AjouterProduit">
-          {(props) => (
-            <SafeAreaView style={{ flex: 1 }}>
-              <View style={{ flex: 1 }}>
-                <CustomAjouterProduitScreen {...props} />
-              </View>
-              <CustomBottomBar navigation={props.navigation} activeRoute="AjouterProduit" />
-            </SafeAreaView>
-          )}
-        </Stack.Screen>
+        <Stack.Screen 
+          name="AjouterProduit"
+          component={AjouterProduitScreen}
+          options={({ navigation }) => ({ 
+            headerShown: true,
+            headerTitle: "Ajouter un produit",
+            presentation: 'modal',
+            animation: 'slide_from_bottom',
+            headerLeft: () => (
+              <TouchableOpacity 
+                onPress={() => navigation.goBack()}
+                style={{ marginLeft: 10 }}
+              >
+                <Ionicons name="close" size={24} color="#000" />
+              </TouchableOpacity>
+            ),
+          })}
+        />
         
         <Stack.Screen name="Messages">
           {(props) => (
             <SafeAreaView style={{ flex: 1 }}>
-              <View style={{ flex: 1 }}>
-                <MessagesScreen />
-              </View>
+              <MessagesScreen {...props} />
               <CustomBottomBar navigation={props.navigation} activeRoute="Messages" />
             </SafeAreaView>
           )}
@@ -269,20 +319,38 @@ export default function AppNavigator() {
         <Stack.Screen name="Profile">
           {(props) => (
             <SafeAreaView style={{ flex: 1 }}>
-              <View style={{ flex: 1 }}>
-                <ProfileScreen {...props} />
-              </View>
+              <ProfileScreen {...props} />
               <CustomBottomBar navigation={props.navigation} activeRoute="Profile" />
             </SafeAreaView>
           )}
         </Stack.Screen>
-        
-        <Stack.Screen name="Auth" component={AuthNavigator} />
+
+        <Stack.Screen 
+          name="Auth" 
+          component={AuthNavigator}
+          options={{ presentation: 'modal' }}
+        />
         
         <Stack.Screen 
           name="ProductDetails" 
           component={ProductDetailsScreen}
-          options={{ headerShown: true, title: 'Détails du produit' }}
+          options={{ 
+            headerShown: true,
+            headerTitle: "",
+            presentation: 'modal',
+            animation: 'slide_from_bottom',
+          }}
+        />
+        
+        <Stack.Screen 
+          name="Chat" 
+          component={ChatScreen}
+          options={{ 
+            headerShown: true,
+            headerTitle: "",
+            presentation: 'modal',
+            animation: 'slide_from_bottom',
+          }}
         />
       </Stack.Navigator>
     </NavigationContainer>
@@ -332,5 +400,21 @@ const styles = StyleSheet.create({
     position: 'absolute',
     right: 5,
     bottom: 5,
+  },
+  badge: {
+    position: 'absolute',
+    right: -6,
+    top: -6,
+    backgroundColor: '#ff6b9b',
+    borderRadius: 10,
+    minWidth: 20,
+    height: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  badgeText: {
+    color: '#ffffff',
+    fontSize: 12,
+    fontWeight: 'bold',
   },
 }); 

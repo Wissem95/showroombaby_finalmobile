@@ -15,6 +15,7 @@ import { Ionicons, MaterialIcons } from '@expo/vector-icons';
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { StatusBar } from 'expo-status-bar';
+import { widthPercentageToDP as wp, heightPercentageToDP as hp } from 'react-native-responsive-screen';
 
 // URL de l'API
 const API_URL = 'http://127.0.0.1:8000';
@@ -283,7 +284,7 @@ export default function FavoritesScreen({ navigation }: any) {
       <StatusBar style="dark" />
       
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Mes favoris</Text>
+        <Text style={styles.title}>Mes favoris</Text>
         <Searchbar
           placeholder="Rechercher dans vos favoris"
           onChangeText={handleSearch}
@@ -343,23 +344,23 @@ const token = AsyncStorage.getItem('token');
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8f8f8',
+    backgroundColor: '#ffffff',
   },
   header: {
-    padding: 16,
-    backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee',
+    paddingHorizontal: wp('4%'),
+    paddingTop: hp('2%'),
+    paddingBottom: hp('1%'),
   },
-  headerTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    marginBottom: 12,
+  title: {
+    fontSize: wp('6%'),
+    fontWeight: '600',
+    marginBottom: hp('2%'),
   },
   searchBar: {
+    marginBottom: hp('2%'),
+    borderRadius: 30,
     elevation: 0,
-    backgroundColor: '#f2f2f2',
-    borderRadius: 8,
+    backgroundColor: '#f5f5f5',
   },
   searchInput: {
     fontSize: 16,
@@ -368,12 +369,12 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 20,
+    backgroundColor: '#ffffff',
   },
   loadingText: {
-    marginTop: 12,
-    fontSize: 16,
+    marginTop: hp('2%'),
     color: '#666',
+    fontSize: wp('4%'),
   },
   errorText: {
     marginTop: 12,
@@ -393,13 +394,14 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 20,
+    backgroundColor: '#ffffff',
+    padding: wp('4%'),
   },
   emptyText: {
-    marginTop: 16,
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#444',
+    fontSize: wp('4%'),
+    color: '#666',
+    textAlign: 'center',
+    marginBottom: hp('2%'),
   },
   emptySubtext: {
     marginTop: 8,
@@ -417,45 +419,51 @@ const styles = StyleSheet.create({
     paddingBottom: 80,
   },
   productCard: {
-    marginBottom: 16,
+    marginHorizontal: wp('4%'),
+    marginBottom: hp('2%'),
+    borderRadius: 12,
+    overflow: 'hidden',
+    backgroundColor: '#ffffff',
+    elevation: 2,
   },
   productImage: {
-    height: 200,
-    borderTopLeftRadius: 8,
-    borderTopRightRadius: 8,
+    height: wp('50%'),
+    borderTopLeftRadius: 12,
+    borderTopRightRadius: 12,
   },
   cardContent: {
-    paddingHorizontal: 12,
-    paddingVertical: 12,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+    padding: wp('3%'),
   },
   productInfo: {
     flex: 1,
-    marginRight: 8,
   },
   productTitle: {
-    fontSize: 16,
+    fontSize: wp('4%'),
     fontWeight: '500',
-    marginBottom: 4,
+    marginBottom: hp('0.5%'),
   },
   productPrice: {
-    fontSize: 18,
+    fontSize: wp('4.5%'),
     fontWeight: 'bold',
-    color: '#e75480',
-    marginBottom: 6,
+    color: '#ff6b9b',
+    marginBottom: hp('0.5%'),
   },
   productLocation: {
-    fontSize: 14,
+    fontSize: wp('3.5%'),
     color: '#666',
-    marginBottom: 4,
+    marginBottom: hp('0.5%'),
   },
   productDate: {
-    fontSize: 12,
+    fontSize: wp('3%'),
     color: '#999',
   },
   removeButton: {
-    padding: 8,
+    position: 'absolute',
+    top: wp('2%'),
+    right: wp('2%'),
+    backgroundColor: 'rgba(255,255,255,0.9)',
+    borderRadius: wp('6%'),
+    padding: wp('2%'),
   },
   noResultsContainer: {
     padding: 20,
