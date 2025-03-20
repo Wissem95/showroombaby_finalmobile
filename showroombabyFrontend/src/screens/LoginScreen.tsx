@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
-import { StyleSheet, View, ImageBackground, KeyboardAvoidingView, Platform, TouchableOpacity, Animated } from 'react-native';
+import { StyleSheet, View, ImageBackground, KeyboardAvoidingView, Platform, TouchableOpacity, Animated, Alert } from 'react-native';
 import { TextInput, Button, Text, IconButton } from 'react-native-paper';
 import { widthPercentageToDP as wp, heightPercentageToDP as hp } from 'react-native-responsive-screen';
 import { BlurView } from 'expo-blur';
 import AuthService from '../services/auth';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { CommonActions } from '@react-navigation/native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 type Props = NativeStackScreenProps<any, 'Login'>;
 
@@ -28,12 +29,36 @@ export default function LoginScreen({ navigation }: Props) {
       
       setDebugInfo('Connexion réussie! User: ' + JSON.stringify(response));
       
-      // Rediriger vers la page d'accueil
-      navigation.dispatch(
-        CommonActions.reset({
-          index: 0,
-          routes: [{ name: 'Home' }],
-        })
+      // Vérifier s'il y a une redirection à faire après connexion
+      const redirectScreen = await AsyncStorage.getItem('redirectAfterLogin');
+      await AsyncStorage.removeItem('redirectAfterLogin'); // Nettoyer après utilisation
+      
+      // Afficher un message de confirmation
+      Alert.alert(
+        'Connexion réussie',
+        'Bienvenue sur Showroombaby!',
+        [
+          {
+            text: 'OK',
+            onPress: () => {
+              // Rediriger vers l'écran sauvegardé ou vers l'accueil par défaut
+              if (redirectScreen) {
+                navigation.dispatch(
+                  CommonActions.navigate({
+                    name: redirectScreen
+                  })
+                );
+              } else {
+                navigation.dispatch(
+                  CommonActions.reset({
+                    index: 0,
+                    routes: [{ name: 'Home' }],
+                  })
+                );
+              }
+            }
+          }
+        ]
       );
     } catch (err: any) {
       setError(err.message || 'Erreur de connexion');
@@ -48,7 +73,16 @@ export default function LoginScreen({ navigation }: Props) {
   };
 
   const handleClose = () => {
-    navigation.goBack();
+    if (navigation.canGoBack()) {
+      navigation.goBack();
+    } else {
+      navigation.dispatch(
+        CommonActions.reset({
+          index: 0,
+          routes: [{ name: 'Home' }],
+        })
+      );
+    }
   };
 
   return (
@@ -111,15 +145,41 @@ export default function LoginScreen({ navigation }: Props) {
 
           <Text style={styles.forgotPassword}>Mot de passe oublié ?</Text>
 
-          <Button
-            mode="contained"
-            onPress={handleLogin}
-            style={styles.button}
-            contentStyle={styles.buttonContent}
-            loading={loading}
-          >
-            Se connecter
-          </Button>
+          <View style={styles.formContainer}>
+            <Button
+              mode="contained"
+              onPress={handleLogin}
+              style={styles.button}
+              loading={loading}
+              disabled={loading}
+            >
+              Se connecter
+            </Button>
+
+            <Button
+              mode="outlined"
+              onPress={handleRegisterPress}
+              style={[styles.button, styles.registerButton]}
+              disabled={loading}
+            >
+              S'inscrire
+            </Button>
+
+            <Button
+              mode="text"
+              onPress={() => {
+                navigation.dispatch(
+                  CommonActions.reset({
+                    index: 0,
+                    routes: [{ name: 'Home' }],
+                  })
+                );
+              }}
+              style={styles.homeButton}
+            >
+              Retour à l'accueil
+            </Button>
+          </View>
 
           <Text style={styles.orText}>ou</Text>
 
@@ -280,5 +340,16 @@ const styles = StyleSheet.create({
     left: wp('2%'),
     zIndex: 1,
     backgroundColor: 'rgba(255, 255, 255, 0.8)',
+  },
+  formContainer: {
+    marginBottom: hp('2%'),
+  },
+  registerButton: {
+    backgroundColor: 'white',
+    borderColor: '#ff6b9b',
+    borderWidth: 2,
+  },
+  homeButton: {
+    marginTop: 8,
   },
 }); 

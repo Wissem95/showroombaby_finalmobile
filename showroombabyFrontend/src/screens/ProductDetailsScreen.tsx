@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { StyleSheet, View, ScrollView, Image, Share, ActivityIndicator, Alert } from 'react-native';
+import React, { useState, useEffect, useRef } from 'react';
+import { StyleSheet, View, ScrollView, Image, Share, ActivityIndicator, Alert, Dimensions, TouchableOpacity } from 'react-native';
 import { Button, Text, Card, Chip, Divider, IconButton, Dialog, Portal } from 'react-native-paper';
 import { Ionicons } from '@expo/vector-icons';
 import AuthService from '../services/auth';
@@ -7,12 +7,21 @@ import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useNavigation } from '@react-navigation/native';
 import { widthPercentageToDP as wp, heightPercentageToDP as hp } from 'react-native-responsive-screen';
+import MapView, { Marker } from 'react-native-maps';
+import Geolocation from '@react-native-community/geolocation';
+import Carousel from 'react-native-reanimated-carousel';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 // URL de l'API
 const API_URL = 'http://127.0.0.1:8000';
 
 // Importer l'image placeholder directement
 const placeholderImage = require('../../assets/placeholder.png');
+
+// Constantes pour l'API HERE
+const HERE_API_KEY = 'mJTj_ivJS2vjA9GLOtq6AtOFK91e8CoNoBpvK1mEQ7c';
+
+const { width: screenWidth } = Dimensions.get('window');
 
 // Interface du produit (similaire à celle de ExploreScreen)
 interface Product {
@@ -23,6 +32,7 @@ interface Product {
   condition: string;
   status: string;
   category_id: number;
+  subcategory_id?: number;
   city?: string;
   location?: string;
   view_count: number;
@@ -32,6 +42,19 @@ interface Product {
   is_trending?: boolean | number;
   is_featured?: boolean | number;
   user_id: number;
+  size?: string;
+  color?: string;
+  warranty?: string;
+  phone?: string;
+  hide_phone?: boolean;
+  zip_code?: string;
+  latitude?: number;
+  longitude?: number;
+  brand?: string;
+  model?: string;
+  material?: string;
+  dimensions?: string;
+  weight?: string;
 }
 
 // Interface pour l'utilisateur vendeur
@@ -44,6 +67,373 @@ interface Seller {
   rating?: number;
 }
 
+interface Category {
+  id: number;
+  name: string;
+  subcategories?: { id: number; name: string }[];
+}
+
+interface ImageType {
+  path?: string;
+  url?: string;
+}
+
+// Styles pour le carrousel d'images
+const carouselStyles = StyleSheet.create({
+  container: {
+    width: '100%',
+    height: '100%',
+    backgroundColor: 'black',
+    position: 'relative',
+    overflow: 'hidden',
+  },
+  item: {
+    width: '100%',
+    height: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'transparent',
+    overflow: 'hidden',
+  },
+  image: {
+    width: '100%',
+    height: '100%',
+    resizeMode: 'cover',
+  },
+  overlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.2)',
+  },
+  headerBar: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 60,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 15,
+    backgroundColor: 'rgba(0,0,0,0.3)',
+    zIndex: 10,
+  },
+  pagination: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    position: 'absolute',
+    bottom: 100,
+    width: '100%',
+    zIndex: 5,
+  },
+  paginationDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: 'rgba(255, 255, 255, 0.5)',
+    marginHorizontal: 4,
+  },
+  paginationDotActive: {
+    width: 20,
+    height: 8,
+    backgroundColor: '#fff',
+    borderRadius: 4,
+  },
+  backButton: {
+    width: 40,
+    height: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderRadius: 20,
+    backgroundColor: 'rgba(0,0,0,0.3)',
+  },
+  productInfoOverlay: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    padding: 20,
+    paddingBottom: 80,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    zIndex: 3,
+  },
+  productTitle: {
+    fontSize: 22,
+    fontWeight: '700',
+    color: '#fff',
+    marginBottom: 8,
+    textShadowColor: 'rgba(0, 0, 0, 0.75)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
+  },
+  productPrice: {
+    fontSize: 26,
+    fontWeight: '700',
+    color: '#fff',
+    textShadowColor: 'rgba(0, 0, 0, 0.75)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
+  },
+  publishDate: {
+    fontSize: 14,
+    color: 'rgba(255,255,255,0.8)',
+    marginTop: 8,
+  },
+  actionsBar: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: 65,
+    backgroundColor: '#fff',
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    alignItems: 'center',
+    zIndex: 4,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: -3,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 5,
+    elevation: 5,
+  },
+  actionButton: {
+    width: 50,
+    height: 50,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderRadius: 25,
+  },
+  actionButtonActive: {
+    backgroundColor: 'rgba(107, 60, 233, 0.1)',
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'black',
+    padding: 20,
+  },
+  errorText: {
+    color: '#fff',
+    fontSize: 16,
+    textAlign: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    padding: 15,
+    borderRadius: 10,
+  }
+});
+
+const ImageCarousel = ({ images, navigation, product }: { images: string[], navigation: any, product: Product }) => {
+  const [activeIndex, setActiveIndex] = useState(0);
+  const [imageLoadError, setImageLoadError] = useState<Record<string, boolean>>({});
+  const [favorite, setFavorite] = useState(false);
+
+  // Fonction pour formater le prix spécifique au composant
+  const formatProductPrice = (price: number) => {
+    if (price === undefined || price === null) {
+      return '0 €';
+    }
+    return `${price}€`;
+  };
+
+  const handleShare = async () => {
+    if (!product) return;
+    
+    try {
+      await Share.share({
+        message: `Découvrez ${product.title} à ${product.price}€ sur Showroom Baby!`,
+        title: product.title,
+      });
+    } catch (error) {
+      console.error('Erreur lors du partage:', error);
+    }
+  };
+
+  if (!images || images.length === 0) {
+    console.log('ImageCarousel - Aucune image, affichage du placeholder');
+    return (
+      <View style={carouselStyles.container}>
+        <View style={carouselStyles.item}>
+          <Image
+            source={placeholderImage}
+            style={carouselStyles.image}
+            resizeMode="cover"
+          />
+          <View style={carouselStyles.overlay} />
+        </View>
+        
+        <View style={carouselStyles.headerBar}>
+          <TouchableOpacity 
+            style={carouselStyles.backButton} 
+            onPress={() => navigation.goBack()}
+          >
+            <Ionicons name="chevron-back" size={28} color="#fff" />
+          </TouchableOpacity>
+        </View>
+        
+        <View style={carouselStyles.productInfoOverlay}>
+          <Text style={carouselStyles.productTitle}>{product.title}</Text>
+          <Text style={carouselStyles.productPrice}>{formatProductPrice(product.price)}</Text>
+          <Text style={carouselStyles.publishDate}>
+            Publié le {new Date(product.created_at).toLocaleDateString('fr-FR')}
+          </Text>
+        </View>
+        
+        <View style={carouselStyles.actionsBar}>
+          <TouchableOpacity style={carouselStyles.actionButton}>
+            <Ionicons name="call-outline" size={26} color="#777" />
+          </TouchableOpacity>
+          <TouchableOpacity style={carouselStyles.actionButton}>
+            <Ionicons name="chatbubble-outline" size={26} color="#777" />
+          </TouchableOpacity>
+          <TouchableOpacity 
+            style={[
+              carouselStyles.actionButton, 
+              favorite && carouselStyles.actionButtonActive
+            ]}
+            onPress={() => setFavorite(!favorite)}
+          >
+            <Ionicons 
+              name={favorite ? "heart" : "heart-outline"} 
+              size={26} 
+              color={favorite ? "#e74c3c" : "#777"} 
+            />
+          </TouchableOpacity>
+          <TouchableOpacity 
+            style={carouselStyles.actionButton}
+            onPress={handleShare}
+          >
+            <Ionicons name="share-social-outline" size={26} color="#777" />
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  }
+
+  const renderItem = ({ item }: { item: string }) => {
+    const imageUrl = typeof item === 'string' && item.startsWith('http') 
+      ? item 
+      : typeof item === 'string'
+        ? `${API_URL}/storage/${item}`
+        : placeholderImage;
+
+    return (
+      <View style={carouselStyles.item}>
+        {imageLoadError[imageUrl] ? (
+          <View style={carouselStyles.errorContainer}>
+            <Image
+              source={placeholderImage}
+              style={[carouselStyles.image, { opacity: 0.7 }]}
+              resizeMode="cover"
+            />
+            <Text style={carouselStyles.errorText}>Image non disponible</Text>
+          </View>
+        ) : (
+          <>
+            <Image
+              source={{ uri: imageUrl }}
+              style={carouselStyles.image}
+              resizeMode="cover"
+              defaultSource={placeholderImage}
+              onError={(error) => {
+                console.log('ImageCarousel - Erreur de chargement image:', {
+                  url: imageUrl,
+                  error: error.nativeEvent.error
+                });
+                setImageLoadError(prev => ({ ...prev, [imageUrl]: true }));
+              }}
+            />
+            <View style={carouselStyles.overlay} />
+          </>
+        )}
+      </View>
+    );
+  };
+
+  return (
+    <View style={carouselStyles.container}>
+      <View style={carouselStyles.headerBar}>
+        <TouchableOpacity 
+          style={carouselStyles.backButton} 
+          onPress={() => navigation.goBack()}
+        >
+          <Ionicons name="chevron-back" size={28} color="#fff" />
+        </TouchableOpacity>
+      </View>
+      
+      <GestureHandlerRootView style={{ flex: 1, width: '100%' }}>
+        <Carousel
+          loop
+          width={screenWidth}
+          height={screenWidth * 1.7}
+          autoPlay={images.length > 1}
+          data={images}
+          scrollAnimationDuration={800}
+          onSnapToItem={setActiveIndex}
+          renderItem={renderItem}
+          autoPlayInterval={4000}
+          style={{ width: '100%' }}
+        />
+      </GestureHandlerRootView>
+      
+      {images.length > 1 && (
+        <View style={carouselStyles.pagination}>
+          {images.map((_, index) => (
+            <View
+              key={index}
+              style={[
+                carouselStyles.paginationDot,
+                index === activeIndex && carouselStyles.paginationDotActive,
+              ]}
+            />
+          ))}
+        </View>
+      )}
+      
+      <View style={carouselStyles.productInfoOverlay}>
+        <Text style={carouselStyles.productTitle}>{product.title}</Text>
+        <Text style={carouselStyles.productPrice}>{formatProductPrice(product.price)}</Text>
+        <Text style={carouselStyles.publishDate}>
+          Publié le {new Date(product.created_at).toLocaleDateString('fr-FR')}
+        </Text>
+      </View>
+      
+      <View style={carouselStyles.actionsBar}>
+        <TouchableOpacity style={carouselStyles.actionButton}>
+          <Ionicons name="call-outline" size={26} color="#777" />
+        </TouchableOpacity>
+        <TouchableOpacity style={carouselStyles.actionButton}>
+          <Ionicons name="chatbubble-outline" size={26} color="#777" />
+        </TouchableOpacity>
+        <TouchableOpacity 
+          style={[
+            carouselStyles.actionButton, 
+            favorite && carouselStyles.actionButtonActive
+          ]}
+          onPress={() => setFavorite(!favorite)}
+        >
+          <Ionicons 
+            name={favorite ? "heart" : "heart-outline"} 
+            size={26} 
+            color={favorite ? "#e74c3c" : "#777"} 
+          />
+        </TouchableOpacity>
+        <TouchableOpacity 
+          style={carouselStyles.actionButton}
+          onPress={handleShare}
+        >
+          <Ionicons name="share-social-outline" size={26} color="#777" />
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+};
+
 export default function ProductDetailsScreen({ route, navigation }: any) {
   const { productId } = route.params || {};
   
@@ -54,8 +444,44 @@ export default function ProductDetailsScreen({ route, navigation }: any) {
   const [favorite, setFavorite] = useState(false);
   const [loginDialogVisible, setLoginDialogVisible] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [location, setLocation] = useState<{ latitude: number; longitude: number } | null>(null);
 
   const navigationNative = useNavigation();
+
+  // Charger les catégories
+  useEffect(() => {
+    const fetchCategories = async () => {
+      try {
+        const response = await axios.get(`${API_URL}/api/categories`);
+        if (response.data && Array.isArray(response.data)) {
+          setCategories(response.data);
+        } else if (response.data && response.data.data && Array.isArray(response.data.data)) {
+          setCategories(response.data.data);
+        }
+      } catch (error) {
+        console.error('Erreur lors du chargement des catégories:', error);
+      }
+    };
+
+    fetchCategories();
+  }, []);
+
+  // Obtenir le nom de la catégorie
+  const getCategoryName = (categoryId: number) => {
+    const category = categories.find(c => c.id === categoryId);
+    return category ? category.name : `Catégorie ${categoryId}`;
+  };
+
+  // Obtenir le nom de la sous-catégorie
+  const getSubcategoryName = (categoryId: number, subcategoryId: number) => {
+    const category = categories.find(c => c.id === categoryId);
+    if (category && category.subcategories) {
+      const subcategory = category.subcategories.find(sc => sc.id === subcategoryId);
+      return subcategory ? subcategory.name : `Sous-catégorie ${subcategoryId}`;
+    }
+    return `Sous-catégorie ${subcategoryId}`;
+  };
 
   // Charger les détails du produit
   useEffect(() => {
@@ -278,87 +704,90 @@ export default function ProductDetailsScreen({ route, navigation }: any) {
   };
 
   // Obtenir l'image principale d'un produit
-  const getProductImage = (product: Product | null) => {
+  const getProductImage = (product: Product | null): string[] => {
     if (!product || !product.images) {
-      console.log('Produit sans images, utilisation du placeholder');
-      return placeholderImage;
+      console.log('Produit sans images');
+      return [];
     }
-    
+
     try {
-      console.log(`Produit ${product.id}: format des images:`, typeof product.images, product.images);
-      
       // Si les images sont stockées sous forme de chaîne JSON
       if (typeof product.images === 'string') {
         try {
           const parsedImages = JSON.parse(product.images);
-          console.log(`Produit ${product.id}: images JSON parsées:`, parsedImages);
-          
-          if (Array.isArray(parsedImages) && parsedImages.length > 0) {
-            // Vérifier si l'image contient un chemin complet ou juste un nom de fichier
-            const imageUrl = parsedImages[0].includes('http') 
-              ? parsedImages[0] 
-              : `${API_URL}/storage/${parsedImages[0]}`;
-            
-            console.log(`Produit ${product.id}: URL d'image utilisée:`, imageUrl);
-            return { uri: imageUrl };
+          if (Array.isArray(parsedImages)) {
+            return parsedImages.map((img: ImageType | string) => {
+              if (typeof img === 'string') {
+                return img;
+              }
+              if (img && typeof img === 'object') {
+                if (img.path) {
+                  return img.path;
+                }
+                if (img.url) {
+                  return img.url;
+                }
+              }
+              return '';
+            }).filter(Boolean);
           }
+          // Si c'est une chaîne JSON mais pas un tableau
+          return [product.images];
         } catch (e) {
-          // Si ce n'est pas un JSON valide, on utilise directement la chaîne
-          const imageUrl = product.images.includes('http') 
-            ? product.images 
-            : `${API_URL}/storage/${product.images}`;
-          
-          console.log(`Produit ${product.id}: URL d'image directe utilisée:`, imageUrl);
-          return { uri: imageUrl };
-        }
-      } 
-      // Si c'est déjà un tableau d'objets avec propriété "path"
-      else if (Array.isArray(product.images) && product.images.length > 0) {
-        // Vérifier si c'est un tableau d'objets avec une propriété path
-        if (typeof product.images[0] === 'object' && product.images[0] !== null) {
-          // Si l'objet contient un champ path ou url
-          if (product.images[0].path) {
-            const imageUrl = product.images[0].path.includes('http') 
-              ? product.images[0].path 
-              : `${API_URL}/storage/${product.images[0].path}`;
-            
-            console.log(`Produit ${product.id}: URL depuis path:`, imageUrl);
-            return { uri: imageUrl };
-          } else if (product.images[0].url) {
-            console.log(`Produit ${product.id}: URL depuis url:`, product.images[0].url);
-            return { uri: product.images[0].url };
-          } else {
-            // Essayer de récupérer directement la première valeur
-            const firstImage = product.images[0];
-            console.log(`Produit ${product.id}: Premier élément du tableau:`, firstImage);
-            
-            if (typeof firstImage === 'string') {
-              const imageUrl = firstImage.includes('http') 
-                ? firstImage 
-                : `${API_URL}/storage/${firstImage}`;
-              
-              console.log(`Produit ${product.id}: URL du premier élément:`, imageUrl);
-              return { uri: imageUrl };
-            }
-          }
-        } else if (typeof product.images[0] === 'string') {
-          // Si c'est un tableau de chaînes
-          const imageUrl = product.images[0].includes('http') 
-            ? product.images[0] 
-            : `${API_URL}/storage/${product.images[0]}`;
-          
-          console.log(`Produit ${product.id}: URL d'image du tableau:`, imageUrl);
-          return { uri: imageUrl };
+          // Si ce n'est pas un JSON valide, utiliser directement la chaîne
+          return [product.images];
         }
       }
+
+      // Si c'est déjà un tableau
+      if (Array.isArray(product.images)) {
+        return product.images.map((img: ImageType | string) => {
+          if (typeof img === 'string') {
+            return img;
+          }
+          if (img && typeof img === 'object') {
+            if (img.path) {
+              return img.path;
+            }
+            if (img.url) {
+              return img.url;
+            }
+          }
+          return '';
+        }).filter(Boolean);
+      }
+
+      // Si c'est un objet avec une propriété path ou url
+      if (typeof product.images === 'object' && product.images !== null) {
+        const img = product.images as ImageType;
+        if (img.path) {
+          return [img.path];
+        }
+        if (img.url) {
+          return [img.url];
+        }
+      }
+
+      console.log('Format d\'images non reconnu:', product.images);
+      return [];
     } catch (error) {
-      console.error(`Produit ${product.id}: Erreur lors du traitement de l'image:`, error);
+      console.error('Erreur lors du traitement des images:', error);
+      return [];
     }
-    
-    console.log(`Produit ${product.id}: Aucune image valide trouvée, utilisation du placeholder`);
-    return placeholderImage;
   };
   
+  // Traduire la garantie
+  const getWarrantyLabel = (warranty: string) => {
+    const warranties: Record<string, string> = {
+      'no': 'Pas de garantie',
+      '3_months': '3 mois',
+      '6_months': '6 mois',
+      '12_months': '12 mois',
+      '24_months': '24 mois'
+    };
+    return warranties[warranty] || warranty;
+  };
+
   // Traduire la condition du produit
   const getConditionLabel = (condition: string) => {
     const conditions: Record<string, string> = {
@@ -378,6 +807,70 @@ export default function ProductDetailsScreen({ route, navigation }: any) {
     return price.toFixed(2).replace(/\d(?=(\d{3})+\.)/g, '$& ') + ' €';
   };
 
+  // Fonction pour obtenir les coordonnées à partir de l'adresse
+  const getCoordinates = async (address: string) => {
+    try {
+      const response = await axios.get(
+        `https://geocode.search.hereapi.com/v1/geocode?q=${encodeURIComponent(address)}&apiKey=${HERE_API_KEY}`
+      );
+      
+      if (response.data?.items?.[0]?.position) {
+        const { lat, lng } = response.data.items[0].position;
+        setLocation({ latitude: lat, longitude: lng });
+      }
+    } catch (error) {
+      console.error('Erreur de géocodage:', error);
+    }
+  };
+
+  // Utiliser l'effet pour obtenir les coordonnées
+  useEffect(() => {
+    if (product && (product.city || product.location)) {
+      const address = `${product.location || ''} ${product.city || ''} ${product.zip_code || ''}`.trim();
+      if (address) {
+        getCoordinates(address);
+      }
+    }
+  }, [product]);
+
+  // Pour la vue fullscreen, nous n'utiliserons pas le reste du contenu
+  if (route.params?.fullscreenMode) {
+    if (loading) {
+      return (
+        <View style={[styles.loadingContainer, { backgroundColor: '#3e4652' }]}>
+          <ActivityIndicator size="large" color="#fff" />
+          <Text style={[styles.loadingText, { color: '#fff' }]}>Chargement...</Text>
+        </View>
+      );
+    }
+
+    if (error || !product) {
+      return (
+        <View style={[styles.errorContainer, { backgroundColor: '#3e4652' }]}>
+          <Text style={[styles.errorText, { color: '#fff' }]}>{error || 'Produit non disponible'}</Text>
+          <Button 
+            mode="contained" 
+            onPress={() => navigation.goBack()}
+            style={styles.errorButton}
+          >
+            Retour
+          </Button>
+        </View>
+      );
+    }
+
+    return (
+      <View style={{ flex: 1 }}>
+        <ImageCarousel 
+          images={getProductImage(product)} 
+          navigation={navigation} 
+          product={product}
+        />
+      </View>
+    );
+  }
+
+  // Rendre la vue normale
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
@@ -402,16 +895,74 @@ export default function ProductDetailsScreen({ route, navigation }: any) {
     );
   }
 
+  // Interface normale (non fullscreen)
   return (
     <ScrollView style={styles.container}>
       <View style={styles.imageContainer}>
-        <Image 
-          source={getProductImage(product)} 
-          style={styles.image}
-          resizeMode="cover"
-          defaultSource={placeholderImage}
-          onError={() => console.log(`Erreur de chargement de l'image pour le produit ${product.id}`)}
-        />
+        <TouchableOpacity 
+          style={styles.fullImageButton}
+          activeOpacity={0.95}
+          onPress={() => navigation.navigate('ProductDetails', { 
+            productId: product.id,
+            fullscreenMode: true
+          })}
+        >
+          {getProductImage(product).length > 0 ? (
+            <>
+              <Image
+                source={{ 
+                  uri: getProductImage(product).length > 0 
+                    ? (
+                      typeof getProductImage(product)[0] === 'string' && getProductImage(product)[0].startsWith('http')
+                        ? getProductImage(product)[0]
+                        : `${API_URL}/storage/${getProductImage(product)[0]}`
+                    )
+                    : placeholderImage
+                }}
+                style={styles.mainImage}
+                resizeMode="cover"
+              />
+              <View style={styles.imageOverlay} />
+            </>
+          ) : (
+            <>
+              <Image
+                source={placeholderImage}
+                style={styles.mainImage}
+                resizeMode="cover"
+              />
+              <View style={styles.imageOverlay} />
+            </>
+          )}
+          
+          <View style={styles.imageHeader}>
+            <TouchableOpacity 
+              style={styles.backButton}
+              onPress={() => navigation.goBack()}
+            >
+              <Ionicons name="chevron-back" size={28} color="#fff" />
+            </TouchableOpacity>
+          </View>
+          
+          <View style={styles.imageInfo}>
+            <Text style={styles.miniTitle}>{product.title}</Text>
+            <Text style={styles.miniPrice}>{formatPrice(product.price)}</Text>
+          </View>
+          
+          {getProductImage(product).length > 1 && (
+            <View style={styles.imagePagination}>
+              {getProductImage(product).map((_, index) => (
+                <View
+                  key={index}
+                  style={[
+                    styles.paginationDot,
+                    index === 0 && styles.paginationDotActive,
+                  ]}
+                />
+              ))}
+            </View>
+          )}
+        </TouchableOpacity>
       </View>
       
       <View style={styles.header}>
@@ -433,7 +984,7 @@ export default function ProductDetailsScreen({ route, navigation }: any) {
           </View>
         </View>
       </View>
-
+      
       <Divider style={styles.divider} />
       
       <View style={styles.section}>
@@ -445,15 +996,139 @@ export default function ProductDetailsScreen({ route, navigation }: any) {
       
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Détails</Text>
-        <View style={styles.chipsContainer}>
-          <Chip style={styles.chip} icon="tag">Catégorie {product.category_id}</Chip>
-          <Chip style={styles.chip} icon="package-variant">{getConditionLabel(product.condition)}</Chip>
-          {(product.city || product.location) && (
-            <Chip style={styles.chip} icon="map-marker">{product.city || product.location}</Chip>
+        <View style={styles.detailsGrid}>
+          <View style={styles.detailItem}>
+            <Text style={styles.detailLabel}>État</Text>
+            <Text style={styles.detailValue}>{getConditionLabel(product.condition)}</Text>
+          </View>
+          
+          {product.size && (
+            <View style={styles.detailItem}>
+              <Text style={styles.detailLabel}>Taille</Text>
+              <Text style={styles.detailValue}>{product.size}</Text>
+            </View>
           )}
-          <Chip style={styles.chip} icon="eye-outline">{product.view_count} vues</Chip>
+          
+          {product.color && (
+            <View style={styles.detailItem}>
+              <Text style={styles.detailLabel}>Couleur</Text>
+              <Text style={styles.detailValue}>{product.color}</Text>
+            </View>
+          )}
+          
+          {product.warranty && (
+            <View style={styles.detailItem}>
+              <Text style={styles.detailLabel}>Garantie</Text>
+              <Text style={styles.detailValue}>{getWarrantyLabel(product.warranty)}</Text>
+            </View>
+          )}
+          
+          <View style={styles.detailItem}>
+            <Text style={styles.detailLabel}>Catégorie</Text>
+            <Text style={styles.detailValue}>{getCategoryName(product.category_id)}</Text>
+          </View>
+          
+          {product.subcategory_id && (
+            <View style={styles.detailItem}>
+              <Text style={styles.detailLabel}>Sous-catégorie</Text>
+              <Text style={styles.detailValue}>
+                {getSubcategoryName(product.category_id, product.subcategory_id)}
+              </Text>
+            </View>
+          )}
+          
+          {(product.city || product.location) && (
+            <View style={styles.detailItem}>
+              <Text style={styles.detailLabel}>Localisation</Text>
+              <Text style={styles.detailValue}>
+                <Ionicons name="location-outline" size={16} color="#666" />
+                {' '}{product.city || product.location}
+                {product.zip_code && `, ${product.zip_code}`}
+              </Text>
+            </View>
+          )}
+          
+          <View style={styles.detailItem}>
+            <Text style={styles.detailLabel}>Vues</Text>
+            <Text style={styles.detailValue}>{product.view_count}</Text>
+          </View>
+          
+          <View style={styles.detailItem}>
+            <Text style={styles.detailLabel}>Date de publication</Text>
+            <Text style={styles.detailValue}>
+              {new Date(product.created_at).toLocaleDateString('fr-FR')}
+            </Text>
+          </View>
+          
+          {!product.hide_phone && product.phone && (
+            <View style={styles.detailItem}>
+              <Text style={styles.detailLabel}>Téléphone</Text>
+              <Text style={styles.detailValue}>{product.phone}</Text>
+            </View>
+          )}
+          
+          {product.brand && (
+            <View style={styles.detailItem}>
+              <Text style={styles.detailLabel}>Marque</Text>
+              <Text style={styles.detailValue}>{product.brand}</Text>
+            </View>
+          )}
+          
+          {product.model && (
+            <View style={styles.detailItem}>
+              <Text style={styles.detailLabel}>Modèle</Text>
+              <Text style={styles.detailValue}>{product.model}</Text>
+            </View>
+          )}
+          
+          {product.material && (
+            <View style={styles.detailItem}>
+              <Text style={styles.detailLabel}>Matériau</Text>
+              <Text style={styles.detailValue}>{product.material}</Text>
+            </View>
+          )}
+          
+          {product.dimensions && (
+            <View style={styles.detailItem}>
+              <Text style={styles.detailLabel}>Dimensions</Text>
+              <Text style={styles.detailValue}>{product.dimensions}</Text>
+            </View>
+          )}
+          
+          {product.weight && (
+            <View style={styles.detailItem}>
+              <Text style={styles.detailLabel}>Poids</Text>
+              <Text style={styles.detailValue}>{product.weight}</Text>
+            </View>
+          )}
         </View>
       </View>
+
+      {location && (
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Localisation</Text>
+          <View style={styles.mapContainer}>
+            <MapView
+              style={styles.map}
+              initialRegion={{
+                latitude: location.latitude,
+                longitude: location.longitude,
+                latitudeDelta: 0.01,
+                longitudeDelta: 0.01,
+              }}
+            >
+              <Marker
+                coordinate={{
+                  latitude: location.latitude,
+                  longitude: location.longitude,
+                }}
+                title={product.title}
+                description={`${product.city || product.location || ''}`}
+              />
+            </MapView>
+          </View>
+        </View>
+      )}
 
       {seller && (
         <>
@@ -507,7 +1182,7 @@ export default function ProductDetailsScreen({ route, navigation }: any) {
         </Button>
       </View>
 
-      {/* Dialogue pour suggérer la connexion */}
+      {/* Dialogue de connexion */}
       <Portal>
         <Dialog visible={loginDialogVisible} onDismiss={() => setLoginDialogVisible(false)}>
           <Dialog.Title>Connexion requise</Dialog.Title>
@@ -518,7 +1193,7 @@ export default function ProductDetailsScreen({ route, navigation }: any) {
             <Button onPress={() => setLoginDialogVisible(false)}>Annuler</Button>
             <Button onPress={() => {
               setLoginDialogVisible(false);
-              navigationNative.navigate('Connexion');
+              navigation.navigate('Auth');
             }}>Se connecter</Button>
           </Dialog.Actions>
         </Dialog>
@@ -530,49 +1205,66 @@ export default function ProductDetailsScreen({ route, navigation }: any) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: '#f8f9fa',
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#fff',
+    backgroundColor: '#f8f9fa',
   },
   loadingText: {
-    marginTop: 10,
+    marginTop: 12,
     color: '#666',
+    fontSize: 16,
   },
   errorContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     padding: 20,
-    backgroundColor: '#fff',
+    backgroundColor: '#f8f9fa',
   },
   errorText: {
     fontSize: 16,
-    color: 'red',
+    color: '#ff4444',
     textAlign: 'center',
     marginBottom: 20,
   },
   errorButton: {
-    marginTop: 10,
+    marginTop: 15,
+    borderRadius: 25,
+    height: 50,
+    justifyContent: 'center',
   },
   imageContainer: {
-    height: 300,
-    backgroundColor: '#e1e1e1',
-  },
-  image: {
     width: '100%',
-    height: '100%',
+    height: hp('60%'),
+    padding: 0,
+    margin: 0,
+    backgroundColor: 'black',
   },
   header: {
     padding: 16,
+    backgroundColor: '#fff',
+    borderRadius: 20,
+    marginHorizontal: 15,
+    marginTop: 15,
+    marginBottom: 10,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 3.84,
+    elevation: 3,
   },
   title: {
     fontSize: 24,
-    fontWeight: 'bold',
-    marginBottom: 8,
+    fontWeight: '600',
+    color: '#000',
+    marginBottom: 12,
   },
   priceRow: {
     flexDirection: 'row',
@@ -580,42 +1272,91 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   price: {
-    fontSize: 22,
-    fontWeight: 'bold',
-    color: '#6200ee',
+    fontSize: 28,
+    fontWeight: '700',
+    color: '#6B3CE9',
   },
   actions: {
     flexDirection: 'row',
+    alignItems: 'center',
   },
   divider: {
-    marginVertical: 8,
+    marginVertical: 12,
+    height: 1,
+    backgroundColor: '#f0f0f0',
   },
   section: {
+    backgroundColor: '#fff',
+    borderRadius: 20,
+    marginHorizontal: 15,
+    marginVertical: 8,
     padding: 16,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 3.84,
+    elevation: 3,
   },
   sectionTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginBottom: 8,
+    fontSize: 20,
+    fontWeight: '600',
+    color: '#000',
+    marginBottom: 12,
   },
   description: {
     fontSize: 16,
     lineHeight: 24,
-    color: '#333',
+    color: '#666',
   },
-  chipsContainer: {
+  detailsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    marginTop: 5,
+    justifyContent: 'space-between',
+    gap: 12,
   },
-  chip: {
-    marginRight: 8,
-    marginBottom: 8,
+  detailItem: {
+    width: '47%',
+    backgroundColor: '#fff',
+    padding: 12,
+    borderRadius: 15,
+    marginBottom: 10,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 1,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  detailLabel: {
+    fontSize: 14,
+    color: '#999',
+    marginBottom: 4,
+  },
+  detailValue: {
+    fontSize: 16,
+    color: '#333',
+    fontWeight: '500',
   },
   sellerContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     marginTop: 10,
+    backgroundColor: '#fff',
+    padding: 15,
+    borderRadius: 12,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 3.84,
+    elevation: 3,
   },
   sellerAvatar: {
     width: 50,
@@ -623,7 +1364,7 @@ const styles = StyleSheet.create({
     borderRadius: 25,
   },
   sellerAvatarPlaceholder: {
-    backgroundColor: '#6200ee',
+    backgroundColor: '#6B3CE9',
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -634,10 +1375,12 @@ const styles = StyleSheet.create({
   },
   sellerInfo: {
     marginLeft: 15,
+    flex: 1,
   },
   sellerName: {
-    fontSize: 16,
-    fontWeight: 'bold',
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#000',
   },
   ratingContainer: {
     flexDirection: 'row',
@@ -653,13 +1396,130 @@ const styles = StyleSheet.create({
     color: '#666',
   },
   actionButtons: {
-    padding: wp('4%'),
-    gap: hp('2%'),
+    padding: 15,
+    paddingBottom: 25,
+    gap: 10,
+    backgroundColor: '#fff',
+    borderTopWidth: 1,
+    borderTopColor: '#f0f0f0',
   },
   actionButton: {
     borderRadius: 25,
+    height: 50,
+    justifyContent: 'center',
   },
   contactButton: {
-    backgroundColor: '#ff6b9b',
+    backgroundColor: '#6B3CE9',
+  },
+  mapContainer: {
+    height: 200,
+    marginTop: 10,
+    borderRadius: 12,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 3.84,
+    elevation: 3,
+  },
+  map: {
+    width: '100%',
+    height: '100%',
+  },
+  fullImageButton: {
+    flex: 1,
+    position: 'relative',
+    height: '100%',
+  },
+  mainImage: {
+    width: '100%',
+    height: '100%',
+    resizeMode: 'cover',
+  },
+  imageOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.2)',
+  },
+  imageGradient: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: 150,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+  },
+  imageHeader: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 60,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 15,
+    backgroundColor: 'rgba(0,0,0,0.3)',
+  },
+  backButton: {
+    width: 40,
+    height: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderRadius: 20,
+    backgroundColor: 'rgba(0,0,0,0.3)',
+  },
+  imageInfo: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    padding: 20,
+    paddingBottom: 20,
+  },
+  miniTitle: {
+    fontSize: 22,
+    fontWeight: '700',
+    color: '#fff',
+    marginBottom: 8,
+    textShadowColor: 'rgba(0, 0, 0, 0.75)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
+  },
+  miniPrice: {
+    fontSize: 26,
+    fontWeight: '700',
+    color: '#fff',
+    textShadowColor: 'rgba(0, 0, 0, 0.75)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
+  },
+  imagePagination: {
+    position: 'absolute',
+    bottom: 80,
+    left: 0,
+    right: 0,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  paginationDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: 'rgba(255, 255, 255, 0.5)',
+    marginHorizontal: 4,
+  },
+  paginationDotActive: {
+    width: 20,
+    height: 8,
+    backgroundColor: '#fff',
+    borderRadius: 4,
   },
 }); 

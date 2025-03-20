@@ -3,11 +3,13 @@ import { View, Text, StyleSheet, ScrollView, Image, TouchableOpacity, TextInput,
 import { Button, Card, Checkbox, Divider, HelperText, Searchbar } from 'react-native-paper';
 import { Ionicons, MaterialIcons, Entypo, AntDesign } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
+import { manipulateAsync, SaveFormat } from 'expo-image-manipulator';
 import * as Location from 'expo-location';
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { StatusBar } from 'expo-status-bar';
-import { useFocusEffect } from '@react-navigation/native';
+import { useFocusEffect, CommonActions } from '@react-navigation/native';
+import AddressAutocomplete from '../components/AddressAutocomplete';
 
 // URL de l'API
 const API_URL = 'http://127.0.0.1:8000';
@@ -153,7 +155,7 @@ export default function AjouterProduitScreen({ navigation, route }: any) {
                   { 
                     text: 'Quitter', 
                     style: 'destructive',
-                    onPress: () => navigation.goBack() 
+                    onPress: () => navigation.navigate('Home') 
                   }
                 ]
               );
@@ -178,7 +180,7 @@ export default function AjouterProduitScreen({ navigation, route }: any) {
         { 
           text: 'Quitter', 
           style: 'destructive',
-          onPress: () => navigation.goBack()
+          onPress: () => navigation.navigate('Home')
         }
       ]
     );
@@ -259,9 +261,16 @@ export default function AjouterProduitScreen({ navigation, route }: any) {
     }
   };
 
-  const validateImage = async (imageUri: string): Promise<boolean> => {
+  const validateImage = async (imageUri: string): Promise<string | false> => {
     try {
-      const response = await fetch(imageUri);
+      // Compresser l'image avant validation
+      const compressedImage = await manipulateAsync(
+        imageUri,
+        [{ resize: { width: 1024 } }],
+        { compress: 0.7, format: SaveFormat.JPEG }
+      );
+
+      const response = await fetch(compressedImage.uri);
       const blob = await response.blob();
       
       // Vérifier la taille
@@ -276,7 +285,7 @@ export default function AjouterProduitScreen({ navigation, route }: any) {
         return false;
       }
 
-      return true;
+      return compressedImage.uri;
     } catch (error) {
       console.error('Erreur lors de la validation de l\'image:', error);
       Alert.alert('Erreur', 'Impossible de valider l\'image');
@@ -302,20 +311,28 @@ export default function AjouterProduitScreen({ navigation, route }: any) {
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
         allowsEditing: true,
         aspect: [4, 3],
-        quality: 0.8,
-        base64: true
+        quality: 0.7,
+        base64: false
       });
 
       if (!result.canceled && result.assets && result.assets.length > 0) {
         const asset = result.assets[0];
-        const isValid = await validateImage(asset.uri);
-        if (isValid) {
+        
+        // Compresser l'image
+        const compressedImage = await manipulateAsync(
+          asset.uri,
+          [{ resize: { width: 1024 } }],
+          { compress: 0.7, format: SaveFormat.JPEG }
+        );
+
+        const validatedUri = await validateImage(compressedImage.uri);
+        if (validatedUri) {
           setProductData(prev => ({
             ...prev,
             images: [...prev.images, {
-              uri: asset.uri,
+              uri: validatedUri,
               type: 'image/jpeg',
-              name: asset.uri.split('/').pop() || 'photo.jpg'
+              name: `image_${prev.images.length}.jpg`
             }]
           }));
         }
@@ -438,18 +455,16 @@ export default function AjouterProduitScreen({ navigation, route }: any) {
 
       // Ajout des images
       if (productData.images && productData.images.length > 0) {
-        for (let i = 0; i < productData.images.length; i++) {
-          const image = productData.images[i];
-          // Ne pas renvoyer les images déjà sur le serveur
+        productData.images.forEach((image, index) => {
           if (!image.uri.includes(API_URL)) {
             const uri = Platform.OS === 'ios' ? image.uri.replace('file://', '') : image.uri;
-            formData.append('images[]', {
+            formData.append(`images[${index}]`, {
               uri: uri,
               type: 'image/jpeg',
-              name: 'photo.jpg'
+              name: `image_${index}.jpg`
             } as any);
           }
-        }
+        });
       }
 
       let response;
@@ -583,6 +598,17 @@ export default function AjouterProduitScreen({ navigation, route }: any) {
     setModalVisible(null);
   };
 
+  const handleAddressSelect = (address: any) => {
+    setProductData(prev => ({
+      ...prev,
+      location: `${address.street || ''} ${address.city || ''}`.trim(),
+      city: address.city || '',
+      zip_code: address.postalCode || '',
+      latitude: address.latitude,
+      longitude: address.longitude
+    }));
+  };
+
   const renderPhotoStep = () => (
     <View style={styles.stepContainer}>
       <Text style={styles.stepTitle}>Ajoutez des photos</Text>
@@ -630,14 +656,13 @@ export default function AjouterProduitScreen({ navigation, route }: any) {
       </View>
       
       <Text style={styles.inputLabel}>Adresse</Text>
-      <TextInput
-        style={styles.input}
-        placeholder="Ex: Paris, 75001"
-        value={productData.location}
-        onChangeText={(text) => setProductData(prev => ({ ...prev, location: text }))}
+      <AddressAutocomplete
+        onSelect={handleAddressSelect}
+        placeholder="Entrez votre adresse"
+        style={styles.addressAutocomplete}
       />
       <Text style={styles.inputHint}>
-        Format recommandé: Ville, Code Postal (ex: Paris, 75001)
+        Format recommandé: Rue, Ville, Code Postal
       </Text>
       {errors.location && <Text style={styles.errorText}>{errors.location}</Text>}
       
@@ -1404,5 +1429,9 @@ const styles = StyleSheet.create({
     color: '#333',
     fontSize: 16,
     fontWeight: 'bold',
+  },
+  addressAutocomplete: {
+    marginBottom: 8,
+    zIndex: 1000,
   },
 }); 

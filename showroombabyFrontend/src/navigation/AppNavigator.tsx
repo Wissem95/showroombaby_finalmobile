@@ -100,19 +100,31 @@ function CustomBottomBar({ navigation, activeRoute }: CustomBottomBarProps) {
     // Si l'utilisateur n'est pas connecté et essaie d'accéder à une fonctionnalité protégée
     if (!isAuthenticated && 
         (screen === 'Favoris' || screen === 'AjouterProduit' || screen === 'Messages')) {
-      // Rediriger vers la page de connexion
-      navigation.navigate('Auth');
       // Afficher un message pour informer l'utilisateur
       Alert.alert(
         'Connexion requise',
         'Vous devez être connecté pour accéder à cette fonctionnalité',
-        [{ text: 'OK' }]
+        [
+          { 
+            text: 'Annuler',
+            style: 'cancel'
+          },
+          { 
+            text: 'Se connecter',
+            onPress: () => {
+              // Stocker l'écran de destination pour y accéder après connexion
+              AsyncStorage.setItem('redirectAfterLogin', screen);
+              // Rediriger vers la page de connexion
+              navigation.navigate('Auth');
+            }
+          }
+        ]
       );
     } else {
+      // Utiliser CommonActions.navigate au lieu de reset pour préserver l'historique
       navigation.dispatch(
-        CommonActions.reset({
-          index: 0,
-          routes: [{ name: screen }],
+        CommonActions.navigate({
+          name: screen
         })
       );
     }
@@ -346,10 +358,8 @@ export default function AppNavigator() {
           name="Chat" 
           component={ChatScreen}
           options={{ 
-            headerShown: true,
-            headerTitle: "",
-            presentation: 'modal',
-            animation: 'slide_from_bottom',
+            headerShown: false,
+            animation: 'default'
           }}
         />
       </Stack.Navigator>

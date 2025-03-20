@@ -93,7 +93,44 @@ export default function ProfileScreen({ navigation }: Props) {
   }, []);
 
   const handleLogout = async () => {
-    await AuthService.logout();
+    Alert.alert(
+      'Confirmation de déconnexion',
+      'Êtes-vous sûr de vouloir vous déconnecter?',
+      [
+        {
+          text: 'Annuler',
+          style: 'cancel'
+        },
+        {
+          text: 'Déconnexion',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              const result = await AuthService.logout();
+              
+              Alert.alert(
+                'Déconnexion réussie',
+                'Vous avez été déconnecté avec succès.',
+                [
+                  {
+                    text: 'OK',
+                    onPress: () => {
+                      navigation.reset({
+                        index: 0,
+                        routes: [{ name: 'Auth' }],
+                      });
+                    }
+                  }
+                ]
+              );
+            } catch (error) {
+              console.error('Erreur lors de la déconnexion:', error);
+              Alert.alert('Erreur', 'Une erreur est survenue lors de la déconnexion.');
+            }
+          }
+        }
+      ]
+    );
   };
 
   const formatPrice = (price: number) => {

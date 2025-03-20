@@ -139,7 +139,14 @@ class AuthService {
     }
     this.token = null;
     this.user = null;
+    
+    // Supprimer toutes les données d'authentification
     await AsyncStorage.removeItem('token');
+    await AsyncStorage.removeItem('userId');
+    
+    // Ajouter d'autres clés à supprimer si nécessaire
+    
+    return { success: true, message: 'Déconnexion réussie' };
   }
 
   getUser(): User | null {

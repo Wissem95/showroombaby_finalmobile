@@ -266,9 +266,11 @@ class ProductController extends Controller
         }
 
         // Suppression des images
-        foreach ($product->images as $image) {
-            Storage::disk('public')->delete($image->path);
-            $image->delete();
+        if ($product->images !== null) {
+            foreach ($product->images as $image) {
+                Storage::disk('public')->delete($image->path);
+                $image->delete();
+            }
         }
 
         // Suppression du produit
