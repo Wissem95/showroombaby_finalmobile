@@ -32,6 +32,7 @@ Route::get('/test', function () {
 Route::post('/auth/register', [AuthController::class, 'register']);
 Route::post('/auth/login', [AuthController::class, 'login']);
 Route::middleware('auth:sanctum')->post('/auth/logout', [AuthController::class, 'logout']);
+Route::middleware('auth:sanctum')->get('/auth/check', [AuthController::class, 'check']);
 
 // Routes des produits
 Route::prefix('products')->group(function () {

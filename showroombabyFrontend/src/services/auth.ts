@@ -21,6 +21,29 @@ axios.interceptors.response.use(
   }
 );
 
+// Configuration globale axios avec intercepteur pour ajouter automatiquement le token
+axios.interceptors.request.use(
+  async (config) => {
+    // Ne pas ajouter de token pour les requêtes d'authentification
+    if (config.url?.includes('/auth/login') || config.url?.includes('/auth/register')) {
+      return config;
+    }
+    
+    try {
+      const token = await AsyncStorage.getItem('token');
+      if (token) {
+        config.headers.Authorization = `Bearer ${token}`;
+      }
+    } catch (error) {
+      console.error('Erreur récupération token dans intercepteur:', error);
+    }
+    return config;
+  },
+  (error) => {
+    return Promise.reject(error);
+  }
+);
+
 export interface User {
   id: number;
   name: string;
@@ -42,6 +65,7 @@ class AuthService {
   private static instance: AuthService;
   private user: User | null = null;
   private token: string | null = null;
+  private initialized: boolean = false;
 
   private constructor() {}
 
@@ -53,17 +77,31 @@ class AuthService {
   }
 
   async init() {
+    if (this.initialized) return;
+    
     this.token = await AsyncStorage.getItem('token');
+    console.log('Auth init - Token récupéré:', this.token ? 'Token présent' : 'Aucun token');
+    
     if (this.token) {
       try {
         const response = await axios.get(`${API_URL}/users/profile`, {
-          headers: { Authorization: `Bearer ${this.token}` }
+          headers: { Authorization: `Bearer ${this.token}` },
+          timeout: 5000 // Ajouter un timeout
         });
         this.user = response.data;
+        console.log('Auth init - Profil récupéré:', this.user);
       } catch (error) {
-        await this.logout();
+        console.error('Auth init - Erreur récupération profil:', error);
+        // Ne pas se déconnecter automatiquement en cas d'erreur réseau
+        if (axios.isAxiosError(error) && error.response?.status === 401) {
+          await this.logout();
+        } else {
+          console.log('Erreur réseau - garder le token actif');
+        }
       }
     }
+    
+    this.initialized = true;
   }
 
   async login(credentials: LoginCredentials): Promise<any> {
@@ -74,9 +112,14 @@ class AuthService {
       });
 
       if (response.data.access_token) {
+        this.token = response.data.access_token;
+        this.user = response.data.user;
+        
         await AsyncStorage.setItem('token', response.data.access_token);
         await AsyncStorage.setItem('userId', response.data.user.id.toString());
-        this.user = response.data.user;
+        
+        console.log('Login réussi - Token stocké:', this.token ? 'Token présent' : 'Aucun token');
+        
         return response.data;
       }
       throw new Error('Token non reçu');
@@ -155,6 +198,65 @@ class AuthService {
 
   isAuthenticated(): boolean {
     return !!this.token;
+  }
+
+  // Version asynchrone qui vérifie le token stocké si nécessaire
+  async isAuthenticatedAsync(): Promise<boolean> {
+    if (!this.token) {
+      this.token = await AsyncStorage.getItem('token');
+    }
+    return !!this.token;
+  }
+
+  // Fonction pour vérifier si l'utilisateur est connecté avec un token valide
+  async checkAuth(): Promise<boolean> {
+    if (!this.token) {
+      this.token = await AsyncStorage.getItem('token');
+      if (!this.token) {
+        console.log('checkAuth: Aucun token trouvé');
+        return false;
+      }
+    }
+    
+    try {
+      // Vérifier si le token est valide
+      const response = await axios.get(`${API_URL}/auth/check`, {
+        headers: { Authorization: `Bearer ${this.token}` },
+        timeout: 5000 // Ajouter un timeout pour éviter les attentes infinies
+      });
+      
+      if (response.status === 200 && response.data.user) {
+        // Mettre à jour les informations de l'utilisateur
+        this.user = response.data.user;
+        console.log('checkAuth: Token valide, utilisateur mis à jour');
+        return true;
+      }
+      
+      console.log('checkAuth: Réponse reçue mais format inattendu', response.status);
+      return false;
+    } catch (error) {
+      console.error('Erreur vérification token:', error);
+      // Si erreur 401, le token n'est plus valide
+      if (axios.isAxiosError(error) && error.response?.status === 401) {
+        console.log('checkAuth: Token invalide (401), déconnexion');
+        await this.logout();
+      }
+      // Éviter de se déconnecter pour les erreurs réseau
+      else if (axios.isAxiosError(error) && !error.response) {
+        console.log('checkAuth: Erreur réseau, considérer le token comme valide');
+        return !!this.token; // Considérer le token valide en cas d'erreur réseau
+      }
+      return false;
+    }
+  }
+
+  // Utiliser cette fonction pour les requêtes API qui nécessitent l'authentification
+  async getAuthHeaders() {
+    if (!this.token) {
+      this.token = await AsyncStorage.getItem('token');
+    }
+    
+    return this.token ? { Authorization: `Bearer ${this.token}` } : {};
   }
 
   async setToken(token: string) {

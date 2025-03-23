@@ -4,7 +4,8 @@ import { TextInput, List } from 'react-native-paper';
 import axios from 'axios';
 import debounce from 'lodash/debounce';
 
-const HERE_API_KEY = 'mJTj_ivJS2vjA9GLOtq6AtOFK91e8CoNoBpvK1mEQ7c';
+// Token Mapbox pour l'autocomplétion
+const MAPBOX_ACCESS_TOKEN = 'pk.eyJ1Ijoid2lzc2VtOTUiLCJhIjoiY204bG52Z3cyMWQ5dTJrcXI2d210ZnY2ZSJ9.-xQ5BHlcU51dTyLmbHoXog';
 
 interface AddressAutocompleteProps {
   onSelect: (address: {
@@ -23,36 +24,80 @@ export default function AddressAutocomplete({ onSelect, placeholder = "Entrez un
   const [suggestions, setSuggestions] = useState<any[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
 
-  const searchAddress = debounce(async (text: string) => {
-    if (text.length < 3) {
-      setSuggestions([]);
-      return;
-    }
-
-    try {
-      const response = await axios.get(
-        `https://geocode.search.hereapi.com/v1/geocode?q=${encodeURIComponent(text)}&apiKey=${HERE_API_KEY}&limit=5`
-      );
-
-      if (response.data?.items) {
-        setSuggestions(response.data.items);
-      }
-    } catch (error) {
-      console.error('Erreur lors de la recherche d\'adresse:', error);
-      setSuggestions([]);
-    }
+  // Appliquer un debounce pour éviter trop d'appels API
+  const debouncedSearch = debounce((text: string) => {
+    searchAddress(text);
   }, 300);
 
+  const searchAddress = async (text: string) => {
+    setQuery(text);
+    
+    if (text.length > 2) {
+      try {
+        // Utiliser l'API Mapbox Geocoding pour la recherche d'adresses
+        const response = await axios.get(
+          `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(text)}.json?access_token=${MAPBOX_ACCESS_TOKEN}&country=fr&types=address,place,postcode`
+        );
+        
+        // Transformation des résultats de l'API en suggestions
+        const apiSuggestions = response.data.features.map((feature: any) => {
+          // Extraire les composants de l'adresse
+          const addressParts = feature.place_name.split(',');
+          const streetAddress = addressParts[0] || '';
+          
+          // Extraire le code postal (s'il existe)
+          let postalCode = '';
+          let city = '';
+          
+          // Essayer d'extraire le code postal des context
+          if (feature.context) {
+            for (const context of feature.context) {
+              if (context.id.startsWith('postcode')) {
+                postalCode = context.text;
+              }
+              if (context.id.startsWith('place')) {
+                city = context.text;
+              }
+            }
+          }
+          
+          return {
+            title: feature.place_name,
+            id: feature.id,
+            city: city,
+            postalCode: postalCode,
+            position: {
+              lat: feature.center[1],
+              lng: feature.center[0]
+            }
+          };
+        });
+        
+        setSuggestions(apiSuggestions);
+      } catch (error) {
+        console.error('Erreur lors de la recherche d\'adresse:', error);
+        setSuggestions([]);
+      }
+    } else {
+      setSuggestions([]);
+    }
+  };
+
   const handleSelect = (item: any) => {
+    console.log('Adresse sélectionnée:', JSON.stringify(item, null, 2));
+    
+    // S'assurer que le code postal est correctement extrait
     const address = {
-      street: item.address?.street,
-      city: item.address?.city,
-      postalCode: item.address?.postalCode,
+      street: item.title.split(',')[0] || '',
+      city: item.city || '',
+      postalCode: item.postalCode || '',
       latitude: item.position?.lat,
       longitude: item.position?.lng,
     };
-
-    setQuery(item.title || item.address?.label || '');
+    
+    console.log('Données d\'adresse extraites:', address);
+    
+    setQuery(item.title || '');
     setSuggestions([]);
     setShowSuggestions(false);
     onSelect(address);
@@ -65,7 +110,7 @@ export default function AddressAutocomplete({ onSelect, placeholder = "Entrez un
         onChangeText={(text) => {
           setQuery(text);
           setShowSuggestions(true);
-          searchAddress(text);
+          debouncedSearch(text);
         }}
         placeholder={placeholder}
         mode="outlined"
@@ -77,8 +122,8 @@ export default function AddressAutocomplete({ onSelect, placeholder = "Entrez un
           {suggestions.map((item, index) => (
             <List.Item
               key={index}
-              title={item.title || item.address?.label}
-              description={item.address?.city}
+              title={item.title}
+              description={item.postalCode ? `${item.city}, ${item.postalCode}` : item.city}
               onPress={() => handleSelect(item)}
               style={styles.suggestionItem}
             />

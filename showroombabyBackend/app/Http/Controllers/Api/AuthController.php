@@ -100,4 +100,15 @@ class AuthController extends Controller
             'message' => 'Déconnexion réussie'
         ]);
     }
+
+    /**
+     * Vérifier la validité du token d'authentification
+     */
+    public function check(Request $request)
+    {
+        return response()->json([
+            'message' => 'Token valide',
+            'user' => $request->user()
+        ]);
+    }
 }

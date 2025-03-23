@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ScrollView, View, StyleSheet, TouchableOpacity, RefreshControl, Alert } from 'react-native';
+import { ScrollView, View, StyleSheet, TouchableOpacity, RefreshControl, Alert, ActivityIndicator } from 'react-native';
 import { Avatar, Text, Divider, List, Button, Card } from 'react-native-paper';
 import AuthService from '../services/auth';
 import { Props } from '../types/navigation';
@@ -23,8 +23,11 @@ interface Product {
   view_count: number;
   created_at: string;
   updated_at: string;
-  images?: string | string[] | null;
+  images?: string | string[] | { path: string; url?: string }[] | any[] | null;
 }
+
+// Constantes
+const DEFAULT_IMAGE_URL = 'https://placehold.co/400x300/f8bbd0/ffffff?text=Showroom+Baby';
 
 export default function ProfileScreen({ navigation }: Props) {
   const [user, setUser] = useState(AuthService.getUser());
@@ -138,9 +141,73 @@ export default function ProfileScreen({ navigation }: Props) {
   };
 
   const getProductImage = (product: Product) => {
-    if (product.images && Array.isArray(product.images) && product.images.length > 0) {
-      return { uri: `${API_URL}/storage/${product.images[0]}` };
+    // Image par défaut si pas d'images
+    if (!product.images) {
+      return require('../../assets/placeholder.png');
     }
+    
+    try {
+      // Si images est une chaîne JSON, on essaie de l'analyser
+      if (typeof product.images === 'string') {
+        try {
+          const parsedImages = JSON.parse(product.images);
+          
+          if (Array.isArray(parsedImages) && parsedImages.length > 0) {
+            // Vérifier si l'image contient un chemin complet ou juste un nom de fichier
+            const imageUrl = parsedImages[0].includes('http') 
+              ? parsedImages[0] 
+              : `${API_URL}/storage/${parsedImages[0]}`;
+            
+            return { uri: imageUrl };
+          }
+        } catch (e) {
+          // Si ce n'est pas un JSON valide, on utilise directement la chaîne
+          const imageUrl = product.images.includes('http') 
+            ? product.images 
+            : `${API_URL}/storage/${product.images}`;
+          
+          return { uri: imageUrl };
+        }
+      } 
+      // Si c'est déjà un tableau d'objets avec propriété "path"
+      else if (Array.isArray(product.images) && product.images.length > 0) {
+        // Vérifier si c'est un tableau d'objets avec une propriété path
+        if (typeof product.images[0] === 'object' && product.images[0] !== null) {
+          // Si l'objet contient un champ path ou url
+          if (product.images[0].path) {
+            const imageUrl = product.images[0].path.includes('http') 
+              ? product.images[0].path 
+              : `${API_URL}/storage/${product.images[0].path}`;
+            
+            return { uri: imageUrl };
+          } else if (product.images[0].url) {
+            return { uri: product.images[0].url };
+          } else {
+            // Essayer de récupérer directement la première valeur
+            const firstImage = product.images[0];
+            
+            if (typeof firstImage === 'string') {
+              const imageUrl = firstImage.includes('http') 
+                ? firstImage 
+                : `${API_URL}/storage/${firstImage}`;
+              
+              return { uri: imageUrl };
+            }
+          }
+        } else if (typeof product.images[0] === 'string') {
+          // Si c'est un tableau de chaînes
+          const imageUrl = product.images[0].includes('http') 
+            ? product.images[0] 
+            : `${API_URL}/storage/${product.images[0]}`;
+          
+          return { uri: imageUrl };
+        }
+      }
+    } catch (e) {
+      console.error('Erreur traitement image:', e);
+    }
+    
+    // Image par défaut en cas d'échec
     return require('../../assets/placeholder.png');
   };
 
@@ -175,38 +242,80 @@ export default function ProfileScreen({ navigation }: Props) {
     );
   };
 
+  // Composant de produit dans le profil
+  const ProductItemCard = React.memo(({ product, onDelete, onEdit }: { 
+    product: Product; 
+    onDelete: (id: number) => void; 
+    onEdit: (id: number) => void;
+  }) => {
+    const [imageLoading, setImageLoading] = useState(true);
+    const [imageError, setImageError] = useState(false);
+    
+    return (
+      <Card style={styles.productCard} key={product.id}>
+        <TouchableOpacity 
+          onPress={() => navigation.navigate('ProductDetails', { productId: product.id })}
+        >
+          <View style={styles.productImageContainer}>
+            {imageLoading && (
+              <ActivityIndicator 
+                size="small" 
+                color="#E75A7C" 
+                style={styles.imageLoader} 
+              />
+            )}
+            {imageError && (
+              <View style={styles.imageErrorContainer}>
+                <Ionicons name="image-outline" size={24} color="#E75A7C" />
+                <Text style={styles.imageErrorText}>Image indisponible</Text>
+              </View>
+            )}
+            <Card.Cover 
+              source={getProductImage(product)} 
+              style={styles.productImage}
+              onLoadStart={() => setImageLoading(true)}
+              onLoadEnd={() => setImageLoading(false)}
+              onError={() => {
+                setImageLoading(false);
+                setImageError(true);
+              }}
+            />
+          </View>
+          <Card.Content style={styles.productContent}>
+            <Text style={styles.productTitle} numberOfLines={2}>{product.title}</Text>
+            <Text style={styles.productPrice}>{formatPrice(product.price)}</Text>
+            {product.location && (
+              <Text style={styles.productLocation} numberOfLines={1}>
+                <Ionicons name="location-outline" size={14} color="#666" /> {product.location}
+              </Text>
+            )}
+          </Card.Content>
+        </TouchableOpacity>
+        <Card.Actions style={styles.productActions}>
+          <Button 
+            mode="outlined" 
+            onPress={() => onEdit(product.id)}
+          >
+            Modifier
+          </Button>
+          <Button 
+            mode="outlined" 
+            textColor="red"
+            onPress={() => onDelete(product.id)}
+          >
+            Supprimer
+          </Button>
+        </Card.Actions>
+      </Card>
+    );
+  });
+
   const renderProductItem = (product: Product) => (
-    <Card style={styles.productCard} key={product.id}>
-      <TouchableOpacity 
-        onPress={() => navigation.navigate('ProductDetails', { productId: product.id })}
-      >
-        <Card.Cover source={getProductImage(product)} style={styles.productImage} />
-        <Card.Content style={styles.productContent}>
-          <Text style={styles.productTitle} numberOfLines={2}>{product.title}</Text>
-          <Text style={styles.productPrice}>{formatPrice(product.price)}</Text>
-          {product.location && (
-            <Text style={styles.productLocation} numberOfLines={1}>
-              <Ionicons name="location-outline" size={14} color="#666" /> {product.location}
-            </Text>
-          )}
-        </Card.Content>
-      </TouchableOpacity>
-      <Card.Actions style={styles.productActions}>
-        <Button 
-          mode="outlined" 
-          onPress={() => navigation.navigate('AjouterProduit', { productId: product.id })}
-        >
-          Modifier
-        </Button>
-        <Button 
-          mode="outlined" 
-          textColor="red"
-          onPress={() => handleDeleteProduct(product.id)}
-        >
-          Supprimer
-        </Button>
-      </Card.Actions>
-    </Card>
+    <ProductItemCard 
+      product={product} 
+      onDelete={handleDeleteProduct} 
+      onEdit={(id) => navigation.navigate('AjouterProduit', { productId: id })}
+    />
   );
 
   return (
@@ -249,7 +358,14 @@ export default function ProfileScreen({ navigation }: Props) {
               </Button>
             </View>
           ) : (
-            userProducts.map(renderProductItem)
+            userProducts.map(product => (
+              <ProductItemCard 
+                key={product.id}
+                product={product} 
+                onDelete={handleDeleteProduct} 
+                onEdit={(id) => navigation.navigate('AjouterProduit', { productId: id })}
+              />
+            ))
           )}
         </View>
       </List.Section>
@@ -326,8 +442,43 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     elevation: 2,
   },
+  productImageContainer: {
+    position: 'relative',
+    borderTopLeftRadius: 8,
+    borderTopRightRadius: 8,
+    overflow: 'hidden',
+  },
+  imageLoader: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.4)',
+    zIndex: 1,
+  },
+  imageErrorContainer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.7)',
+    zIndex: 1,
+  },
+  imageErrorText: {
+    fontSize: 14,
+    color: '#E75A7C',
+    marginTop: 8,
+  },
   productImage: {
     height: 200,
+    borderTopLeftRadius: 8,
+    borderTopRightRadius: 8,
   },
   productContent: {
     padding: 8,

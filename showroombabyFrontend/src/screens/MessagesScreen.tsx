@@ -170,6 +170,7 @@ export default function MessagesScreen({ navigation }: any) {
         setConversations([]);
         setLoading(false);
         setRefreshing(false);
+        setIsAuthenticated(false);
         return;
       }
       
@@ -184,12 +185,19 @@ export default function MessagesScreen({ navigation }: any) {
         setConversations([]);
         setLoading(false);
         setRefreshing(false);
+        setIsAuthenticated(false);
         return;
       }
       
+      // Mettre à jour l'état d'authentification
+      setIsAuthenticated(true);
+      
       const response = await axios.get(
         `${API_URL}/api/messages/conversations`,
-        { headers: { Authorization: `Bearer ${token}` } }
+        { 
+          headers: { Authorization: `Bearer ${token}` },
+          timeout: 10000 // Ajouter un timeout pour éviter les attentes infinies
+        }
       );
 
       // Log détaillé pour déboguer
@@ -226,13 +234,6 @@ export default function MessagesScreen({ navigation }: any) {
           }
         });
         
-        console.log(`Nombre de conversations après regroupement: ${userConversations.size}`);
-        
-        // Afficher les détails des conversations regroupées pour déboguer
-        userConversations.forEach((conv, userId) => {
-          console.log(`Conversation regroupée: userId=${userId}, product_id=${conv.product_id || 'none'}, product_title=${conv.product?.title || 'none'}`);
-        });
-        
         // Convertir la Map en tableau
         const uniqueConversations = Array.from(userConversations.values());
         
@@ -250,20 +251,17 @@ export default function MessagesScreen({ navigation }: any) {
         console.error('Format de données invalide:', response.data);
         setConversations([]);
       }
-      setLoading(false);
-      setRefreshing(false);
     } catch (error: any) {
       console.error('Erreur chargement conversations:', error);
       
-      // Vérifier explicitement si l'erreur est due à une déconnexion
-      if (error.response && error.response.status === 401) {
-        console.log('Token expiré ou invalide - utilisateur déconnecté');
-        // Réinitialiser les données de session
-        setConversations([]);
-        setUserId(null);
+      // Si erreur d'authentification, ne pas rediriger mais mettre à jour l'état
+      if (error.response?.status === 401) {
+        console.log('Erreur 401: Token expiré ou invalide');
         setIsAuthenticated(false);
       }
       
+      setConversations([]);
+    } finally {
       setLoading(false);
       setRefreshing(false);
     }

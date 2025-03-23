@@ -37,7 +37,7 @@ interface Product {
   view_count: number;
   created_at: string;
   updated_at: string;
-  images?: string | string[] | null;
+  images?: string | string[] | { path: string; url?: string }[] | any[] | null;
 }
 
 // Après la définition du type Product, ajouter un type pour les favoris
@@ -75,7 +75,8 @@ export default function FavoritesScreen({ navigation }: any) {
       }
       
       const response = await axios.get(`${API_URL}/api/favorites`, {
-        headers: { Authorization: `Bearer ${token}` }
+        headers: { Authorization: `Bearer ${token}` },
+        timeout: 10000 // Ajouter un timeout pour éviter les attentes infinies
       });
       
       // L'API renvoie un tableau d'objets de favoris avec les produits imbriqués
@@ -99,9 +100,20 @@ export default function FavoritesScreen({ navigation }: any) {
         console.warn('Format de données inattendu:', response.data);
         setFavorites([]);
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Erreur lors du chargement des favoris:', error);
-      setError('Impossible de charger vos favoris. Veuillez réessayer.');
+      
+      // Gérer spécifiquement les erreurs d'authentification
+      if (error.response?.status === 401) {
+        console.log('Erreur 401 lors du chargement des favoris - Token expiré');
+        setError('Session expirée. Veuillez vous reconnecter.');
+        
+        // Ne pas rediriger automatiquement pour éviter une boucle
+        // navigation.navigate('Auth') - NE PAS FAIRE CECI
+      } else {
+        setError('Impossible de charger vos favoris. Veuillez réessayer.');
+      }
+      
       setFavorites([]);
     } finally {
       setLoading(false);
@@ -158,31 +170,70 @@ export default function FavoritesScreen({ navigation }: any) {
   };
 
   const getProductImage = (product: Product) => {
+    // Image par défaut si pas d'images
     if (!product.images) {
       return placeholderImage;
     }
     
-    let imageUrl;
-    
-    if (typeof product.images === 'string') {
-      try {
-        // Tenter de parser si c'est une chaîne JSON
-        const parsed = JSON.parse(product.images);
-        imageUrl = Array.isArray(parsed) && parsed.length > 0 ? parsed[0] : null;
-      } catch (e) {
-        // Si ce n'est pas un JSON valide, utiliser comme URL directe
-        imageUrl = product.images;
+    try {
+      // Si images est une chaîne JSON, on essaie de l'analyser
+      if (typeof product.images === 'string') {
+        try {
+          const parsedImages = JSON.parse(product.images);
+          
+          if (Array.isArray(parsedImages) && parsedImages.length > 0) {
+            // Vérifier si l'image contient un chemin complet ou juste un nom de fichier
+            const imageUrl = parsedImages[0].includes('http') 
+              ? parsedImages[0] 
+              : `${API_URL}/storage/${parsedImages[0]}`;
+            
+            return { uri: imageUrl };
+          }
+        } catch (e) {
+          // Si ce n'est pas un JSON valide, on utilise directement la chaîne
+          const imageUrl = product.images.includes('http') 
+            ? product.images 
+            : `${API_URL}/storage/${product.images}`;
+          
+          return { uri: imageUrl };
+        }
+      } 
+      // Si c'est déjà un tableau d'objets avec propriété "path"
+      else if (Array.isArray(product.images) && product.images.length > 0) {
+        // Vérifier si c'est un tableau d'objets avec une propriété path
+        if (typeof product.images[0] === 'object' && product.images[0] !== null) {
+          // Si l'objet contient un champ path ou url
+          if (product.images[0].path) {
+            const imageUrl = product.images[0].path.includes('http') 
+              ? product.images[0].path 
+              : `${API_URL}/storage/${product.images[0].path}`;
+            
+            return { uri: imageUrl };
+          } else if (product.images[0].url) {
+            return { uri: product.images[0].url };
+          } else {
+            // Essayer de récupérer directement la première valeur
+            const firstImage = product.images[0];
+            
+            if (typeof firstImage === 'string') {
+              const imageUrl = firstImage.includes('http') 
+                ? firstImage 
+                : `${API_URL}/storage/${firstImage}`;
+              
+              return { uri: imageUrl };
+            }
+          }
+        } else if (typeof product.images[0] === 'string') {
+          // Si c'est un tableau de chaînes
+          const imageUrl = product.images[0].includes('http') 
+            ? product.images[0] 
+            : `${API_URL}/storage/${product.images[0]}`;
+          
+          return { uri: imageUrl };
+        }
       }
-    } else if (Array.isArray(product.images) && product.images.length > 0) {
-      imageUrl = product.images[0];
-    }
-    
-    if (imageUrl && typeof imageUrl === 'string') {
-      if (imageUrl.startsWith('http')) {
-        return { uri: imageUrl };
-      } else {
-        return { uri: `${API_URL}/storage/${imageUrl}` };
-      }
+    } catch (e) {
+      console.error('Erreur traitement image:', e);
     }
     
     return placeholderImage;
@@ -204,34 +255,77 @@ export default function FavoritesScreen({ navigation }: any) {
     });
   };
 
-  const renderItem = ({ item }: { item: Product }) => (
-    <TouchableOpacity 
-      style={styles.productCard}
-      onPress={() => navigation.navigate('ProductDetails', { productId: item.id })}
-    >
-      <Card>
-        <Card.Cover source={getProductImage(item)} style={styles.productImage} />
-        <Card.Content style={styles.cardContent}>
-          <View style={styles.productInfo}>
-            <Text style={styles.productTitle}>{item.title}</Text>
-            <Text style={styles.productPrice}>{formatPrice(item.price)}</Text>
-            {item.location && (
-              <Text style={styles.productLocation}>
-                <Ionicons name="location-outline" size={14} color="#666" />
-                {' '}{item.location}
-              </Text>
+  // Composant pour afficher un élément de produit favori
+  const ProductItem = React.memo(({ item, navigation, onRemove }: { 
+    item: Product; 
+    navigation: any; 
+    onRemove: (id: number, title: string) => void;
+  }) => {
+    const [imageLoading, setImageLoading] = useState(true);
+    const [imageError, setImageError] = useState(false);
+    
+    return (
+      <TouchableOpacity 
+        style={styles.productCard}
+        onPress={() => navigation.navigate('ProductDetails', { productId: item.id })}
+      >
+        <Card>
+          <View style={styles.productImageContainer}>
+            {imageLoading && (
+              <ActivityIndicator 
+                size="small" 
+                color="#e75480" 
+                style={styles.imageLoader} 
+              />
             )}
-            <Text style={styles.productDate}>Ajouté le {formatDate(item.created_at)}</Text>
+            {imageError && (
+              <View style={styles.imageErrorContainer}>
+                <Ionicons name="image-outline" size={24} color="#e75480" />
+                <Text style={styles.imageErrorText}>Image indisponible</Text>
+              </View>
+            )}
+            <Card.Cover 
+              source={getProductImage(item)} 
+              style={styles.productImage} 
+              onLoadStart={() => setImageLoading(true)}
+              onLoadEnd={() => setImageLoading(false)}
+              onError={() => {
+                setImageLoading(false);
+                setImageError(true);
+              }}
+            />
           </View>
-          <TouchableOpacity 
-            style={styles.removeButton}
-            onPress={() => confirmRemove(item.id, item.title)}
-          >
-            <Ionicons name="heart-dislike" size={24} color="#e75480" />
-          </TouchableOpacity>
-        </Card.Content>
-      </Card>
-    </TouchableOpacity>
+          <Card.Content style={styles.cardContent}>
+            <View style={styles.productInfo}>
+              <Text style={styles.productTitle}>{item.title}</Text>
+              <Text style={styles.productPrice}>{formatPrice(item.price)}</Text>
+              {item.location && (
+                <Text style={styles.productLocation}>
+                  <Ionicons name="location-outline" size={14} color="#666" />
+                  {' '}{item.location}
+                </Text>
+              )}
+              <Text style={styles.productDate}>Ajouté le {formatDate(item.created_at)}</Text>
+            </View>
+            <TouchableOpacity 
+              style={styles.removeButton}
+              onPress={() => onRemove(item.id, item.title)}
+            >
+              <Ionicons name="heart-dislike" size={24} color="#e75480" />
+            </TouchableOpacity>
+          </Card.Content>
+        </Card>
+      </TouchableOpacity>
+    );
+  });
+
+  // Remplacer la fonction renderItem par cette version qui utilise le composant défini ci-dessus
+  const renderItem = ({ item }: { item: Product }) => (
+    <ProductItem 
+      item={item} 
+      navigation={navigation} 
+      onRemove={confirmRemove} 
+    />
   );
 
   const filteredProducts = favorites.filter(product => 
@@ -426,6 +520,23 @@ const styles = StyleSheet.create({
     backgroundColor: '#ffffff',
     elevation: 2,
   },
+  productImageContainer: {
+    position: 'relative',
+    borderTopLeftRadius: 12,
+    borderTopRightRadius: 12,
+    overflow: 'hidden',
+  },
+  imageLoader: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.4)',
+    zIndex: 1,
+  },
   productImage: {
     height: wp('50%'),
     borderTopLeftRadius: 12,
@@ -474,4 +585,20 @@ const styles = StyleSheet.create({
     color: '#666',
     textAlign: 'center',
   },
-}); 
+  imageErrorContainer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.4)',
+    zIndex: 1,
+  },
+  imageErrorText: {
+    fontSize: 16,
+    color: '#e75480',
+    marginTop: 8,
+  },
+});
