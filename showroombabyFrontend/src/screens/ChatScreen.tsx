@@ -757,21 +757,25 @@ export default function ChatScreen({ route, navigation }: Props) {
 }
 
 const styles = StyleSheet.create({
+  // Conteneur principal pour tout l'écran de chat
   container: {
     flex: 1,
     backgroundColor: '#f8f9fa',
   },
+  // Conteneur affiché pendant le chargement des messages
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: '#f8f9fa',
   },
+  // Texte affiché pendant le chargement
   loadingText: {
     marginTop: 8,
     color: '#666',
     fontSize: 14,
   },
+  // Conteneur affiché en cas d'erreur
   errorContainer: {
     flex: 1,
     justifyContent: 'center',
@@ -779,6 +783,7 @@ const styles = StyleSheet.create({
     padding: 20,
     backgroundColor: '#f8f9fa',
   },
+  // Style du texte d'erreur
   errorText: {
     fontSize: 16,
     color: '#ff4444',
@@ -786,10 +791,12 @@ const styles = StyleSheet.create({
     marginTop: 8,
     marginBottom: 16,
   },
+  // Style du bouton de réessai en cas d'erreur
   retryButton: {
     paddingHorizontal: 24,
     borderRadius: 25,
   },
+  // Barre d'en-tête contenant les informations du vendeur et du produit
   header: {
     backgroundColor: '#ffffff',
     elevation: 2,
@@ -801,22 +808,26 @@ const styles = StyleSheet.create({
     paddingTop: 0,
     paddingBottom: 0,
   },
+  // Partie principale de l'en-tête contenant les infos
   headerContent: {
     flex: 1,
     marginLeft: 4,
     justifyContent: 'flex-start',
     paddingVertical: 0,
   },
+  // Conteneur des informations de l'utilisateur dans l'en-tête
   headerUserInfo: {
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 1,
     marginTop: 0,
   },
+  // Avatar dans l'en-tête
   headerAvatar: {
     marginRight: 6,
     marginTop: 0,
   },
+  // Titre dans l'en-tête (nom du vendeur)
   headerTitle: {
     fontSize: 15,
     fontWeight: '700',
@@ -824,6 +835,7 @@ const styles = StyleSheet.create({
     paddingTop: 0,
     marginTop: 0,
   },
+  // Sous-titre dans l'en-tête (titre du produit)
   headerSubtitle: {
     fontSize: 13,
     color: '#6B3CE9',
@@ -831,16 +843,19 @@ const styles = StyleSheet.create({
     marginLeft: 34,
     marginTop: -2,
   },
+  // Bouton d'action dans l'en-tête (info)
   headerAction: {
     padding: 2,
     marginRight: 4,
   },
+  // Wrapper pour la carte d'informations du produit
   productCardWrapper: {
     overflow: 'visible',
     paddingHorizontal: 12,
     paddingVertical: 8,
     backgroundColor: '#f8f9fa',
   },
+  // Conteneur principal des informations du produit
   productInfoContainer: {
     backgroundColor: '#fff',
     paddingVertical: 10,
@@ -852,11 +867,13 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.15,
     shadowRadius: 4,
   },
+  // Disposition du contenu des informations du produit
   productInfoContent: {
     flexDirection: 'row',
     alignItems: 'center',
     height: 65,
   },
+  // Conteneur de l'image du produit
   productImageContainer: {
     width: 56,
     height: 56,
@@ -867,6 +884,7 @@ const styles = StyleSheet.create({
     marginRight: 12,
     backgroundColor: '#fff',
   },
+  // Conteneur de l'image placeholder quand aucune image n'est disponible
   placeholderImageContainer: {
     width: 56, 
     height: 56,
@@ -875,25 +893,30 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderRadius: 8,
   },
+  // Style de l'image du produit
   productImage: {
     width: '100%',
     height: '100%',
     borderRadius: 8,
   },
+  // Conteneur des détails textuels du produit
   productDetails: {
     flex: 1,
     justifyContent: 'center',
   },
+  // Titre du produit dans la carte d'info
   productTitle: {
     fontSize: 14,
     fontWeight: '600',
     color: '#333',
     marginBottom: 6,
   },
+  // Conteneur du prix et autres infos
   priceContainer: {
     flexDirection: 'row',
     alignItems: 'center',
   },
+  // Badge visuel pour le prix
   priceTag: {
     backgroundColor: 'rgba(255,107,155,0.15)',
     paddingVertical: 3,
@@ -903,36 +926,43 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255,107,155,0.1)',
     marginRight: 10,
   },
+  // Style du texte du prix
   productPrice: {
     fontSize: 14,
     fontWeight: '700',
     color: '#ff6b9b',
   },
+  // Texte "Voir l'annonce" cliquable
   viewProductText: {
     fontSize: 12,
     color: '#6B3CE9',
     textDecorationLine: 'underline',
   },
+  // Conteneur de la liste des messages
   messagesContainer: {
     padding: 8,
     paddingBottom: 12,
   },
+  // Style pour le conteneur vide (pas de messages)
   emptyContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
   },
+  // Wrapper pour le message "chat vide" (avec rotation pour l'inversion)
   emptyChatWrapper: {
     transform: [{ rotate: '180deg' }],
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
   },
+  // Conteneur pour le message "chat vide"
   emptyChatContainer: {
     alignItems: 'center',
     justifyContent: 'center',
     padding: 20,
   },
+  // Titre pour le chat vide
   emptyChatTitle: {
     fontSize: 18,
     fontWeight: '600',
@@ -940,30 +970,36 @@ const styles = StyleSheet.create({
     marginTop: 12,
     marginBottom: 8,
   },
+  // Texte explicatif pour le chat vide
   emptyChatText: {
     fontSize: 14,
     color: '#999',
     textAlign: 'center',
     lineHeight: 20,
   },
+  // Bulle contenant un message
   messageBubble: {
     flexDirection: 'row',
     marginBottom: 1,
     maxWidth: '85%',
   },
+  // Avatar à côté des messages reçus
   messageAvatar: {
     marginRight: 4,
     alignSelf: 'flex-end',
     marginBottom: 2,
   },
+  // Style pour les messages envoyés (alignés à droite)
   sentMessage: {
     alignSelf: 'flex-end',
     marginLeft: 16,
   },
+  // Style pour les messages reçus (alignés à gauche)
   receivedMessage: {
     alignSelf: 'flex-start',
     marginRight: 16,
   },
+  // Contenu du message (texte et heure)
   messageContent: {
     borderRadius: 16,
     padding: 8,
@@ -971,10 +1007,12 @@ const styles = StyleSheet.create({
     minWidth: 60,
     maxWidth: '100%',
   },
+  // Style spécifique pour le contenu des messages envoyés
   sentMessageContent: {
     backgroundColor: '#ff6b9b',
     borderBottomRightRadius: 4,
   },
+  // Style spécifique pour le contenu des messages reçus
   receivedMessageContent: {
     backgroundColor: '#fff',
     borderBottomLeftRadius: 4,
@@ -984,34 +1022,43 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 1,
   },
+  // Style pour les messages consécutifs du même expéditeur
   consecutiveMessage: {
     marginLeft: 28,
   },
+  // Style du texte des messages
   messageText: {
     fontSize: 15,
     lineHeight: 20,
   },
+  // Style du texte pour les messages envoyés
   sentMessageText: {
     color: '#fff',
   },
+  // Style du texte pour les messages reçus
   receivedMessageText: {
     color: '#333',
   },
+  // Style de l'heure du message
   messageTime: {
     fontSize: 10,
     marginTop: 2,
     alignSelf: 'flex-end',
   },
+  // Style de l'heure pour les messages envoyés
   sentMessageTime: {
     color: 'rgba(255, 255, 255, 0.7)',
   },
+  // Style de l'heure pour les messages reçus
   receivedMessageTime: {
     color: '#999',
   },
+  // Conteneur pour la date séparant les messages
   dateContainer: {
     alignItems: 'center',
     marginVertical: 6,
   },
+  // Style du texte de la date
   dateText: {
     fontSize: 11,
     color: '#999',
@@ -1020,6 +1067,7 @@ const styles = StyleSheet.create({
     paddingVertical: 2,
     borderRadius: 10,
   },
+  // Conteneur pour la zone de saisie de message en bas
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1033,6 +1081,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.05,
     shadowRadius: 2,
   },
+  // Champ de saisie du message
   input: {
     flex: 1,
     backgroundColor: '#f1f3f5',
@@ -1044,6 +1093,7 @@ const styles = StyleSheet.create({
     maxHeight: 100,
     color: '#333',
   },
+  // Bouton d'envoi du message
   sendButton: {
     backgroundColor: '#ff6b9b',
     width: 42,
@@ -1052,9 +1102,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
+  // Style du bouton d'envoi désactivé
   sendButtonDisabled: {
     backgroundColor: '#ffb3cb',
   },
+  // Toast d'erreur en bas de l'écran
   errorToast: {
     position: 'absolute',
     bottom: 64,
@@ -1064,6 +1116,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 16,
   },
+  // Contenu du toast d'erreur
   errorToastContent: {
     backgroundColor: 'rgba(255, 70, 70, 0.9)',
     borderRadius: 25,
@@ -1079,6 +1132,7 @@ const styles = StyleSheet.create({
     shadowRadius: 3.84,
     maxWidth: '90%',
   },
+  // Texte du toast d'erreur
   errorToastText: {
     color: '#fff',
     fontSize: 14,
@@ -1086,6 +1140,7 @@ const styles = StyleSheet.create({
     marginHorizontal: 10,
     flex: 1,
   },
+  // Bouton de retour dans l'en-tête
   backButton: {
     marginRight: 0,
     padding: 0,
