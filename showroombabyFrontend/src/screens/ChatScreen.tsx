@@ -942,6 +942,7 @@ const styles = StyleSheet.create({
   messagesContainer: {
     padding: 8,
     paddingBottom: 12,
+    marginTop: hp('10%'),
   },
   // Style pour le conteneur vide (pas de messages)
   emptyContainer: {
