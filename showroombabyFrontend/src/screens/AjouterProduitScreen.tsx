@@ -38,10 +38,11 @@ type ProductData = {
 };
 
 enum Step {
-  PHOTOS = 0,
-  LOCATION = 1,
-  CHARACTERISTICS = 2,
-  DETAILS = 3,
+  INFOS_BASE = 0,
+  DESCRIPTION_PRIX = 1,
+  FACTURE_GARANTIE = 2,
+  PHOTOS = 3,
+  LOCATION = 4,
 }
 
 const CONDITIONS = [
@@ -63,9 +64,177 @@ const MAX_IMAGE_SIZE = 5 * 1024 * 1024; // 5MB
 const MAX_IMAGES = 5;
 const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png'];
 
+// Définition des catégories principales et leurs sous-catégories
+const CATEGORIES_DATA = [
+  {
+    id: 1,
+    name: 'Poussette',
+    subcategories: [
+      { id: 1, name: 'Poussette canne' },
+      { id: 2, name: 'Poussette 3 roues' },
+      { id: 3, name: 'Poussette 4 roues' },
+      { id: 4, name: 'Poussette combiné duo' },
+      { id: 5, name: 'Poussette combiné trio' },
+      { id: 6, name: 'Poussette double' },
+      { id: 7, name: 'Poussette tout terrain' },
+    ]
+  },
+  {
+    id: 2,
+    name: 'Sièges auto',
+    subcategories: [
+      { id: 8, name: 'Groupe 0/0+' },
+      { id: 9, name: 'Groupe 0+/1' },
+      { id: 10, name: 'Groupe 1' },
+      { id: 11, name: 'Groupe 2/3' },
+      { id: 12, name: 'Groupe 1/2/3' },
+      { id: 13, name: 'Siège auto pivotant' },
+    ]
+  },
+  {
+    id: 3,
+    name: 'Chambre',
+    subcategories: [
+      { id: 14, name: 'Applique et suspension' },
+      { id: 15, name: 'Armoire' },
+      { id: 16, name: 'Berceau bébé' },
+      { id: 17, name: 'Bibliothèque' },
+      { id: 18, name: 'Bureau' },
+      { id: 19, name: 'Coffre à jouet' },
+      { id: 20, name: 'Commode' },
+      { id: 21, name: 'Deco/ lampe' },
+      { id: 22, name: 'Lit bébé' },
+      { id: 23, name: 'Lit enfant' },
+      { id: 24, name: 'Lit mezzanine' },
+      { id: 25, name: 'Matelas' },
+      { id: 26, name: 'Parc à bébé' },
+      { id: 27, name: 'Table à langer' },
+      { id: 28, name: 'Table de nuit' },
+      { id: 29, name: 'Tiroir de lit' },
+      { id: 30, name: 'Tour de lit' },
+    ]
+  },
+  {
+    id: 4,
+    name: 'Chaussure / Vêtements',
+    subcategories: [
+      { id: 31, name: 'Gigoteuse' },
+      { id: 32, name: 'Pyjama' },
+      { id: 33, name: 'T-shirt' },
+      { id: 34, name: 'Body' },
+      { id: 35, name: 'Salopette / Combinaison' },
+      { id: 36, name: 'Pantalon / Jean' },
+      { id: 37, name: 'Pull / Gilet / Sweat' },
+      { id: 38, name: 'Robe / Jupe' },
+      { id: 39, name: 'Short' },
+      { id: 40, name: 'Chemise / Blouse' },
+      { id: 41, name: 'Legging' },
+      { id: 42, name: 'Maillot de bain' },
+      { id: 43, name: 'Manteau / Blouson' },
+      { id: 44, name: 'Chaussure' },
+      { id: 45, name: 'Basket' },
+      { id: 46, name: 'Chausson' },
+      { id: 47, name: 'Chaussette' },
+      { id: 48, name: 'Culotte' },
+    ]
+  },
+  {
+    id: 5,
+    name: 'Jeux / Éveil',
+    subcategories: [
+      { id: 49, name: 'Transat' },
+      { id: 50, name: 'Balancelle / Bascule' },
+      { id: 51, name: 'Ballon' },
+      { id: 52, name: 'Trotteur / Porteur/ Chariot' },
+      { id: 53, name: 'Vélo' },
+      { id: 54, name: 'Doudou / Peluche' },
+      { id: 55, name: 'Tapis d\'éveil' },
+      { id: 56, name: 'Jouet de bain' },
+      { id: 57, name: 'Jouet en bois' },
+      { id: 58, name: 'Poupon / Poupée' },
+      { id: 59, name: 'Jeu de construction' },
+      { id: 60, name: 'Figurine' },
+      { id: 61, name: 'Puzzle' },
+    ]
+  },
+  {
+    id: 6,
+    name: 'Livre / Dvd',
+    subcategories: [
+      { id: 62, name: 'Livre sonore' },
+      { id: 63, name: 'Éveil et premier âge' },
+      { id: 64, name: 'Livre 0 mois à 2 ans' },
+      { id: 65, name: 'Livre 2 ans à 4 ans' },
+      { id: 66, name: 'Livre de bain' },
+    ]
+  },
+  {
+    id: 7,
+    name: 'Toilette',
+    subcategories: [
+      { id: 67, name: 'Baignoire' },
+      { id: 68, name: 'Couche réutilisable' },
+      { id: 69, name: 'Housse matelas à langer' },
+      { id: 70, name: 'Matelas à langer' },
+      { id: 71, name: 'Mouche bébé' },
+      { id: 72, name: 'Peigne / Brosse' },
+      { id: 73, name: 'Table à langer' },
+      { id: 74, name: 'Thermomètre de bain' },
+      { id: 75, name: 'Trousse de toilette' },
+    ]
+  },
+  {
+    id: 8,
+    name: 'Repas',
+    subcategories: [
+      { id: 76, name: 'Allaitement' },
+      { id: 77, name: 'Boîte' },
+      { id: 78, name: 'Boîte doseurs' },
+      { id: 79, name: 'Chaise haute bebe' },
+      { id: 80, name: 'Chauffe biberon' },
+      { id: 81, name: 'Chauffe repas' },
+      { id: 82, name: 'Coussin pour chaise haute' },
+      { id: 83, name: 'Vaisselle' },
+      { id: 84, name: 'Soutien gorge allaitement' },
+    ]
+  },
+  {
+    id: 9,
+    name: 'Sortie',
+    subcategories: [
+      { id: 85, name: 'Chancelière' },
+      { id: 86, name: 'Lit pliant' },
+      { id: 87, name: 'Sac a langer' },
+      { id: 88, name: 'Porte bébé' },
+    ]
+  },
+  {
+    id: 10,
+    name: 'Service',
+    subcategories: [
+      { id: 89, name: 'Garde d\'enfant' },
+      { id: 90, name: 'Aide au devoir' },
+    ]
+  }
+];
+
+// Marques pour les différentes catégories
+const BRANDS = [
+  { id: 1, name: 'Babymoov' },
+  { id: 2, name: 'Chicco' },
+  { id: 3, name: 'Bébé Confort' },
+  { id: 4, name: 'Cybex' },
+  { id: 5, name: 'Nattou' },
+  { id: 6, name: 'Nuk' },
+  { id: 7, name: 'Philips Avent' },
+  { id: 8, name: 'Red Castle' },
+  { id: 9, name: 'Tigex' },
+  { id: 10, name: 'Autre' },
+];
+
 export default function AjouterProduitScreen({ navigation, route }: any) {
   const productId = route.params?.productId;
-  const [currentStep, setCurrentStep] = useState<Step>(Step.PHOTOS);
+  const [currentStep, setCurrentStep] = useState<Step>(Step.INFOS_BASE);
   const [isLoading, setIsLoading] = useState(false);
   const [categories, setCategories] = useState<Category[]>([]);
   const [productData, setProductData] = useState<ProductData>({
@@ -94,7 +263,8 @@ export default function AjouterProduitScreen({ navigation, route }: any) {
   const [publishedProductId, setPublishedProductId] = useState<number | null>(null);
 
   useEffect(() => {
-    fetchCategories();
+    // Utiliser les catégories prédéfinies au lieu de les charger depuis l'API
+    setCategories(CATEGORIES_DATA);
     checkPermissions();
     getUserInfo();
     if (productId) {
@@ -128,7 +298,7 @@ export default function AjouterProduitScreen({ navigation, route }: any) {
           images: [],
           user_id: null,
         });
-        setCurrentStep(Step.PHOTOS);
+        setCurrentStep(Step.INFOS_BASE);
         setErrors({});
         setTermsAccepted(false);
         setModalVisible(null);
@@ -208,30 +378,6 @@ export default function AjouterProduitScreen({ navigation, route }: any) {
     } catch (error) {
       console.error('Erreur lors de la récupération des informations utilisateur:', error);
       // Continuer sans les informations utilisateur
-    }
-  };
-
-  const fetchCategories = async () => {
-    try {
-      setLoading(true);
-      // Ajouter un délai artificiel pour éviter les problèmes de course condition
-      const response = await axios.get(`${API_URL}/api/categories`);
-      
-      if (response.data && Array.isArray(response.data)) {
-        setCategories(response.data);
-      } else if (response.data && response.data.data && Array.isArray(response.data.data)) {
-        // Si les données sont dans un sous-objet data
-        setCategories(response.data.data);
-      } else {
-        console.error('Format de données de catégories inattendu:', response.data);
-        setCategories([]);
-      }
-    } catch (error) {
-      console.error('Erreur lors du chargement des catégories:', error);
-      Alert.alert('Erreur', 'Impossible de charger les catégories. Veuillez réessayer.');
-      setCategories([]);
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -353,6 +499,36 @@ export default function AjouterProduitScreen({ navigation, route }: any) {
     const newErrors: Record<string, string> = {};
     
     switch (currentStep) {
+      case Step.INFOS_BASE:
+        if (!productData.title?.trim()) {
+          newErrors.title = 'Veuillez saisir un titre.';
+        } else if (productData.title.length < 3) {
+          newErrors.title = 'Le titre doit contenir au moins 3 caractères.';
+        }
+        if (!productData.category_id) {
+          newErrors.category = 'Veuillez sélectionner une catégorie.';
+        }
+        break;
+        
+      case Step.DESCRIPTION_PRIX:
+        if (!productData.price?.trim()) {
+          newErrors.price = 'Veuillez indiquer un prix.';
+        } else if (isNaN(Number(productData.price)) || Number(productData.price) <= 0) {
+          newErrors.price = 'Veuillez saisir un prix valide.';
+        }
+        if (!productData.description?.trim()) {
+          newErrors.description = 'Veuillez ajouter une description.';
+        } else if (productData.description.length < 20) {
+          newErrors.description = 'La description doit contenir au moins 20 caractères.';
+        }
+        break;
+      
+      case Step.FACTURE_GARANTIE:
+        if (!productData.condition?.trim()) {
+          newErrors.condition = 'Veuillez sélectionner l\'état du produit.';
+        }
+        break;
+        
       case Step.PHOTOS:
         if (productData.images.length === 0) {
           newErrors.images = 'Veuillez ajouter au moins une photo.';
@@ -372,39 +548,6 @@ export default function AjouterProduitScreen({ navigation, route }: any) {
           newErrors.terms = 'Veuillez accepter les conditions générales.';
         }
         break;
-        
-      case Step.CHARACTERISTICS:
-        if (!productData.size?.trim()) {
-          newErrors.size = 'Veuillez sélectionner une taille.';
-        }
-        if (!productData.color?.trim()) {
-          newErrors.color = 'Veuillez sélectionner une couleur.';
-        }
-        if (!productData.condition?.trim()) {
-          newErrors.condition = 'Veuillez sélectionner l\'état du produit.';
-        }
-        break;
-        
-      case Step.DETAILS:
-        if (!productData.title?.trim()) {
-          newErrors.title = 'Veuillez saisir un titre.';
-        } else if (productData.title.length < 3) {
-          newErrors.title = 'Le titre doit contenir au moins 3 caractères.';
-        }
-        if (!productData.category_id) {
-          newErrors.category = 'Veuillez sélectionner une catégorie.';
-        }
-        if (!productData.price?.trim()) {
-          newErrors.price = 'Veuillez indiquer un prix.';
-        } else if (isNaN(Number(productData.price)) || Number(productData.price) <= 0) {
-          newErrors.price = 'Veuillez saisir un prix valide.';
-        }
-        if (!productData.description?.trim()) {
-          newErrors.description = 'Veuillez ajouter une description.';
-        } else if (productData.description.length < 20) {
-          newErrors.description = 'La description doit contenir au moins 20 caractères.';
-        }
-        break;
     }
 
     setErrors(newErrors);
@@ -413,7 +556,7 @@ export default function AjouterProduitScreen({ navigation, route }: any) {
 
   const handleNext = () => {
     if (validateStep()) {
-      if (currentStep < Step.DETAILS) {
+      if (currentStep < Step.LOCATION) {
         setCurrentStep(currentStep + 1);
       } else {
         submitProduct();
@@ -564,8 +707,104 @@ export default function AjouterProduitScreen({ navigation, route }: any) {
   };
 
   // Fonction pour afficher une modale de sélection
-  const showSelectionModal = (type: string) => {
-    setModalVisible(type);
+  const showSelectionModal = () => {
+    // Liste des options selon le type de modale
+    let options: { id: string | number; label: string }[] = [];
+    let title = '';
+
+    switch (modalVisible) {
+      case 'condition':
+        options = CONDITIONS;
+        title = 'Sélectionnez un état';
+        break;
+      case 'warranty':
+        options = WARRANTIES;
+        title = 'Sélectionnez une garantie';
+        break;
+      case 'category':
+        options = categories && Array.isArray(categories) 
+          ? categories.map(c => ({ id: c.id, label: c.name }))
+          : [];
+        title = 'Sélectionnez une catégorie';
+        break;
+      case 'subcategory':
+        const selectedCategory = categories && Array.isArray(categories) 
+          ? categories.find(c => c.id === productData.category_id)
+          : undefined;
+        options = selectedCategory && selectedCategory.subcategories 
+          ? selectedCategory.subcategories.map(sc => ({ id: sc.id, label: sc.name })) 
+          : [];
+        title = 'Sélectionnez une sous-catégorie';
+        break;
+      case 'brand':
+        options = BRANDS.map(b => ({ id: b.id, label: b.name }));
+        title = 'Sélectionnez une marque';
+        break;
+      case 'size':
+        options = [
+          { id: 'xs', label: 'XS' },
+          { id: 's', label: 'S' },
+          { id: 'm', label: 'M' },
+          { id: 'l', label: 'L' },
+          { id: 'xl', label: 'XL' },
+          { id: 'xxl', label: 'XXL' },
+        ];
+        title = 'Sélectionnez une taille';
+        break;
+      case 'color':
+        options = [
+          { id: 'noir', label: 'Noir' },
+          { id: 'blanc', label: 'Blanc' },
+          { id: 'rouge', label: 'Rouge' },
+          { id: 'bleu', label: 'Bleu' },
+          { id: 'vert', label: 'Vert' },
+          { id: 'jaune', label: 'Jaune' },
+          { id: 'orange', label: 'Orange' },
+          { id: 'violet', label: 'Violet' },
+          { id: 'rose', label: 'Rose' },
+          { id: 'marron', label: 'Marron' },
+          { id: 'gris', label: 'Gris' },
+          { id: 'autre', label: 'Autre' },
+        ];
+        title = 'Sélectionnez une couleur';
+        break;
+    }
+
+    return (
+      <Modal
+        animationType="slide"
+        transparent={true}
+        visible={!!modalVisible}
+        onRequestClose={() => setModalVisible(null)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>{title}</Text>
+            <FlatList
+              data={options}
+              keyExtractor={(item) => item.id.toString()}
+              renderItem={({ item }) => (
+                <TouchableOpacity
+                  style={styles.modalItem}
+                  onPress={() => handleSelect(modalVisible || '', item.id.toString(), item.label)}
+                >
+                  <Text style={styles.modalItemText}>{item.label}</Text>
+                </TouchableOpacity>
+              )}
+              ItemSeparatorComponent={() => <Divider />}
+              style={styles.modalList}
+            />
+            <Button
+              mode="text"
+              onPress={() => setModalVisible(null)}
+              style={styles.modalCancelButton}
+            >
+              Annuler
+            </Button>
+          </View>
+        </View>
+      </Modal>
+    );
   };
 
   // Fonction pour sélectionner un élément et fermer la modale
@@ -593,6 +832,10 @@ export default function AjouterProduitScreen({ navigation, route }: any) {
         break;
       case 'color':
         setProductData(prev => ({ ...prev, color: label }));
+        break;
+      case 'brand':
+        const brand = BRANDS.find(b => b.id === parseInt(value));
+        setProductData(prev => ({ ...prev, brand: brand ? brand.name : null }));
         break;
     }
     setModalVisible(null);
@@ -704,233 +947,172 @@ export default function AjouterProduitScreen({ navigation, route }: any) {
     </View>
   );
 
-  const renderCharacteristicsStep = () => (
-    <View style={styles.stepContainer}>
-      <Text style={styles.stepTitle}>Les caractéristiques</Text>
-      <Text style={styles.stepDescription}>
-        Complétez les informations sur votre produit pour faciliter sa recherche
-      </Text>
-      
-      <Text style={styles.inputLabel}>Taille</Text>
-      <TouchableOpacity 
-        style={styles.dropdown}
-        onPress={() => showSelectionModal('size')}
-      >
-        <TextInput
-          style={styles.input}
-          placeholder="Sélectionnez la taille"
-          value={productData.size}
-          editable={false}
-        />
-        <Entypo name="chevron-down" size={24} color="black" style={styles.dropdownIcon} />
-      </TouchableOpacity>
-      {errors.size && <Text style={styles.errorText}>{errors.size}</Text>}
-      
-      <Text style={styles.inputLabel}>Couleur</Text>
-      <TouchableOpacity 
-        style={styles.dropdown}
-        onPress={() => showSelectionModal('color')}
-      >
-        <TextInput
-          style={styles.input}
-          placeholder="Sélectionnez la couleur"
-          value={productData.color}
-          editable={false}
-        />
-        <Entypo name="chevron-down" size={24} color="black" style={styles.dropdownIcon} />
-      </TouchableOpacity>
-      {errors.color && <Text style={styles.errorText}>{errors.color}</Text>}
-      
-      <Text style={styles.inputLabel}>État du produit</Text>
-      <TouchableOpacity 
-        style={styles.dropdown}
-        onPress={() => showSelectionModal('condition')}
-      >
-        <TextInput
-          style={styles.input}
-          placeholder="Sélectionnez l'état"
-          value={CONDITIONS.find(c => c.id === productData.condition)?.label || ''}
-          editable={false}
-        />
-        <Entypo name="chevron-down" size={24} color="black" style={styles.dropdownIcon} />
-      </TouchableOpacity>
-      {errors.condition && <Text style={styles.errorText}>{errors.condition}</Text>}
-    </View>
-  );
-
-  const renderDetailsStep = () => (
-    <View style={styles.stepContainer}>
-      <Text style={styles.stepTitle}>Publier une annonce</Text>
-      <Text style={styles.stepDescription}>
-        Décrivez au mieux votre article afin d'éviter les questions inutiles ! 😄
-      </Text>
-      
-      <Text style={styles.inputLabel}>Quel est le titre de votre annonce?</Text>
-      <TextInput
-        style={styles.input}
-        placeholder="Ex: Poussette Yoyo+ comme neuve"
-        value={productData.title}
-        onChangeText={(text) => setProductData(prev => ({ ...prev, title: text }))}
-      />
-      {errors.title && <Text style={styles.errorText}>{errors.title}</Text>}
-      
-      <Text style={styles.inputLabel}>À quelle catégorie appartient-elle ?</Text>
-      <TouchableOpacity 
-        style={styles.dropdown}
-        onPress={() => showSelectionModal('category')}
-      >
-        <TextInput
-          style={styles.input}
-          placeholder="Toutes catégories"
-          value={categories && categories.length > 0 
-            ? categories.find(c => c.id === productData.category_id)?.name || ''
-            : ''}
-          editable={false}
-        />
-        <Entypo name="chevron-down" size={24} color="black" style={styles.dropdownIcon} />
-      </TouchableOpacity>
-      {errors.category && <Text style={styles.errorText}>{errors.category}</Text>}
-      
-      <Text style={styles.inputLabel}>Prix (€)</Text>
-      <TextInput
-        style={styles.input}
-        placeholder="Prix en euros"
-        keyboardType="numeric"
-        value={productData.price}
-        onChangeText={(text) => setProductData(prev => ({ ...prev, price: text }))}
-      />
-      {errors.price && <Text style={styles.errorText}>{errors.price}</Text>}
-      
-      <Text style={styles.inputLabel}>Description du produit</Text>
-      <TextInput
-        style={[styles.input, styles.textArea]}
-        placeholder="Décrivez votre produit en détail"
-        multiline
-        numberOfLines={4}
-        value={productData.description}
-        onChangeText={(text) => setProductData(prev => ({ ...prev, description: text }))}
-      />
-      {errors.description && <Text style={styles.errorText}>{errors.description}</Text>}
-    </View>
-  );
-
   const renderCurrentStep = () => {
     switch (currentStep) {
+      case Step.INFOS_BASE:
+        return renderInfosBaseStep();
+      case Step.DESCRIPTION_PRIX:
+        return renderDescriptionPrixStep();
+      case Step.FACTURE_GARANTIE:
+        return renderFactureGarantieStep();
       case Step.PHOTOS:
         return renderPhotoStep();
       case Step.LOCATION:
         return renderLocationStep();
-      case Step.CHARACTERISTICS:
-        return renderCharacteristicsStep();
-      case Step.DETAILS:
-        return renderDetailsStep();
       default:
         return null;
     }
   };
 
+  // Création de la nouvelle étape pour les informations de base
+  const renderInfosBaseStep = () => {
+    return (
+      <View style={styles.stepContent}>
+        <Text style={styles.stepTitle}>Informations du produit</Text>
+        
+        <Text style={styles.inputLabel}>Titre de votre annonce</Text>
+        <TextInput
+          style={styles.input}
+          placeholder="Titre de votre annonce"
+          value={productData.title}
+          onChangeText={(text) => setProductData(prev => ({ ...prev, title: text }))}
+        />
+        {errors.title && <Text style={styles.errorText}>{errors.title}</Text>}
+        
+        <Text style={styles.inputLabel}>Catégorie principale</Text>
+        <TouchableOpacity
+          style={styles.selectButton}
+          onPress={() => setModalVisible('category')}
+        >
+          <Text style={productData.category_id ? styles.selectText : styles.selectPlaceholder}>
+            {productData.category_id ? 
+              categories.find(c => c.id === productData.category_id)?.name || 'Sélectionnez une catégorie' : 
+              'Sélectionnez une catégorie'}
+          </Text>
+          <MaterialIcons name="arrow-drop-down" size={24} color="#999" />
+        </TouchableOpacity>
+        {errors.category && <Text style={styles.errorText}>{errors.category}</Text>}
+        
+        {productData.category_id && (
+          <>
+            <Text style={styles.inputLabel}>Sous-catégorie</Text>
+            <TouchableOpacity
+              style={styles.selectButton}
+              onPress={() => setModalVisible('subcategory')}
+            >
+              <Text style={productData.subcategory_id ? styles.selectText : styles.selectPlaceholder}>
+                {productData.subcategory_id ? 
+                  categories.find(c => c.id === productData.category_id)?.subcategories?.find(sc => sc.id === productData.subcategory_id)?.name || 'Sélectionnez une sous-catégorie' : 
+                  'Sélectionnez une sous-catégorie'}
+              </Text>
+              <MaterialIcons name="arrow-drop-down" size={24} color="#999" />
+            </TouchableOpacity>
+          </>
+        )}
+        
+        <Text style={styles.inputLabel}>Marque</Text>
+        <TouchableOpacity
+          style={styles.selectButton}
+          onPress={() => setModalVisible('brand')}
+        >
+          <Text style={styles.selectPlaceholder}>
+            Sélectionnez une marque
+          </Text>
+          <MaterialIcons name="arrow-drop-down" size={24} color="#999" />
+        </TouchableOpacity>
+      </View>
+    );
+  };
+
+  // Étape de description et prix
+  const renderDescriptionPrixStep = () => {
+    return (
+      <View style={styles.stepContent}>
+        <Text style={styles.stepTitle}>Description et prix</Text>
+        
+        <Text style={styles.inputLabel}>Prix (€)</Text>
+        <TextInput
+          style={styles.input}
+          placeholder="Prix"
+          keyboardType="numeric"
+          value={productData.price}
+          onChangeText={(text) => setProductData(prev => ({ ...prev, price: text }))}
+        />
+        {errors.price && <Text style={styles.errorText}>{errors.price}</Text>}
+        
+        <Text style={styles.inputLabel}>Description du produit</Text>
+        <TextInput
+          style={[styles.input, styles.textArea]}
+          placeholder="Décrivez votre produit en détail"
+          multiline
+          numberOfLines={4}
+          value={productData.description}
+          onChangeText={(text) => setProductData(prev => ({ ...prev, description: text }))}
+        />
+        {errors.description && <Text style={styles.errorText}>{errors.description}</Text>}
+      </View>
+    );
+  };
+
+  // Étape facture, garantie, état
+  const renderFactureGarantieStep = () => {
+    return (
+      <View style={styles.stepContent}>
+        <Text style={styles.stepTitle}>Détails supplémentaires</Text>
+        
+        <Text style={styles.inputLabel}>Facture d'achat</Text>
+        <TouchableOpacity
+          style={styles.selectButton}
+          onPress={() => {/* Action pour facture */}}
+        >
+          <Text style={styles.selectPlaceholder}>Veuillez choisir...</Text>
+          <MaterialIcons name="arrow-drop-down" size={24} color="#999" />
+        </TouchableOpacity>
+        
+        <Text style={styles.inputLabel}>Envoi possible</Text>
+        <TouchableOpacity
+          style={styles.selectButton}
+          onPress={() => {/* Action pour envoi */}}
+        >
+          <Text style={styles.selectPlaceholder}>Veuillez choisir...</Text>
+          <MaterialIcons name="arrow-drop-down" size={24} color="#999" />
+        </TouchableOpacity>
+        
+        <Text style={styles.inputLabel}>Garantie</Text>
+        <TouchableOpacity
+          style={styles.selectButton}
+          onPress={() => setModalVisible('warranty')}
+        >
+          <Text style={productData.warranty ? styles.selectText : styles.selectPlaceholder}>
+            {productData.warranty ? 
+              WARRANTIES.find(w => w.id === productData.warranty)?.label || 'Sélectionnez une garantie' : 
+              'Veuillez choisir...'}
+          </Text>
+          <MaterialIcons name="arrow-drop-down" size={24} color="#999" />
+        </TouchableOpacity>
+        
+        <Text style={styles.inputLabel}>État du produit</Text>
+        <TouchableOpacity
+          style={styles.selectButton}
+          onPress={() => setModalVisible('condition')}
+        >
+          <Text style={productData.condition ? styles.selectText : styles.selectPlaceholder}>
+            {productData.condition ? 
+              CONDITIONS.find(c => c.id === productData.condition)?.label || 'Sélectionnez un état' : 
+              'État du produit'}
+          </Text>
+          <MaterialIcons name="arrow-drop-down" size={24} color="#999" />
+        </TouchableOpacity>
+        {errors.condition && <Text style={styles.errorText}>{errors.condition}</Text>}
+      </View>
+    );
+  };
+
   const getButtonLabel = () => {
-    if (currentStep === Step.DETAILS) {
+    if (currentStep === Step.LOCATION) {
       return productId ? 'Modifier l\'annonce' : 'Publier mon annonce';
     }
     return 'Continuer';
-  };
-
-  // Modale pour les sélections
-  const renderSelectionModal = () => {
-    // Liste des options selon le type de modale
-    let options: { id: string | number; label: string }[] = [];
-    let title = '';
-
-    switch (modalVisible) {
-      case 'condition':
-        options = CONDITIONS;
-        title = 'Sélectionnez un état';
-        break;
-      case 'warranty':
-        options = WARRANTIES;
-        title = 'Sélectionnez une garantie';
-        break;
-      case 'category':
-        options = categories && Array.isArray(categories) 
-          ? categories.map(c => ({ id: c.id, label: c.name }))
-          : [];
-        title = 'Sélectionnez une catégorie';
-        break;
-      case 'subcategory':
-        const selectedCategory = categories && Array.isArray(categories) 
-          ? categories.find(c => c.id === productData.category_id)
-          : undefined;
-        options = selectedCategory && selectedCategory.subcategories 
-          ? selectedCategory.subcategories.map(sc => ({ id: sc.id, label: sc.name })) 
-          : [];
-        title = 'Sélectionnez une sous-catégorie';
-        break;
-      case 'size':
-        options = [
-          { id: 'xs', label: 'XS' },
-          { id: 's', label: 'S' },
-          { id: 'm', label: 'M' },
-          { id: 'l', label: 'L' },
-          { id: 'xl', label: 'XL' },
-          { id: 'xxl', label: 'XXL' },
-        ];
-        title = 'Sélectionnez une taille';
-        break;
-      case 'color':
-        options = [
-          { id: 'noir', label: 'Noir' },
-          { id: 'blanc', label: 'Blanc' },
-          { id: 'rouge', label: 'Rouge' },
-          { id: 'bleu', label: 'Bleu' },
-          { id: 'vert', label: 'Vert' },
-          { id: 'jaune', label: 'Jaune' },
-          { id: 'orange', label: 'Orange' },
-          { id: 'violet', label: 'Violet' },
-          { id: 'rose', label: 'Rose' },
-          { id: 'marron', label: 'Marron' },
-          { id: 'gris', label: 'Gris' },
-          { id: 'autre', label: 'Autre' },
-        ];
-        title = 'Sélectionnez une couleur';
-        break;
-    }
-
-    return (
-      <Modal
-        animationType="slide"
-        transparent={true}
-        visible={!!modalVisible}
-        onRequestClose={() => setModalVisible(null)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>{title}</Text>
-            <FlatList
-              data={options}
-              keyExtractor={(item) => item.id.toString()}
-              renderItem={({ item }) => (
-                <TouchableOpacity
-                  style={styles.modalItem}
-                  onPress={() => handleSelect(modalVisible || '', item.id.toString(), item.label)}
-                >
-                  <Text style={styles.modalItemText}>{item.label}</Text>
-                </TouchableOpacity>
-              )}
-              ItemSeparatorComponent={() => <Divider />}
-              style={styles.modalList}
-            />
-            <Button
-              mode="text"
-              onPress={() => setModalVisible(null)}
-              style={styles.modalCancelButton}
-            >
-              Annuler
-            </Button>
-          </View>
-        </View>
-      </Modal>
-    );
   };
 
   // Nouveau composant pour la page de confirmation
@@ -988,10 +1170,11 @@ export default function AjouterProduitScreen({ navigation, route }: any) {
         
         <Text style={styles.headerTitle}>
           {productId ? 'Modifier l\'annonce' : 
+          currentStep === Step.INFOS_BASE ? 'Publier' :
+          currentStep === Step.DESCRIPTION_PRIX ? 'Description et prix' :
+          currentStep === Step.FACTURE_GARANTIE ? 'Publier' :
           currentStep === Step.PHOTOS ? 'Ajouter des photos' :
-          currentStep === Step.LOCATION ? 'Localisation' :
-          currentStep === Step.CHARACTERISTICS ? 'Caractéristiques' :
-          'Détails du produit'}
+          'Localisation'}
         </Text>
         
         <TouchableOpacity style={styles.closeButton} onPress={handleClosePress}>
@@ -1042,7 +1225,7 @@ export default function AjouterProduitScreen({ navigation, route }: any) {
         
         <TouchableOpacity 
           style={[styles.button, styles.primaryButton]} 
-          onPress={currentStep === Step.DETAILS ? submitProduct : handleNext}
+          onPress={currentStep === Step.LOCATION ? submitProduct : handleNext}
           disabled={isLoading}
         >
           <Text style={styles.buttonText}>
@@ -1051,7 +1234,7 @@ export default function AjouterProduitScreen({ navigation, route }: any) {
         </TouchableOpacity>
       </View>
 
-      {renderSelectionModal()}
+      {showSelectionModal()}
 
       {isLoading && (
         <View style={styles.loadingContainer}>
@@ -1433,5 +1616,20 @@ const styles = StyleSheet.create({
   addressAutocomplete: {
     marginBottom: 8,
     zIndex: 1000,
+  },
+  stepContent: {
+    padding: 16,
+    backgroundColor: '#fff',
+  },
+  selectButton: {
+    position: 'relative',
+  },
+  selectText: {
+    fontSize: 16,
+    color: '#333',
+  },
+  selectPlaceholder: {
+    fontSize: 16,
+    color: '#999',
   },
 }); 

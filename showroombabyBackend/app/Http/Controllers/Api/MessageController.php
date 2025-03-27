@@ -316,7 +316,7 @@ class MessageController extends Controller
     }
 
     /**
-     * Méthode privée pour construire la requête de récupération des conversations
+     * Requête pour récupérer les conversations
      *
      * @param User $user
      * @param bool $archived
@@ -324,18 +324,23 @@ class MessageController extends Controller
      */
     private function getConversationsQuery($user, $archived = false)
     {
-        // Simplification de la requête pour le test
+        // Inclure l'ID du produit et créer une requête plus complète
         return DB::table('messages')
             ->select(
-                'sender_id',
-                'recipient_id',
-                'content',
-                'created_at'
+                'messages.id',
+                'messages.sender_id',
+                'messages.recipient_id',
+                'messages.content',
+                'messages.created_at',
+                'messages.read',
+                'messages.product_id',
+                'messages.archived_by_sender',
+                'messages.archived_by_recipient'
             )
             ->where(function($query) use ($user) {
                 $query->where('sender_id', $user->id)
                     ->orWhere('recipient_id', $user->id);
             })
-            ->orderBy('created_at', 'desc');
+            ->orderBy('messages.created_at', 'desc');
     }
 }

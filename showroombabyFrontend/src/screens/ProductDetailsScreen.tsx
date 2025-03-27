@@ -18,9 +18,6 @@ const API_URL = 'http://127.0.0.1:8000';
 // Importer l'image placeholder directement
 const placeholderImage = require('../../assets/placeholder.png');
 
-// Constantes pour l'API HERE
-const HERE_API_KEY = 'mJTj_ivJS2vjA9GLOtq6AtOFK91e8CoNoBpvK1mEQ7c';
-
 const { width: screenWidth } = Dimensions.get('window');
 
 // Interface du produit (similaire à celle de ExploreScreen)
@@ -674,33 +671,22 @@ export default function ProductDetailsScreen({ route, navigation }: any) {
   };
 
   // Fonction pour contacter le vendeur
-  const handleContact = async () => {
-    if (!product) return;
-    
-    const token = await AsyncStorage.getItem('token');
-    if (!token) {
-      Alert.alert(
-        'Connexion requise',
-        'Vous devez être connecté pour contacter le vendeur',
-        [
-          { 
-            text: 'Se connecter', 
-            onPress: () => navigation.navigate('Auth')
-          },
-          {
-            text: 'Annuler',
-            style: 'cancel'
-          }
-        ]
-      );
-      return;
+  const handleContactSeller = () => {
+    if (product && product.user_id) {
+      console.log('Navigation vers Chat depuis ProductDetails:', {
+        productId: product.id,
+        productTitle: product.title,
+        receiverId: product.user_id
+      });
+      
+      navigation.navigate('Chat', {
+        receiverId: product.user_id,
+        productId: product.id,
+        productTitle: product.title
+      });
+    } else {
+      Alert.alert("Erreur", "Impossible de contacter le vendeur");
     }
-    
-    navigation.navigate('Chat', { 
-      receiverId: product.user_id,
-      productId: product.id,
-      productTitle: product.title
-    });
   };
 
   // Obtenir l'image principale d'un produit
@@ -810,25 +796,59 @@ export default function ProductDetailsScreen({ route, navigation }: any) {
   // Fonction pour obtenir les coordonnées à partir de l'adresse
   const getCoordinates = async (address: string) => {
     try {
-      const response = await axios.get(
-        `https://geocode.search.hereapi.com/v1/geocode?q=${encodeURIComponent(address)}&apiKey=${HERE_API_KEY}`
-      );
+      // Token Mapbox en dur
+      const MAPBOX_TOKEN = 'pk.eyJ1Ijoid2lzc2VtOTUiLCJhIjoiY204bG52Z3cyMWQ5dTJrcXI2d210ZnY2ZSJ9.-xQ5BHlcU51dTyLmbHoXog';
       
-      if (response.data?.items?.[0]?.position) {
-        const { lat, lng } = response.data.items[0].position;
-        setLocation({ latitude: lat, longitude: lng });
+      console.log("🔍 Appel géocodage Mapbox avec adresse:", address);
+      const encodedAddress = encodeURIComponent(address);
+      const geocodingUrl = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodedAddress}.json?access_token=${MAPBOX_TOKEN}&country=fr&types=address,place,postcode&limit=1`;
+      
+      console.log("🌐 URL géocodage:", geocodingUrl);
+      
+      const response = await axios.get(geocodingUrl);
+      
+      console.log("✅ Réponse géocodage status:", response.status);
+      
+      if (response.data?.features?.length > 0 && response.data.features[0]?.center) {
+        const center = response.data.features[0].center;
+        // Mapbox renvoie les coordonnées dans l'ordre [longitude, latitude]
+        console.log("📍 Coordonnées trouvées:", center);
+        setLocation({ latitude: center[1], longitude: center[0] });
+      } else {
+        console.warn("⚠️ Aucune coordonnée trouvée pour cette adresse:", address);
+        console.log("📄 Réponse complète:", JSON.stringify(response.data));
       }
-    } catch (error) {
-      console.error('Erreur de géocodage:', error);
+    } catch (error: any) {
+      console.error('❌ Erreur de géocodage:', error.message);
+      if (error.response) {
+        console.error('🔴 Statut:', error.response.status);
+        console.error('🔴 Données:', JSON.stringify(error.response.data));
+      } else if (error.request) {
+        console.error('🔴 Aucune réponse reçue:', error.request);
+      } else {
+        console.error('🔴 Erreur de configuration:', error.message);
+      }
     }
   };
 
   // Utiliser l'effet pour obtenir les coordonnées
   useEffect(() => {
-    if (product && (product.city || product.location)) {
-      const address = `${product.location || ''} ${product.city || ''} ${product.zip_code || ''}`.trim();
+    if (product) {
+      // Construire une adresse complète avec tous les éléments disponibles
+      const addressParts = [];
+      
+      if (product.location) addressParts.push(product.location);
+      if (product.city) addressParts.push(product.city);
+      if (product.zip_code) addressParts.push(product.zip_code);
+      
+      // Ajouter le pays par défaut si aucun élément n'indique le pays
+      const address = addressParts.join(' ');
+      
       if (address) {
+        console.log("🏙️ Construction de l'adresse pour la géolocalisation:", address);
         getCoordinates(address);
+      } else {
+        console.warn("⚠️ Impossible de construire une adresse à partir des données du produit");
       }
     }
   }, [product]);
@@ -1107,25 +1127,27 @@ export default function ProductDetailsScreen({ route, navigation }: any) {
       {location && (
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Localisation</Text>
-          <View style={styles.mapContainer}>
-            <MapView
-              style={styles.map}
-              initialRegion={{
-                latitude: location.latitude,
-                longitude: location.longitude,
-                latitudeDelta: 0.01,
-                longitudeDelta: 0.01,
-              }}
-            >
-              <Marker
-                coordinate={{
+          <View style={styles.mapContainerWrapper}>
+            <View style={styles.mapContainer}>
+              <MapView
+                style={styles.map}
+                initialRegion={{
                   latitude: location.latitude,
                   longitude: location.longitude,
+                  latitudeDelta: 0.01,
+                  longitudeDelta: 0.01,
                 }}
-                title={product.title}
-                description={`${product.city || product.location || ''}`}
-              />
-            </MapView>
+              >
+                <Marker
+                  coordinate={{
+                    latitude: location.latitude,
+                    longitude: location.longitude,
+                  }}
+                  title={product.title}
+                  description={`${product.city || product.location || ''}`}
+                />
+              </MapView>
+            </View>
           </View>
         </View>
       )}
@@ -1169,7 +1191,7 @@ export default function ProductDetailsScreen({ route, navigation }: any) {
         <Button 
           mode="contained" 
           style={[styles.actionButton, styles.contactButton]}
-          onPress={handleContact}
+          onPress={handleContactSeller}
         >
           Contacter le vendeur
         </Button>
@@ -1411,7 +1433,7 @@ const styles = StyleSheet.create({
   contactButton: {
     backgroundColor: '#6B3CE9',
   },
-  mapContainer: {
+  mapContainerWrapper: {
     height: 200,
     marginTop: 10,
     borderRadius: 12,
@@ -1424,6 +1446,10 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 3.84,
     elevation: 3,
+  },
+  mapContainer: {
+    height: '100%',
+    width: '100%',
   },
   map: {
     width: '100%',

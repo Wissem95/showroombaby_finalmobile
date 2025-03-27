@@ -201,7 +201,11 @@ export default function MessagesScreen({ navigation }: any) {
       );
 
       // Log détaillé pour déboguer
-      console.log('Réponse API conversations:', JSON.stringify(response.data.data.data).substring(0, 500) + '...');
+      console.log('Réponse API conversations:', JSON.stringify(response.data).substring(0, 500) + '...');
+      console.log('Format de données reçu:', response.data ? typeof response.data : 'undefined');
+      console.log('Format data.data:', response.data?.data ? typeof response.data.data : 'undefined');
+      console.log('Format data.data.data:', response.data?.data?.data ? typeof response.data.data.data : 'undefined');
+      console.log('Nombre de conversations reçues:', response.data?.data?.data?.length || 0);
 
       // Vérifier si les données sont présentes et valides
       if (response.data?.data?.data && Array.isArray(response.data.data.data)) {
@@ -236,17 +240,20 @@ export default function MessagesScreen({ navigation }: any) {
         
         // Convertir la Map en tableau
         const uniqueConversations = Array.from(userConversations.values());
+        console.log(`Conversations après regroupement: ${uniqueConversations.length}`);
         
         // Trier par date de création (plus récent en premier)
         uniqueConversations.sort((a, b) => 
           new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
         );
+        console.log(`Conversations après tri: ${uniqueConversations.length}`);
         
         setConversations(uniqueConversations);
         
         // Compter les conversations non lues
         const unread = uniqueConversations.filter((conv: Conversation) => !conv.read).length;
         setUnreadCount(unread);
+        console.log(`Conversations non lues: ${unread}`);
       } else {
         console.error('Format de données invalide:', response.data);
         setConversations([]);
@@ -327,15 +334,49 @@ export default function MessagesScreen({ navigation }: any) {
         headers: { Authorization: `Bearer ${token}` }
       });
       
+      // Vérifier explicitement le format de la réponse
+      console.log(`Réponse du produit #${productId}:`, JSON.stringify(response.data).substring(0, 200) + '...');
+      
+      let productData;
       if (response.data && response.data.data) {
+        productData = response.data.data;
+        console.log("Format trouvé: response.data.data");
+      } else if (response.data) {
+        productData = response.data;
+        console.log("Format trouvé: response.data");
+      }
+      
+      if (productData) {
+        console.log(`Mise à jour de la conversation #${conversationId} avec le produit #${productId}`);
+        
+        // S'assurer que les images sont correctement formatées
+        if (productData.images && Array.isArray(productData.images)) {
+          console.log(`Le produit a ${productData.images.length} images`);
+        } else {
+          console.log(`Le produit n'a pas d'images ou format incorrect:`, productData.images);
+        }
+        
         // Mettre à jour la conversation avec les détails du produit
         setConversations(prevConversations => 
-          prevConversations.map(conv => 
-            conv.id === conversationId 
-              ? { ...conv, product: response.data.data } 
-              : conv
-          )
+          prevConversations.map(conv => {
+            if (conv.id === conversationId) {
+              console.log(`Mise à jour conversation ${conversationId} avec produit:`, {
+                id: productData.id,
+                title: productData.title,
+                price: productData.price,
+                images: productData.images
+              });
+              return { 
+                ...conv, 
+                product: productData,
+                product_id: productId 
+              };
+            }
+            return conv;
+          })
         );
+      } else {
+        console.error(`Format de données invalide pour le produit #${productId}`);
       }
     } catch (error) {
       console.error(`Erreur lors du chargement du produit #${productId}:`, error);
@@ -345,9 +386,23 @@ export default function MessagesScreen({ navigation }: any) {
   useEffect(() => {
     // Ne charger les détails des produits que si les conversations sont chargées et si l'utilisateur est authentifié
     if (conversations.length > 0 && isAuthenticated) {
+      console.log(`Chargement des détails pour ${conversations.length} conversations`);
+      
       conversations.forEach(conversation => {
-        if (conversation.product_id && (!conversation.product || !conversation.product.title)) {
-          loadProductDetails(conversation.product_id, conversation.id);
+        if (conversation.product_id) {
+          console.log(`Vérification produit pour conversation #${conversation.id} avec product_id=${conversation.product_id}`);
+          
+          const productMissing = !conversation.product || !conversation.product.title;
+          const productIdMismatch = conversation.product && conversation.product.id !== conversation.product_id;
+          
+          if (productMissing || productIdMismatch) {
+            console.log(`Chargement nécessaire pour produit #${conversation.product_id} (missing=${productMissing}, mismatch=${productIdMismatch})`);
+            loadProductDetails(conversation.product_id, conversation.id);
+          } else {
+            console.log(`Produit #${conversation.product_id} déjà chargé pour conversation #${conversation.id}`);
+          }
+        } else {
+          console.log(`Pas de product_id pour conversation #${conversation.id}`);
         }
       });
     }
@@ -408,11 +463,17 @@ export default function MessagesScreen({ navigation }: any) {
         layout={Layout.springify()}
       >
         <TouchableOpacity
-          onPress={() => navigation.navigate('Chat', {
-            receiverId: otherUserId,
-            productTitle: productTitle,
-            productId: item.product_id || item.product?.id
-          })}
+          onPress={() => {
+            // Log pour vérifier les données passées
+            const productIdToPass = item.product_id || (item.product ? item.product.id : undefined);
+            console.log(`Navigation vers Chat avec: receiverId=${otherUserId}, productId=${productIdToPass}, productTitle=${productTitle}`);
+            
+            navigation.navigate('Chat', {
+              receiverId: otherUserId,
+              productTitle: productTitle,
+              productId: productIdToPass
+            });
+          }}
           style={styles.conversationTouchable}
           activeOpacity={0.7}
         >
@@ -554,10 +615,12 @@ export default function MessagesScreen({ navigation }: any) {
 }
 
 const styles = StyleSheet.create({
+  // Conteneur principal de l'écran
   container: {
     flex: 1,
     backgroundColor: '#f5f5f5',
   },
+  // En-tête de l'application avec le titre "Messages"
   header: {
     backgroundColor: '#ffffff',
     elevation: 4,
@@ -565,27 +628,33 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 3,
+    marginTop: hp('-5%'),
   },
+  // Style du titre dans l'en-tête
   headerTitle: {
     fontSize: wp('5%'),
     fontWeight: '600',
   },
+  // Conteneur pour l'indicateur de chargement
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
   },
+  // Texte affiché pendant le chargement
   loadingText: {
     marginTop: hp('2%'),
     color: '#666',
     fontSize: wp('4%'),
   },
+  // Conteneur pour l'état vide (aucune conversation)
   emptyContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     padding: wp('8%'),
   },
+  // Texte principal affiché quand la liste est vide
   emptyText: {
     fontSize: wp('4.5%'),
     fontWeight: '600',
@@ -593,6 +662,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: hp('3%'),
   },
+  // Texte secondaire affiché quand la liste est vide
   emptySubText: {
     fontSize: wp('3.5%'),
     color: '#888',
@@ -600,17 +670,21 @@ const styles = StyleSheet.create({
     marginTop: hp('1%'),
     lineHeight: wp('5%'),
   },
+  // Style pour la liste vide (pour centrer le contenu)
   emptyList: {
     flex: 1,
   },
+  // Conteneur de la liste des conversations
   listContainer: {
     paddingVertical: hp('1%'),
   },
+  // Zone cliquable pour chaque conversation
   conversationTouchable: {
     marginHorizontal: wp('3%'),
     marginVertical: hp('0.8%'),
     borderRadius: 12,
   },
+  // Carte représentant une conversation dans la liste
   conversationCard: {
     borderRadius: 12,
     backgroundColor: '#ffffff',
@@ -623,18 +697,22 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.15,
     shadowRadius: 2,
   },
+  // Style spécifique pour les conversations non lues
   unreadCard: {
     backgroundColor: '#fff9fb',
   },
+  // Partie principale de la carte de conversation
   conversationMain: {
     flex: 1,
   },
+  // Disposition du contenu de la conversation
   conversationContent: {
     flexDirection: 'row',
     padding: wp('3%'),
     alignItems: 'center',
     position: 'relative',
   },
+  // Style de l'avatar dans la conversation
   avatar: {
     marginRight: wp('2.5%'),
     width: wp('12%'),
@@ -642,16 +720,19 @@ const styles = StyleSheet.create({
     borderRadius: wp('6%'),
     backgroundColor: '#ff6b9b',
   },
+  // Conteneur des textes (nom, produit, message)
   textContainer: {
     flex: 1,
     marginRight: wp('2%'),
   },
+  // Ligne d'en-tête avec le nom et l'heure
   headerRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: hp('0.3%'),
   },
+  // Style du nom d'utilisateur
   userName: {
     fontSize: wp('3.8%'),
     fontWeight: '700',
@@ -659,15 +740,18 @@ const styles = StyleSheet.create({
     flex: 1,
     marginRight: 10,
   },
+  // Style de l'heure du message
   timeText: {
     fontSize: wp('3%'),
     color: '#999',
   },
+  // Ligne contenant les infos du produit
   productInfoRow: {
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 3,
   },
+  // Image miniature du produit
   messageProductImage: {
     width: 32,
     height: 32,
@@ -677,12 +761,14 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#e8e8e8',
   },
+  // Titre du produit discuté
   productTitle: {
     fontSize: wp('3.5%'),
     color: '#6B3CE9',
     fontWeight: '500',
     flex: 1,
   },
+  // Badge contenant le prix
   priceBadgeContainer: {
     marginLeft: 6,
     paddingVertical: 3,
@@ -692,32 +778,38 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(255,107,155,0.1)',
   },
+  // Style du prix dans le badge
   messagePriceTag: {
     fontSize: wp('3.2%'),
     color: '#ff6b9b',
     fontWeight: '700',
   },
+  // Style du dernier message
   lastMessage: {
     fontSize: wp('3.4%'),
     color: '#666',
     lineHeight: wp('4.2%'),
     marginTop: 2,
   },
+  // Style pour le texte des messages non lus
   unreadText: {
     fontWeight: '600',
     color: '#333',
   },
+  // Badge indiquant un message non lu
   unreadBadge: {
     backgroundColor: '#ff6b9b',
     position: 'absolute',
     right: wp('4%'),
     top: hp('4%'),
   },
+  // Conteneur pour les boutons
   buttonContainer: {
     width: '100%',
     marginTop: 12,
     alignItems: 'center',
   },
+  // Conteneur du compteur de messages non lus
   unreadCountContainer: {
     backgroundColor: '#ff6b9b',
     borderRadius: 15,
@@ -727,16 +819,19 @@ const styles = StyleSheet.create({
     minWidth: wp('5%'),
     alignItems: 'center',
   },
+  // Texte du compteur de messages non lus
   unreadCountText: {
     color: '#fff',
     fontSize: wp('3%'),
     fontWeight: '600',
   },
+  // Séparateur entre les conversations
   divider: {
     marginHorizontal: wp('4%'),
     height: 1,
     backgroundColor: '#f0f0f0',
   },
+  // Bouton flottant pour créer un nouveau message
   fab: {
     position: 'absolute',
     margin: 16,
@@ -744,6 +839,7 @@ const styles = StyleSheet.create({
     bottom: 0,
     backgroundColor: '#ff6b9b',
   },
+  // Wrapper pour gérer les ombres autour des cartes
   cardShadowWrapper: {
     borderRadius: 12,
     overflow: 'visible',

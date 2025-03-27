@@ -240,9 +240,37 @@ export default function ChatScreen({ route, navigation }: Props) {
         headers: { Authorization: `Bearer ${token}` }
       });
       
-      if (response.data && (response.data.data || response.data)) {
-        const productData = response.data.data || response.data;
-        console.log('Données du produit chargées:', JSON.stringify(productData).substring(0, 200));
+      console.log(`Réponse du produit #${productId}:`, JSON.stringify(response.data).substring(0, 200) + '...');
+      
+      let productData;
+      if (response.data && response.data.data) {
+        productData = response.data.data;
+        console.log("Format trouvé: response.data.data");
+      } else if (response.data) {
+        productData = response.data;
+        console.log("Format trouvé: response.data");
+      }
+      
+      if (productData) {
+        console.log(`Produit #${productId} chargé avec succès:`, {
+          id: productData.id,
+          title: productData.title,
+          price: productData.price
+        });
+        
+        // Vérifier les images
+        if (productData.images && Array.isArray(productData.images)) {
+          console.log(`Le produit a ${productData.images.length} images`);
+          
+          // Si l'image est un objet complexe, assurons-nous qu'elle est correctement formatée
+          if (productData.images.length > 0 && typeof productData.images[0] === 'object') {
+            console.log(`Format de la première image:`, JSON.stringify(productData.images[0]));
+          }
+        } else {
+          console.log(`Le produit n'a pas d'images ou format incorrect:`, productData.images);
+          productData.images = []; // Initialiser un tableau vide pour éviter les erreurs
+        }
+        
         setProduct(productData);
       } else {
         console.error('Format de réponse invalide pour le produit:', response.data);
