@@ -41,6 +41,18 @@ interface Message {
   created_at: string;
   product_id?: number;
   read: boolean;
+  sender?: {
+    id: number;
+    username: string;
+    email?: string;
+    avatar?: string;
+  };
+  recipient?: {
+    id: number;
+    username: string;
+    email?: string;
+    avatar?: string;
+  };
 }
 
 interface Product {
@@ -300,21 +312,42 @@ export default function ChatScreen({ route, navigation }: Props) {
         return;
       }
       
+      console.log(`Chargement des détails de l'utilisateur #${receiverId}`);
+      
       const response = await axios.get(`${API_URL}/api/users/profile/${receiverId}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       
       if (response.data) {
+        console.log(`Données utilisateur reçues:`, JSON.stringify(response.data).substring(0, 200));
+        
+        // S'assurer que nous avons bien le nom d'utilisateur
+        if (!response.data.username) {
+          console.error(`Nom d'utilisateur manquant pour l'ID: ${receiverId}`);
+        }
+        
         setSeller({
           id: response.data.id,
-          username: response.data.username,
+          username: response.data.username || `Utilisateur #${receiverId}`,
           avatar: response.data.avatar
         });
       } else {
         console.error('Format de réponse invalide pour les détails du vendeur');
+        // Définir un nom par défaut en cas d'erreur
+        setSeller({
+          id: receiverId,
+          username: `Utilisateur #${receiverId}`,
+          avatar: undefined
+        });
       }
     } catch (error) {
       console.error('Erreur chargement vendeur:', error);
+      // Définir un nom par défaut en cas d'erreur
+      setSeller({
+        id: receiverId,
+        username: `Utilisateur #${receiverId}`,
+        avatar: undefined
+      });
     }
   };
 
@@ -334,6 +367,25 @@ export default function ChatScreen({ route, navigation }: Props) {
       if (response.data && response.data.data) {
         // Obtenir tous les messages avec cet utilisateur, indépendamment du produit
         const allMessages = response.data.data;
+        
+        console.log(`Reçu ${allMessages.length} messages avec l'utilisateur #${receiverId}`);
+        
+        // Si nous n'avons pas encore les infos du vendeur et qu'il y a des messages
+        if (!seller && allMessages.length > 0) {
+          // Trouver un message de l'autre utilisateur
+          const otherUserMessage = allMessages.find((m: Message) => m.sender_id === receiverId);
+          if (otherUserMessage && otherUserMessage.sender) {
+            console.log(`Infos utilisateur trouvées dans les messages:`, JSON.stringify(otherUserMessage.sender));
+            setSeller({
+              id: receiverId,
+              username: otherUserMessage.sender.username || `Utilisateur #${receiverId}`,
+              avatar: otherUserMessage.sender.avatar
+            });
+          } else {
+            console.log(`Aucune info utilisateur trouvée dans les messages, appel à loadSellerDetails nécessaire`);
+            loadSellerDetails();
+          }
+        }
         
         // Tri par date (plus récent en premier)
         allMessages.sort((a: Message, b: Message) => 
@@ -467,6 +519,10 @@ export default function ChatScreen({ route, navigation }: Props) {
     const isSameSender = index > 0 ? messages[index - 1].sender_id === item.sender_id : false;
     const showAvatar = !isUser && (!isSameSender || !isSameDay);
     
+    // Récupérer le nom d'utilisateur directement à partir du message
+    const otherUser = isUser ? item.recipient : item.sender;
+    const otherUserName = otherUser?.username || seller?.username || `Utilisateur #${isUser ? item.recipient_id : item.sender_id}`;
+    
     return (
       <>
         {showDate && (
@@ -486,7 +542,7 @@ export default function ChatScreen({ route, navigation }: Props) {
           {!isUser && showAvatar && (
             <Avatar.Text 
               size={30} 
-              label={(seller?.username || 'U').charAt(0).toUpperCase()}
+              label={(otherUser?.username?.[0] || seller?.username?.[0] || 'U').toUpperCase()}
               style={styles.messageAvatar}
               color="#fff"
               theme={{ colors: { primary: '#ff6b9b' } }}
@@ -579,7 +635,8 @@ export default function ChatScreen({ route, navigation }: Props) {
     >
       <Appbar.Header style={styles.header}>
         <Appbar.BackAction 
-          color="#555" 
+          color="#ff6b9b" 
+          size={28}
           onPress={() => {
             if (navigation.canGoBack()) {
               navigation.goBack();
@@ -608,14 +665,14 @@ export default function ChatScreen({ route, navigation }: Props) {
             ) : (
               <Avatar.Text 
                 size={26} 
-                label={(seller?.username || 'U').charAt(0).toUpperCase()} 
+                label={(seller?.username?.[0] || 'U').toUpperCase()} 
                 style={styles.headerAvatar}
                 color="#fff"
                 theme={{ colors: { primary: '#ff6b9b' } }}
               />
             )}
             <Text style={styles.headerTitle} numberOfLines={1}>
-              {seller?.username || 'Vendeur'}
+              {seller?.username}
             </Text>
           </View>
           
@@ -741,9 +798,11 @@ export default function ChatScreen({ route, navigation }: Props) {
           disabled={!newMessage.trim() || sending}
         >
           {sending ? (
-            <ActivityIndicator size={24} color="#fff" />
+            <ActivityIndicator size={26} color="#fff" />
           ) : (
-            <Ionicons name="send" size={20} color="#fff" />
+            <View style={styles.sendIconContainer}>
+              <Ionicons name="paper-plane" size={22} color="#fff" />
+            </View>
           )}
         </TouchableOpacity>
       </Surface>
@@ -942,7 +1001,8 @@ const styles = StyleSheet.create({
   messagesContainer: {
     padding: 8,
     paddingBottom: 12,
-    marginTop: hp('10%'),
+    marginTop: hp('5%'),
+    marginBottom: hp('2%'),
   },
   // Style pour le conteneur vide (pas de messages)
   emptyContainer: {
@@ -1072,40 +1132,63 @@ const styles = StyleSheet.create({
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 8,
+    padding: 10,
     backgroundColor: '#fff',
     borderTopWidth: 1,
     borderTopColor: '#f0f0f0',
-    elevation: 2,
+    elevation: 4,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: -1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
+    shadowOffset: { width: 0, height: -2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+    marginHorizontal: 8,
+    marginBottom: 8,
+    borderRadius: 24,
   },
   // Champ de saisie du message
   input: {
     flex: 1,
-    backgroundColor: '#f1f3f5',
-    paddingHorizontal: 16,
-    paddingVertical: 10,
+    backgroundColor: '#f8f9fa',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
     borderRadius: 24,
-    marginRight: 8,
-    fontSize: 15,
+    marginRight: 10,
+    fontSize: 16,
     maxHeight: 100,
     color: '#333',
+    borderWidth: 1,
+    borderColor: '#ececec',
+    elevation: 1,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 1,
   },
   // Bouton d'envoi du message
   sendButton: {
     backgroundColor: '#ff6b9b',
-    width: 42,
-    height: 42,
-    borderRadius: 21,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
     justifyContent: 'center',
     alignItems: 'center',
+    elevation: 4,
+    shadowColor: '#ff3b7b',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.4,
+    shadowRadius: 5,
   },
   // Style du bouton d'envoi désactivé
   sendButtonDisabled: {
     backgroundColor: '#ffb3cb',
+    elevation: 2,
+    shadowOpacity: 0.2,
+  },
+  // Conteneur pour l'icône d'envoi avec effets visuels
+  sendIconContainer: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    transform: [{ translateY: -1 }], // Petit ajustement pour centrer l'icône
   },
   // Toast d'erreur en bas de l'écran
   errorToast: {
@@ -1143,7 +1226,10 @@ const styles = StyleSheet.create({
   },
   // Bouton de retour dans l'en-tête
   backButton: {
-    marginRight: 0,
-    padding: 0,
+    marginRight: 6,
+    marginLeft: 2,
+    padding: 8,
+    backgroundColor: 'rgba(255, 107, 155, 0.1)',
+    borderRadius: 20,
   },
 }); 

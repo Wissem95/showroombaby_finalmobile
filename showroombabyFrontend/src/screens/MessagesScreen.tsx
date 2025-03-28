@@ -8,8 +8,46 @@ import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect } from '@react-navigation/native';
 
-const API_URL = 'http://127.0.0.1:8000';
+// Ignorer les avertissements non critiques
+LogBox.ignoreLogs([
+  'When you set overflow',  // Ignorer les avertissements liés aux ombres des composants Surface
+  'VirtualizedLists should never be nested',
+  'Warning: Failed prop type'
+]);
+
+// Adapter l'URL de l'API en fonction de la plateforme
+const API_URL = Platform.OS === 'ios' 
+  ? 'http://localhost:8000'   // iOS utilise localhost
+  : 'http://10.0.2.2:8000';   // Android utilise 10.0.2.2 pour se connecter à localhost de la machine hôte
+
 const placeholderImage = require('../../assets/placeholder.png');
+const DEFAULT_AVATAR_URL = 'https://via.placeholder.com/100';
+
+// Fonction utilitaire pour résoudre les chemins d'images
+const resolveImagePath = (image: any): string => {
+  // Si l'image est une chaîne
+  if (typeof image === 'string') {
+    // Si c'est une URL complète
+    if (image.startsWith('http')) {
+      return image;
+    }
+    // Si c'est un chemin relatif
+    return `${API_URL}/storage/${image}`;
+  }
+  // Si l'image est un objet avec path
+  else if (typeof image === 'object' && image !== null && image.path) {
+    if (image.path.startsWith('http')) {
+      return image.path;
+    }
+    return `${API_URL}/storage/${image.path}`;
+  }
+  // Si l'image est un objet avec url
+  else if (typeof image === 'object' && image !== null && image.url) {
+    return image.url;
+  }
+  // Image par défaut si rien ne correspond
+  return DEFAULT_AVATAR_URL;
+};
 
 interface Conversation {
   id: number;
@@ -115,8 +153,16 @@ export default function MessagesScreen({ navigation }: any) {
   const [userId, setUserId] = useState<number | null>(null);
   const [unreadCount, setUnreadCount] = useState(0);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const conversationsPerPage = 10; // Nombre de conversations à charger par page
 
+  // Nettoyage des composants démontés pour éviter les fuites mémoire
+  const isMounted = React.useRef(true);
+  
   useEffect(() => {
+    isMounted.current = true;
+    
     const checkAuthentication = async () => {
       const token = await AsyncStorage.getItem('token');
       setIsAuthenticated(!!token);
@@ -126,25 +172,39 @@ export default function MessagesScreen({ navigation }: any) {
     };
     
     checkAuthentication();
+    
+    // Cleanup lors du démontage
+    return () => {
+      isMounted.current = false;
+    };
   }, []);
 
   useFocusEffect(
     useCallback(() => {
+      let intervalId: NodeJS.Timeout | null = null;
       const loadData = async () => {
         const token = await AsyncStorage.getItem('token');
         if (token) {
           getUserId();
-          loadConversations();
+          // Charger les conversations une seule fois au début
+          await loadConversations();
           
-          // Rafraîchir les conversations toutes les 15 secondes
-          const interval = setInterval(loadConversations, 15000);
-          return () => clearInterval(interval);
+          // Rafraîchir les conversations toutes les 30 secondes au lieu de 15
+          // et stocker l'ID de l'intervalle pour pouvoir l'annuler
+          intervalId = setInterval(loadConversations, 30000);
         } else {
           setLoading(false);
         }
       };
       
       loadData();
+      
+      // Fonction de nettoyage pour annuler l'intervalle quand l'écran n'est plus en focus
+      return () => {
+        if (intervalId) {
+          clearInterval(intervalId);
+        }
+      };
     }, [])
   );
 
@@ -153,12 +213,20 @@ export default function MessagesScreen({ navigation }: any) {
       const id = await AsyncStorage.getItem('userId');
       setUserId(id ? parseInt(id) : null);
     } catch (error) {
-      console.error('Erreur récupération ID utilisateur:', error);
+      console.error('Erreur récupération ID utilisateur');
     }
   };
 
   const loadConversations = async () => {
+    // Utiliser les abortController pour annuler les requêtes en cas de démontage
+    const abortController = new AbortController();
+    
     try {
+      // Ne pas continuer si le composant est démonté
+      if (!isMounted.current) return;
+      
+      const signal = abortController.signal;
+      
       // Obtenir le token et l'userId synchronement
       const token = await AsyncStorage.getItem('token');
       const userIdString = await AsyncStorage.getItem('userId');
@@ -166,7 +234,6 @@ export default function MessagesScreen({ navigation }: any) {
       
       // Vérifier si l'utilisateur a changé pendant le chargement
       if (currentUserId === null) {
-        console.log('Utilisateur déconnecté pendant le chargement des conversations');
         setConversations([]);
         setLoading(false);
         setRefreshing(false);
@@ -176,12 +243,10 @@ export default function MessagesScreen({ navigation }: any) {
       
       // Mettre à jour userId si nécessaire
       if (currentUserId !== userId) {
-        console.log(`ID utilisateur mis à jour: ${currentUserId} (ancien: ${userId})`);
         setUserId(currentUserId);
       }
       
       if (!token) {
-        console.log('Token non disponible, utilisateur probablement déconnecté');
         setConversations([]);
         setLoading(false);
         setRefreshing(false);
@@ -196,32 +261,100 @@ export default function MessagesScreen({ navigation }: any) {
         `${API_URL}/api/messages/conversations`,
         { 
           headers: { Authorization: `Bearer ${token}` },
-          timeout: 10000 // Ajouter un timeout pour éviter les attentes infinies
+          timeout: 10000, // Ajouter un timeout pour éviter les attentes infinies
+          signal: signal
         }
       );
-
-      // Log détaillé pour déboguer
-      console.log('Réponse API conversations:', JSON.stringify(response.data).substring(0, 500) + '...');
-      console.log('Format de données reçu:', response.data ? typeof response.data : 'undefined');
-      console.log('Format data.data:', response.data?.data ? typeof response.data.data : 'undefined');
-      console.log('Format data.data.data:', response.data?.data?.data ? typeof response.data.data.data : 'undefined');
-      console.log('Nombre de conversations reçues:', response.data?.data?.data?.length || 0);
 
       // Vérifier si les données sont présentes et valides
       if (response.data?.data?.data && Array.isArray(response.data.data.data)) {
         const conversationsData = response.data.data.data;
         
+        // Transformer les données pour s'assurer que les informations utilisateur sont complètes
+        const processedConversations = conversationsData.map((conv: any) => {
+          // Créer des objets utilisateur complets à partir des données plates
+          const sender = {
+            id: conv.sender_id,
+            username: conv.sender_username || `Utilisateur #${conv.sender_id}`,
+            email: conv.sender_email,
+            avatar: conv.sender_avatar
+          };
+          
+          const recipient = {
+            id: conv.recipient_id,
+            username: conv.recipient_username || `Utilisateur #${conv.recipient_id}`,
+            email: conv.recipient_email,
+            avatar: conv.recipient_avatar
+          };
+          
+          // Créer un objet produit si les données sont disponibles
+          let product = undefined;
+          if (conv.product_id) {
+            let productImages = [];
+            
+            // Traitement des images du produit
+            try {
+              if (conv.product_images) {
+                // Si les images sont déjà sous forme de tableau
+                if (Array.isArray(conv.product_images)) {
+                  productImages = conv.product_images;
+                } 
+                // Si les images sont une chaîne JSON
+                else if (typeof conv.product_images === 'string') {
+                  try {
+                    // Essayer de parser le JSON
+                    productImages = JSON.parse(conv.product_images);
+                  } catch (error) {
+                    // Si le parsing échoue, mais que la chaîne ressemble à un chemin d'image, on l'utilise directement
+                    if (conv.product_images.includes('.jpg') || 
+                        conv.product_images.includes('.jpeg') || 
+                        conv.product_images.includes('.png') ||
+                        conv.product_images.includes('/') ||
+                        conv.product_images.includes('http')) {
+                      productImages = [conv.product_images];
+                    } else {
+                      // Même si la chaîne ne ressemble pas à un chemin, essayons de l'utiliser directement
+                      productImages = [conv.product_images];
+                    }
+                  }
+                } else if (typeof conv.product_images === 'object' && conv.product_images !== null) {
+                  // Si c'est un objet mais pas un tableau, essayer de l'utiliser directement
+                  productImages = [conv.product_images];
+                }
+                
+                // Vérification supplémentaire pour s'assurer que c'est un tableau
+                if (!Array.isArray(productImages)) {
+                  productImages = [];
+                }
+              }
+            } catch (error) {
+              productImages = [];
+            }
+            
+            product = {
+              id: conv.product_id,
+              title: conv.product_title || `Produit #${conv.product_id}`,
+              price: conv.product_price,
+              images: productImages
+            };
+          }
+          
+          // Retourner une conversation avec tous les champs nécessaires
+          return {
+            ...conv,
+            sender,
+            recipient,
+            product
+          };
+        });
+        
         // Regrouper les conversations par utilisateur mais préserver l'information du produit
         const userConversations = new Map<number, Conversation>();
         
-        // Debug info
-        console.log(`Regroupement des conversations avec currentUserId=${currentUserId}`);
-        
-        conversationsData.forEach((conv: Conversation) => {
+        // Vérifier pour chaque conversation si on a bien les infos utilisateur
+        processedConversations.forEach((conv: Conversation) => {
           // Utiliser currentUserId au lieu de userId pour s'assurer que la valeur est disponible
           const otherUserId = conv.sender_id === currentUserId ? conv.recipient_id : conv.sender_id;
-          
-          console.log(`Conversation: sender=${conv.sender_id}, recipient=${conv.recipient_id}, otherUser=${otherUserId}, product_id=${conv.product_id || 'none'}`);
           
           // Si cette conversation a un produit et que nous n'avons pas encore de conversation avec cet utilisateur
           // ou si nous avons déjà une conversation mais sans produit, privilégier celle avec un produit
@@ -240,38 +373,43 @@ export default function MessagesScreen({ navigation }: any) {
         
         // Convertir la Map en tableau
         const uniqueConversations = Array.from(userConversations.values());
-        console.log(`Conversations après regroupement: ${uniqueConversations.length}`);
         
         // Trier par date de création (plus récent en premier)
         uniqueConversations.sort((a, b) => 
           new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
         );
-        console.log(`Conversations après tri: ${uniqueConversations.length}`);
         
         setConversations(uniqueConversations);
         
         // Compter les conversations non lues
         const unread = uniqueConversations.filter((conv: Conversation) => !conv.read).length;
         setUnreadCount(unread);
-        console.log(`Conversations non lues: ${unread}`);
       } else {
-        console.error('Format de données invalide:', response.data);
+        console.error('Format de données invalide');
         setConversations([]);
       }
     } catch (error: any) {
-      console.error('Erreur chargement conversations:', error);
-      
-      // Si erreur d'authentification, ne pas rediriger mais mettre à jour l'état
-      if (error.response?.status === 401) {
-        console.log('Erreur 401: Token expiré ou invalide');
-        setIsAuthenticated(false);
+      if (!axios.isCancel(error)) {
+        // Éviter d'afficher trop d'erreurs dans la console
+        
+        // Si erreur d'authentification, ne pas rediriger mais mettre à jour l'état
+        if (error.response?.status === 401) {
+          setIsAuthenticated(false);
+        }
+        
+        setConversations([]);
       }
-      
-      setConversations([]);
     } finally {
-      setLoading(false);
-      setRefreshing(false);
+      if (isMounted.current) {
+        setLoading(false);
+        setRefreshing(false);
+      }
     }
+    
+    // Retourner une fonction de nettoyage
+    return () => {
+      abortController.abort();
+    };
   };
 
   const onRefresh = () => {
@@ -303,10 +441,7 @@ export default function MessagesScreen({ navigation }: any) {
       return (
         <Avatar.Image 
           size={wp('12%')} 
-          source={{ uri: otherUser.avatar.startsWith('http') 
-            ? otherUser.avatar 
-            : `${API_URL}/storage/${otherUser.avatar}` 
-          }} 
+          source={{ uri: resolveImagePath(otherUser.avatar) }} 
           style={styles.avatar}
         />
       );
@@ -315,7 +450,7 @@ export default function MessagesScreen({ navigation }: any) {
     return (
       <Avatar.Text 
         size={wp('12%')} 
-        label={(otherUser?.username || 'U').charAt(0).toUpperCase()} 
+        label={(otherUser?.username?.[0] || 'U').toUpperCase()} 
         style={styles.avatar}
         color="#fff"
         theme={{ colors: { primary: '#ff6b9b' } }}
@@ -323,103 +458,159 @@ export default function MessagesScreen({ navigation }: any) {
     );
   };
 
-  const loadProductDetails = async (productId: number, conversationId: number) => {
+  useEffect(() => {
+    // Ne charger les détails des produits que si les conversations sont chargées et si l'utilisateur est authentifié
+    if (conversations.length > 0 && isAuthenticated) {
+      // Éviter les logs répétitifs
+      
+      // Traquer les requêtes pour pouvoir les annuler au démontage
+      const controllers: AbortController[] = [];
+      
+      // Limiter le nombre de préchargements d'images pour éviter des fuites mémoire
+      const imagePromises: Promise<any>[] = [];
+      const maxPreloadImages = 5; // Limiter à 5 images préchargées maximum
+      
+      conversations.slice(0, maxPreloadImages).forEach(conversation => {
+        if (conversation.product?.images && Array.isArray(conversation.product.images) && conversation.product.images.length > 0) {
+          const imageToPreload = conversation.product.images[0];
+          const imageUri = resolveImagePath(imageToPreload);
+          
+          // Préchargement de l'image (indirectement via le composant Image)
+          const promise = Image.prefetch(imageUri).catch(error => {
+            // Ignorer les erreurs de préchargement
+          });
+          
+          imagePromises.push(promise);
+        }
+      });
+      
+      // Calculer l'index de début et de fin pour la pagination
+      const startIndex = 0;
+      const endIndex = currentPage * conversationsPerPage;
+      
+      // Charger uniquement les détails des conversations visibles selon la pagination
+      const visibleConversations = conversations.slice(startIndex, endIndex);
+      
+      visibleConversations.forEach(conversation => {
+        if (conversation.product_id) {
+          // Créer un AbortController pour chaque requête
+          const controller = new AbortController();
+          controllers.push(controller);
+          
+          // Forcer le chargement des produits pour obtenir les images
+          if (isMounted.current) {
+            loadProductDetails(conversation.product_id, conversation.id, controller.signal);
+          }
+        }
+      });
+      
+      // Nettoyage à la démontage du composant
+      return () => {
+        // Annuler toutes les requêtes en cours
+        controllers.forEach(controller => {
+          try {
+            controller.abort();
+          } catch (e) {
+            // Ignorer les erreurs d'abandon
+          }
+        });
+      };
+    }
+  }, [conversations, isAuthenticated, currentPage]);
+  
+  // Optimiser la fonction loadProductDetails pour éviter les logs verbeux qui causent des fuites mémoire
+  const loadProductDetails = async (productId: number, conversationId: number, signal?: AbortSignal) => {
+    // Vérifier si le produit a déjà été chargé
+    const existingConversation = conversations.find(c => c.id === conversationId);
+    if (existingConversation && existingConversation.product && existingConversation.product.images) {
+      // Si le produit a déjà des images, ne pas le recharger
+      return;
+    }
+
     try {
+      if (!isMounted.current) return;
+      
       const token = await AsyncStorage.getItem('token');
       if (!token) return;
       
-      console.log(`Chargement des détails du produit #${productId} pour conversation #${conversationId}`);
-      
       const response = await axios.get(`${API_URL}/api/products/${productId}`, {
-        headers: { Authorization: `Bearer ${token}` }
+        headers: { Authorization: `Bearer ${token}` },
+        signal
       });
       
-      // Vérifier explicitement le format de la réponse
-      console.log(`Réponse du produit #${productId}:`, JSON.stringify(response.data).substring(0, 200) + '...');
-      
-      let productData;
-      if (response.data && response.data.data) {
-        productData = response.data.data;
-        console.log("Format trouvé: response.data.data");
-      } else if (response.data) {
-        productData = response.data;
-        console.log("Format trouvé: response.data");
-      }
-      
-      if (productData) {
-        console.log(`Mise à jour de la conversation #${conversationId} avec le produit #${productId}`);
-        
-        // S'assurer que les images sont correctement formatées
-        if (productData.images && Array.isArray(productData.images)) {
-          console.log(`Le produit a ${productData.images.length} images`);
-        } else {
-          console.log(`Le produit n'a pas d'images ou format incorrect:`, productData.images);
+      // Limiter la taille des logs pour éviter les fuites mémoire
+      if (isMounted.current) {
+        let productData;
+        if (response.data && response.data.data) {
+          productData = response.data.data;
+        } else if (response.data) {
+          productData = response.data;
         }
         
-        // Mettre à jour la conversation avec les détails du produit
-        setConversations(prevConversations => 
-          prevConversations.map(conv => {
-            if (conv.id === conversationId) {
-              console.log(`Mise à jour conversation ${conversationId} avec produit:`, {
-                id: productData.id,
-                title: productData.title,
-                price: productData.price,
-                images: productData.images
-              });
-              return { 
-                ...conv, 
-                product: productData,
-                product_id: productId 
-              };
+        if (productData) {
+          // S'assurer que les images sont correctement formatées
+          if (productData.images) {
+            // Si les images sont une chaîne JSON, les parser
+            if (typeof productData.images === 'string') {
+              try {
+                productData.images = JSON.parse(productData.images);
+              } catch (error) {
+                // Si le parsing échoue mais que la chaîne ressemble à un chemin d'image, l'utiliser directement
+                if (productData.images.includes('.jpg') || 
+                    productData.images.includes('.jpeg') || 
+                    productData.images.includes('.png') ||
+                    productData.images.includes('/')) {
+                  productData.images = [productData.images];
+                } else {
+                  productData.images = [];
+                }
+              }
             }
-            return conv;
-          })
-        );
-      } else {
-        console.error(`Format de données invalide pour le produit #${productId}`);
+            
+            // Vérifier si les images sont un tableau
+            if (Array.isArray(productData.images)) {
+              // Ne rien faire de plus pour éviter des logs excessifs
+            } else if (typeof productData.images === 'object' && productData.images !== null) {
+              // Si c'est un objet mais pas un tableau, l'encapsuler dans un tableau
+              productData.images = [productData.images];
+            } else {
+              productData.images = [];
+            }
+          } else {
+            productData.images = [];
+          }
+          
+          // Mettre à jour la conversation avec les détails du produit
+          if (isMounted.current) {
+            setConversations(prevConversations => 
+              prevConversations.map(conv => {
+                if (conv.id === conversationId) {
+                  return { 
+                    ...conv, 
+                    product: productData,
+                    product_id: productId 
+                  };
+                }
+                return conv;
+              })
+            );
+          }
+        }
       }
     } catch (error) {
-      console.error(`Erreur lors du chargement du produit #${productId}:`, error);
+      // Silence les erreurs pour éviter de surcharger la console
     }
   };
 
   useEffect(() => {
-    // Ne charger les détails des produits que si les conversations sont chargées et si l'utilisateur est authentifié
-    if (conversations.length > 0 && isAuthenticated) {
-      console.log(`Chargement des détails pour ${conversations.length} conversations`);
-      
-      conversations.forEach(conversation => {
-        if (conversation.product_id) {
-          console.log(`Vérification produit pour conversation #${conversation.id} avec product_id=${conversation.product_id}`);
-          
-          const productMissing = !conversation.product || !conversation.product.title;
-          const productIdMismatch = conversation.product && conversation.product.id !== conversation.product_id;
-          
-          if (productMissing || productIdMismatch) {
-            console.log(`Chargement nécessaire pour produit #${conversation.product_id} (missing=${productMissing}, mismatch=${productIdMismatch})`);
-            loadProductDetails(conversation.product_id, conversation.id);
-          } else {
-            console.log(`Produit #${conversation.product_id} déjà chargé pour conversation #${conversation.id}`);
-          }
-        } else {
-          console.log(`Pas de product_id pour conversation #${conversation.id}`);
-        }
-      });
-    }
-  }, [conversations, isAuthenticated]);
-
-  useEffect(() => {
     // Réinitialiser les conversations si l'utilisateur change
     if (userId) {
-      console.log(`Utilisateur connecté avec ID: ${userId}`);
-      
       // Si les conversations n'ont pas encore été chargées
       if (loading && conversations.length === 0) {
         loadConversations();
       }
     } else {
       // Si pas d'userId, probablement déconnecté
-      console.log('Réinitialisation des conversations - utilisateur déconnecté');
       setConversations([]);
       setUnreadCount(0);
     }
@@ -429,33 +620,25 @@ export default function MessagesScreen({ navigation }: any) {
     const otherUserId = item.sender_id === userId ? item.recipient_id : item.sender_id;
     const otherUser = item.sender_id === userId ? item.recipient : item.sender;
     
-    // Déterminer le nom à afficher pour l'autre utilisateur (utiliser username s'il existe)
+    // Déterminer le nom à afficher pour l'autre utilisateur
     const otherUserName = otherUser?.username || `Utilisateur #${otherUserId}`;
     
-    // Déterminer le titre à afficher (nom du produit ou titre par défaut)
-    const hasValidProduct = item.product !== undefined && item.product !== null && 
-                           item.product.id !== undefined && 
-                           item.product.title !== undefined;
+    // Déterminons si le produit est valide
+    const hasValidProduct = !!item.product && !!item.product.id && !!item.product.title;
     
-    // Favoriser l'affichage du titre du produit s'il existe
+    // Titre et prix du produit
     const productTitle = hasValidProduct ? item.product!.title : (item.product_id ? `Produit #${item.product_id}` : 'Conversation générale');
     
-    // Prix formaté avec style
     const formattedPrice = item.product?.price 
       ? `${parseFloat(item.product.price.toString()).toFixed(2).replace('.', ',')}€` 
       : (item.product_id ? '??€' : '');
     
-    // Image du produit
-    const productImage = item.product?.images && item.product.images[0] 
-      ? (typeof item.product.images[0] === 'string' && item.product.images[0].startsWith('http') 
-          ? item.product.images[0] 
-          : typeof item.product.images[0] === 'string'
-            ? `${API_URL}/storage/${item.product.images[0]}`
-            : typeof item.product.images[0] === 'object' && (item.product.images[0] as ImageType)?.path
-              ? `${API_URL}/storage/${(item.product.images[0] as ImageType).path}`
-              : null)
-      : null;
-    
+    // Vérification simple de l'existence des images
+    const hasImages = !!item.product && 
+                    !!item.product.images && 
+                    Array.isArray(item.product.images) && 
+                    item.product.images.length > 0;
+
     return (
       <Animated.View
         entering={FadeIn.duration(400)}
@@ -464,89 +647,97 @@ export default function MessagesScreen({ navigation }: any) {
       >
         <TouchableOpacity
           onPress={() => {
-            // Log pour vérifier les données passées
-            const productIdToPass = item.product_id || (item.product ? item.product.id : undefined);
-            console.log(`Navigation vers Chat avec: receiverId=${otherUserId}, productId=${productIdToPass}, productTitle=${productTitle}`);
-            
             navigation.navigate('Chat', {
               receiverId: otherUserId,
               productTitle: productTitle,
-              productId: productIdToPass
+              productId: item.product_id || (item.product ? item.product.id : undefined)
             });
           }}
           style={styles.conversationTouchable}
           activeOpacity={0.7}
         >
-          {/* Wrapper pour gérer le problème d'overflow avec les ombres */}
-          <View style={styles.cardShadowWrapper}>
-            <Surface style={[styles.conversationCard, !item.read && styles.unreadCard]}>
-              <View style={styles.conversationMain}>
-                <View style={styles.conversationContent}>
-                  {renderAvatar(item)}
-                  
-                  <View style={styles.textContainer}>
-                    <View style={styles.headerRow}>
+          {/* Wrapper externe pour gérer les ombres correctement */}
+          <View style={styles.cardOuterWrapper}>
+            <Surface style={styles.conversationSurface}>
+              {/* Wrapper interne avec overflow:hidden pour gérer les coins arrondis */}
+              <View style={[styles.conversationCard, !item.read && styles.unreadCard]}>
+                <View style={styles.conversationMain}>
+                  <View style={styles.conversationContent}>
+                    {renderAvatar(item)}
+                    
+                    <View style={styles.textContainer}>
+                      <View style={styles.headerRow}>
+                        <Text 
+                          style={[
+                            styles.userName, 
+                            !item.read && styles.unreadText
+                          ]} 
+                          numberOfLines={1}
+                        >
+                          {otherUserName}
+                        </Text>
+                        <Text style={styles.timeText}>
+                          {formatDate(item.created_at)}
+                        </Text>
+                      </View>
+                      
+                      <View style={styles.productInfoRow}>
+                        {item.product_id ? (
+                          <View style={styles.productImageContainer}>
+                            {hasImages ? (
+                              <Image 
+                                source={{ 
+                                  uri: resolveImagePath(item.product!.images![0])
+                                }}
+                                style={styles.productImage}
+                                defaultSource={placeholderImage}
+                                onError={() => {
+                                  // Éviter de logger l'erreur
+                                }}
+                              />
+                            ) : (
+                              <View style={styles.placeholderImageContainer}>
+                                <Ionicons name="image-outline" size={16} color="#999" />
+                              </View>
+                            )}
+                          </View>
+                        ) : null}
+                        
+                        <Text 
+                          style={[
+                            styles.productTitle, 
+                            !item.read && { fontWeight: '700' },
+                            !hasValidProduct && { color: '#888', fontStyle: 'italic' }
+                          ]} 
+                          numberOfLines={1}
+                        >
+                          {productTitle}
+                        </Text>
+                        
+                        {formattedPrice && (
+                          <View style={styles.priceBadgeContainer}>
+                            <Text style={styles.messagePriceTag}>
+                              {formattedPrice}
+                            </Text>
+                          </View>
+                        )}
+                      </View>
+                      
                       <Text 
                         style={[
-                          styles.userName, 
+                          styles.lastMessage, 
                           !item.read && styles.unreadText
                         ]} 
                         numberOfLines={1}
                       >
-                        {otherUserName}
-                      </Text>
-                      <Text style={styles.timeText}>
-                        {formatDate(item.created_at)}
+                        {item.content}
                       </Text>
                     </View>
                     
-                    <View style={styles.productInfoRow}>
-                      {productImage ? (
-                        <Image 
-                          source={{ uri: productImage }}
-                          style={styles.messageProductImage}
-                          defaultSource={placeholderImage}
-                        />
-                      ) : hasValidProduct || item.product_id ? (
-                        <View style={[styles.messageProductImage, {backgroundColor: '#f2f2f2', justifyContent: 'center', alignItems: 'center'}]}>
-                          <Ionicons name="image-outline" size={12} color="#999" />
-                        </View>
-                      ) : null}
-                      
-                      <Text 
-                        style={[
-                          styles.productTitle, 
-                          !item.read && { fontWeight: '700' },
-                          !hasValidProduct && { color: '#888', fontStyle: 'italic' }
-                        ]} 
-                        numberOfLines={1}
-                      >
-                        {productTitle}
-                      </Text>
-                      
-                      {formattedPrice && (
-                        <View style={styles.priceBadgeContainer}>
-                          <Text style={styles.messagePriceTag}>
-                            {formattedPrice}
-                          </Text>
-                        </View>
-                      )}
-                    </View>
-                    
-                    <Text 
-                      style={[
-                        styles.lastMessage, 
-                        !item.read && styles.unreadText
-                      ]} 
-                      numberOfLines={1}
-                    >
-                      {item.content}
-                    </Text>
+                    {!item.read && (
+                      <Badge size={wp('2.5%')} style={styles.unreadBadge} />
+                    )}
                   </View>
-                  
-                  {!item.read && (
-                    <Badge size={wp('2.5%')} style={styles.unreadBadge} />
-                  )}
                 </View>
               </View>
             </Surface>
@@ -564,6 +755,45 @@ export default function MessagesScreen({ navigation }: any) {
     // Ici on pourrait naviguer vers une liste de produits ou des vendeurs
     // Pour l'instant, on navigue simplement vers l'écran Explore
     navigation.navigate('Explore');
+  };
+
+  const loadMore = () => {
+    if (loadingMore) return;
+    
+    setLoadingMore(true);
+    setCurrentPage(prev => prev + 1);
+    
+    // Délai d'animation pour montrer le chargement
+    setTimeout(() => {
+      setLoadingMore(false);
+    }, 800);
+  };
+  
+  // Composant pour le bouton "Charger plus"
+  const LoadMoreButton = () => {
+    // Ne pas afficher le bouton s'il n'y a pas de conversations ou si toutes sont déjà chargées
+    if (conversations.length === 0 || conversations.length <= currentPage * conversationsPerPage) {
+      return <View style={styles.loadMorePlaceholder} />;
+    }
+    
+    return (
+      <View style={styles.loadMoreContainer}>
+        <Button 
+          mode="outlined"
+          onPress={loadMore}
+          loading={loadingMore}
+          style={styles.loadMoreButton}
+          labelStyle={styles.loadMoreButtonText}
+          color="#ff6b9b"
+          icon={loadingMore ? undefined : "chevron-down"}
+        >
+          {loadingMore ? 'Chargement...' : 'Voir plus d\'anciens messages'}
+        </Button>
+        
+        {/* Espace supplémentaire pour s'assurer que le bouton est visible au-dessus du FAB */}
+        <View style={{ height: hp('8%') }} />
+      </View>
+    );
   };
 
   return (
@@ -593,6 +823,7 @@ export default function MessagesScreen({ navigation }: any) {
           ]}
           ListEmptyComponent={renderEmptyComponent}
           ItemSeparatorComponent={() => <Divider style={styles.divider} />}
+          ListFooterComponent={conversations.length > 0 ? LoadMoreButton : null}
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
@@ -688,6 +919,14 @@ const styles = StyleSheet.create({
   conversationCard: {
     borderRadius: 12,
     backgroundColor: '#ffffff',
+  },
+  // Style spécifique pour les conversations non lues
+  unreadCard: {
+    backgroundColor: '#fff9fb',
+  },
+  // Surface pour la conversation avec les ombres
+  conversationSurface: {
+    borderRadius: 12,
     elevation: 3,
     shadowColor: '#000',
     shadowOffset: {
@@ -696,10 +935,13 @@ const styles = StyleSheet.create({
     },
     shadowOpacity: 0.15,
     shadowRadius: 2,
+    overflow: 'visible',
   },
-  // Style spécifique pour les conversations non lues
-  unreadCard: {
-    backgroundColor: '#fff9fb',
+  // Wrapper externe pour gérer les ombres
+  cardOuterWrapper: {
+    borderRadius: 12,
+    overflow: 'visible',
+    width: '100%',
   },
   // Partie principale de la carte de conversation
   conversationMain: {
@@ -750,16 +992,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 3,
-  },
-  // Image miniature du produit
-  messageProductImage: {
-    width: 32,
-    height: 32,
-    borderRadius: 4,
-    marginRight: 8,
-    backgroundColor: '#f2f2f2',
-    borderWidth: 1,
-    borderColor: '#e8e8e8',
   },
   // Titre du produit discuté
   productTitle: {
@@ -839,10 +1071,55 @@ const styles = StyleSheet.create({
     bottom: 0,
     backgroundColor: '#ff6b9b',
   },
-  // Wrapper pour gérer les ombres autour des cartes
-  cardShadowWrapper: {
-    borderRadius: 12,
-    overflow: 'visible',
+  // Conteneur pour les images du produit
+  productImageContainer: {
+    width: 36,
+    height: 36,
+    borderRadius: 4,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: '#f0f0f0',
+    marginRight: 8,
+    backgroundColor: '#fff',
+  },
+  // Placeholder pour les images du produit
+  placeholderImageContainer: {
     width: '100%',
+    height: '100%',
+    backgroundColor: '#f5f5f5',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderRadius: 4,
+  },
+  // Style de l'image du produit
+  productImage: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 4,
+  },
+  // Conteneur pour le bouton "Charger plus"
+  loadMoreContainer: {
+    width: '100%',
+    padding: wp('4%'),
+    alignItems: 'center',
+  },
+  // Style du bouton "Charger plus"
+  loadMoreButton: {
+    backgroundColor: '#fff',
+    borderColor: '#ff6b9b',
+    borderWidth: 2,
+    borderRadius: 25,
+    paddingHorizontal: wp('4%'),
+    paddingVertical: hp('1%'),
+  },
+  // Style du texte du bouton "Charger plus"
+  loadMoreButtonText: {
+    color: '#ff6b9b',
+    fontSize: wp('3.5%'),
+    fontWeight: '600',
+  },
+  // Style pour le bouton "Charger plus"
+  loadMorePlaceholder: {
+    height: hp('8%'),
   },
 }); 

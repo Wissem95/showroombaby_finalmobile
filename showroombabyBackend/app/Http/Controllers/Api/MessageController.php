@@ -335,8 +335,23 @@ class MessageController extends Controller
                 'messages.read',
                 'messages.product_id',
                 'messages.archived_by_sender',
-                'messages.archived_by_recipient'
+                'messages.archived_by_recipient',
+                'sender.id as sender_id',
+                'sender.username as sender_username',
+                'sender.email as sender_email',
+                'sender.avatar as sender_avatar',
+                'recipient.id as recipient_id',
+                'recipient.username as recipient_username',
+                'recipient.email as recipient_email',
+                'recipient.avatar as recipient_avatar',
+                'products.id as product_id',
+                'products.title as product_title',
+                'products.price as product_price',
+                'products.images as product_images'
             )
+            ->join('users as sender', 'messages.sender_id', '=', 'sender.id')
+            ->join('users as recipient', 'messages.recipient_id', '=', 'recipient.id')
+            ->leftJoin('products', 'messages.product_id', '=', 'products.id')
             ->where(function($query) use ($user) {
                 $query->where('sender_id', $user->id)
                     ->orWhere('recipient_id', $user->id);
