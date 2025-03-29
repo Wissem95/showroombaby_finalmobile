@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { StyleSheet, View, FlatList, TouchableOpacity, Image, RefreshControl, Platform, LogBox } from 'react-native';
 import { Text, Surface, ActivityIndicator, Appbar, FAB, Badge, Avatar, Divider, Button } from 'react-native-paper';
 import { widthPercentageToDP as wp, heightPercentageToDP as hp } from 'react-native-responsive-screen';
@@ -47,8 +47,24 @@ const resolveImagePath = (image: any): string => {
     }
     
     const firstImage = image[0];
-    // Appel récursif pour résoudre le premier élément du tableau
-    return resolveImagePath(firstImage);
+    // Éviter la récursion infinie en vérifiant le type
+    if (typeof firstImage === 'string') {
+      return resolveImagePath(firstImage);
+    } else if (typeof firstImage === 'object' && firstImage !== null) {
+      // Extraire les chemins d'image directement sans appel récursif
+      if (firstImage.path) {
+        return firstImage.path.startsWith('http') 
+          ? firstImage.path 
+          : `${API_URL}/storage/${firstImage.path}`;
+      }
+      if (firstImage.url) return firstImage.url;
+      if (firstImage.public_path) {
+        return firstImage.public_path.startsWith('http')
+          ? firstImage.public_path
+          : `${API_URL}/storage/${firstImage.public_path}`;
+      }
+    }
+    return DEFAULT_AVATAR_URL;
   }
   
   // Gestion des objets
@@ -75,8 +91,11 @@ const resolveImagePath = (image: any): string => {
     if (image.uri) {
       return image.uri;
     }
-    if (image.source) {
-      return resolveImagePath(image.source);
+    // Ne pas utiliser d'appel récursif pour éviter les boucles
+    if (image.source && typeof image.source === 'string') {
+      return image.source.startsWith('http') 
+        ? image.source 
+        : `${API_URL}/storage/${image.source}`;
     }
     
     // Tenter de trouver n'importe quelle propriété qui pourrait contenir un chemin d'image
@@ -87,7 +106,9 @@ const resolveImagePath = (image: any): string => {
            image[key].includes('.png') || 
            image[key].includes('.webp') ||
            image[key].startsWith('http'))) {
-        return resolveImagePath(image[key]);
+        return image[key].startsWith('http') 
+          ? image[key] 
+          : `${API_URL}/storage/${image[key]}`;
       }
     }
   }
@@ -203,6 +224,9 @@ export default function MessagesScreen({ navigation }: any) {
   const [loadingMore, setLoadingMore] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const conversationsPerPage = 10; // Nombre de conversations à charger par page
+  
+  // Ajouter une référence pour suivre les produits en cours de chargement
+  const loadingProducts = useRef<Record<string, boolean>>({});
 
   // Nettoyage des composants démontés pour éviter les fuites mémoire
   const isMounted = React.useRef(true);
@@ -570,8 +594,29 @@ export default function MessagesScreen({ navigation }: any) {
     try {
       if (!isMounted.current) return;
       
+      // Vérifier si ce produit est déjà chargé et a des images valides
+      const existingConversation = conversations.find(c => c.id === conversationId);
+      if (existingConversation?.product?.images && 
+          Array.isArray(existingConversation.product.images) && 
+          existingConversation.product.images.length > 0) {
+        // Déjà chargé avec des images, ne pas recharger
+        return;
+      }
+      
+      // Vérifier si ce produit est déjà en cours de chargement
+      const productLoadingKey = `loading_product_${productId}_${conversationId}`;
+      if (loadingProducts.current[productLoadingKey]) {
+        return;
+      }
+      
+      // Marquer ce produit comme en cours de chargement
+      loadingProducts.current[productLoadingKey] = true;
+      
       const token = await AsyncStorage.getItem('token');
-      if (!token) return;
+      if (!token) {
+        loadingProducts.current[productLoadingKey] = false;
+        return;
+      }
       
       const response = await axios.get(`${API_URL}/api/products/${productId}`, {
         headers: { Authorization: `Bearer ${token}` },
@@ -663,7 +708,11 @@ export default function MessagesScreen({ navigation }: any) {
         }
       }
     } catch (error) {
-      console.error(`Erreur chargement produit #${productId}:`, error instanceof Error ? error.message : 'Erreur inconnue');
+      // Ne pas logger l'erreur pour éviter de spammer la console
+    } finally {
+      // Marquer ce produit comme n'étant plus en cours de chargement
+      const productLoadingKey = `loading_product_${productId}_${conversationId}`;
+      loadingProducts.current[productLoadingKey] = false;
     }
   };
 
@@ -757,9 +806,21 @@ export default function MessagesScreen({ navigation }: any) {
                                 style={styles.productImage}
                                 defaultSource={placeholderImage}
                                 onError={(e) => {
-                                  console.error("Erreur chargement image:", e.nativeEvent.error);
-                                  // Tenter de recharger les détails du produit si l'image échoue
-                                  loadProductDetails(item.product_id!, item.id);
+                                  // Ne pas logger l'erreur pour éviter les logs répétitifs
+                                  // console.error("Erreur chargement image:", e.nativeEvent.error);
+                                  
+                                  // Utiliser une référence pour éviter les appels répétés
+                                  const productLoadingKey = `loading_product_${item.product_id}_${item.id}`;
+                                  if (!loadingProducts.current[productLoadingKey]) {
+                                    loadingProducts.current[productLoadingKey] = true;
+                                    // Nettoyer le flag après un délai
+                                    setTimeout(() => {
+                                      loadingProducts.current[productLoadingKey] = false;
+                                    }, 10000); // 10 secondes avant de pouvoir recharger
+                                    
+                                    // Tenter de recharger le produit
+                                    loadProductDetails(item.product_id!, item.id);
+                                  }
                                 }}
                               />
                             ) : (
