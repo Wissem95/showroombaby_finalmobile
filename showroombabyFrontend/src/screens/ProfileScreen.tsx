@@ -254,7 +254,7 @@ export default function ProfileScreen({ navigation }: Props) {
     return (
       <Card style={styles.productCard} key={product.id}>
         <TouchableOpacity 
-          onPress={() => navigation.navigate('ProductDetails', { productId: product.id })}
+          onPress={() => navigation.navigate('ProductDetails', { productId: product.id, fullscreenMode: true })}
         >
           <View style={styles.productImageContainer}>
             {imageLoading && (

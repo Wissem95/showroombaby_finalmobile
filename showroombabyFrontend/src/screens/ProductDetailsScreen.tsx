@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { StyleSheet, View, ScrollView, Image, Share, ActivityIndicator, Alert, Dimensions, TouchableOpacity } from 'react-native';
+import { StyleSheet, View, ScrollView, Image, Share, ActivityIndicator, Alert, Dimensions, TouchableOpacity, Linking, Animated } from 'react-native';
 import { Button, Text, Card, Chip, Divider, IconButton, Dialog, Portal } from 'react-native-paper';
 import { Ionicons } from '@expo/vector-icons';
 import AuthService from '../services/auth';
@@ -11,6 +11,7 @@ import MapView, { Marker } from 'react-native-maps';
 import Geolocation from '@react-native-community/geolocation';
 import Carousel from 'react-native-reanimated-carousel';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { PanGestureHandler, State } from 'react-native-gesture-handler';
 
 // URL de l'API
 const API_URL = 'http://127.0.0.1:8000';
@@ -111,8 +112,8 @@ const carouselStyles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 15,
-    backgroundColor: 'rgba(0,0,0,0.3)',
-    zIndex: 10,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    zIndex: 999,
   },
   pagination: {
     flexDirection: 'row',
@@ -137,12 +138,19 @@ const carouselStyles = StyleSheet.create({
     borderRadius: 4,
   },
   backButton: {
-    width: 40,
-    height: 40,
+    width: 50,
+    height: 50,
     justifyContent: 'center',
     alignItems: 'center',
-    borderRadius: 20,
-    backgroundColor: 'rgba(0,0,0,0.3)',
+    borderRadius: 25,
+    backgroundColor: 'rgba(0,0,0,0.8)',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.5,
+    shadowRadius: 4,
+    elevation: 10,
+    margin: 5,
+    top: 20,
   },
   productInfoOverlay: {
     position: 'absolute',
@@ -199,14 +207,22 @@ const carouselStyles = StyleSheet.create({
     elevation: 5,
   },
   actionButton: {
-    width: 50,
-    height: 50,
+    width: 55,
+    height: 55,
     justifyContent: 'center',
     alignItems: 'center',
-    borderRadius: 25,
+    borderRadius: 28,
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 3,
+    elevation: 3,
+    margin: 4,
   },
   actionButtonActive: {
-    backgroundColor: 'rgba(107, 60, 233, 0.1)',
+    backgroundColor: 'rgba(107, 60, 233, 0.15)',
+    transform: [{ scale: 1.05 }],
   },
   errorContainer: {
     flex: 1,
@@ -222,13 +238,86 @@ const carouselStyles = StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.7)',
     padding: 15,
     borderRadius: 10,
-  }
+  },
+  swipeIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 20,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    padding: 8,
+    borderRadius: 20,
+    alignSelf: 'center',
+  },
+  swipeText: {
+    color: '#fff',
+    fontSize: 14,
+    marginLeft: 8,
+    fontWeight: '500',
+  },
 });
 
 const ImageCarousel = ({ images, navigation, product }: { images: string[], navigation: any, product: Product }) => {
   const [activeIndex, setActiveIndex] = useState(0);
   const [imageLoadError, setImageLoadError] = useState<Record<string, boolean>>({});
   const [favorite, setFavorite] = useState(false);
+  
+  // Animation pour l'indicateur de swipe
+  const swipeAnim = useRef(new Animated.Value(0)).current;
+  
+  // Nouvelle animation pour la transition
+  const transitionAnim = useRef(new Animated.Value(0)).current;
+  
+  useEffect(() => {
+    // Animation de l'indicateur de swipe
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(swipeAnim, {
+          toValue: 10,
+          duration: 1000,
+          useNativeDriver: true,
+        }),
+        Animated.timing(swipeAnim, {
+          toValue: 0,
+          duration: 1000,
+          useNativeDriver: true,
+        }),
+      ])
+    ).start();
+  }, []);
+  
+  // Fonction pour animer la transition
+  const animateTransition = () => {
+    // Démarrer l'animation de transition
+    Animated.timing(transitionAnim, {
+      toValue: 1,
+      duration: 400,
+      useNativeDriver: true,
+    }).start(() => {
+      // Une fois l'animation terminée, naviguer vers la vue détaillée
+      navigation.setParams({ fullscreenMode: false });
+    });
+  };
+
+  // Gérer le geste de swipe vertical
+  const onGestureEvent = (event: { nativeEvent: { translationY: number } }) => {
+    const { translationY } = event.nativeEvent;
+    if (translationY > 100) {
+      console.log('Swipe détecté - transition vers les détails');
+      animateTransition();
+    }
+  };
+
+  // Gérer le changement d'état du geste
+  const onHandlerStateChange = (event: { nativeEvent: { oldState: number; translationY: number } }) => {
+    if (event.nativeEvent.oldState === State.ACTIVE) {
+      const { translationY } = event.nativeEvent;
+      if (translationY > 100) {
+        console.log('Fin de swipe - transition vers les détails');
+        animateTransition();
+      }
+    }
+  };
 
   // Fonction pour formater le prix spécifique au composant
   const formatProductPrice = (price: number) => {
@@ -269,7 +358,7 @@ const ImageCarousel = ({ images, navigation, product }: { images: string[], navi
             style={carouselStyles.backButton} 
             onPress={() => navigation.goBack()}
           >
-            <Ionicons name="chevron-back" size={28} color="#fff" />
+            <Ionicons name="chevron-back" size={32} color="#fff" />
           </TouchableOpacity>
         </View>
         
@@ -282,10 +371,66 @@ const ImageCarousel = ({ images, navigation, product }: { images: string[], navi
         </View>
         
         <View style={carouselStyles.actionsBar}>
-          <TouchableOpacity style={carouselStyles.actionButton}>
+          <TouchableOpacity 
+            style={carouselStyles.actionButton}
+            onPress={async () => {
+              if (product && product.phone) {
+                Linking.openURL(`tel:${product.phone}`);
+              } else if (product && product.user_id) {
+                try {
+                  // Vérifier si l'utilisateur essaie de s'envoyer un message à lui-même
+                  const userId = await AsyncStorage.getItem('userId');
+                  const currentUserId = userId ? parseInt(userId) : null;
+                  
+                  if (currentUserId && currentUserId === product.user_id) {
+                    Alert.alert("Information", "Vous ne pouvez pas vous envoyer un message à vous-même");
+                    return;
+                  }
+                  
+                  navigation.navigate('Chat', {
+                    receiverId: product.user_id,
+                    productId: product.id,
+                    productTitle: product.title
+                  });
+                } catch (error) {
+                  console.error("Erreur lors de la vérification de l'ID utilisateur:", error);
+                  Alert.alert("Erreur", "Impossible de contacter le vendeur pour le moment");
+                }
+              } else {
+                Alert.alert("Information", "Aucun numéro de téléphone disponible pour ce produit");
+              }
+            }}
+          >
             <Ionicons name="call-outline" size={26} color="#777" />
           </TouchableOpacity>
-          <TouchableOpacity style={carouselStyles.actionButton}>
+          <TouchableOpacity 
+            style={carouselStyles.actionButton}
+            onPress={async () => {
+              if (product && product.user_id) {
+                try {
+                  // Vérifier si l'utilisateur essaie de s'envoyer un message à lui-même
+                  const userId = await AsyncStorage.getItem('userId');
+                  const currentUserId = userId ? parseInt(userId) : null;
+                  
+                  if (currentUserId && currentUserId === product.user_id) {
+                    Alert.alert("Information", "Vous ne pouvez pas vous envoyer un message à vous-même");
+                    return;
+                  }
+                  
+                  navigation.navigate('Chat', {
+                    receiverId: product.user_id,
+                    productId: product.id,
+                    productTitle: product.title
+                  });
+                } catch (error) {
+                  console.error("Erreur lors de la vérification de l'ID utilisateur:", error);
+                  Alert.alert("Erreur", "Impossible de contacter le vendeur pour le moment");
+                }
+              } else {
+                Alert.alert("Erreur", "Impossible de contacter le vendeur");
+              }
+            }}
+          >
             <Ionicons name="chatbubble-outline" size={26} color="#777" />
           </TouchableOpacity>
           <TouchableOpacity 
@@ -353,81 +498,177 @@ const ImageCarousel = ({ images, navigation, product }: { images: string[], navi
   };
 
   return (
-    <View style={carouselStyles.container}>
-      <View style={carouselStyles.headerBar}>
-        <TouchableOpacity 
-          style={carouselStyles.backButton} 
-          onPress={() => navigation.goBack()}
-        >
-          <Ionicons name="chevron-back" size={28} color="#fff" />
-        </TouchableOpacity>
-      </View>
-      
-      <GestureHandlerRootView style={{ flex: 1, width: '100%' }}>
-        <Carousel
-          loop
-          width={screenWidth}
-          height={screenWidth * 1.7}
-          autoPlay={images.length > 1}
-          data={images}
-          scrollAnimationDuration={800}
-          onSnapToItem={setActiveIndex}
-          renderItem={renderItem}
-          autoPlayInterval={4000}
-          style={{ width: '100%' }}
-        />
-      </GestureHandlerRootView>
-      
-      {images.length > 1 && (
-        <View style={carouselStyles.pagination}>
-          {images.map((_, index) => (
-            <View
-              key={index}
-              style={[
-                carouselStyles.paginationDot,
-                index === activeIndex && carouselStyles.paginationDotActive,
-              ]}
-            />
-          ))}
-        </View>
-      )}
-      
-      <View style={carouselStyles.productInfoOverlay}>
-        <Text style={carouselStyles.productTitle}>{product.title}</Text>
-        <Text style={carouselStyles.productPrice}>{formatProductPrice(product.price)}</Text>
-        <Text style={carouselStyles.publishDate}>
-          Publié le {new Date(product.created_at).toLocaleDateString('fr-FR')}
-        </Text>
-      </View>
-      
-      <View style={carouselStyles.actionsBar}>
-        <TouchableOpacity style={carouselStyles.actionButton}>
-          <Ionicons name="call-outline" size={26} color="#777" />
-        </TouchableOpacity>
-        <TouchableOpacity style={carouselStyles.actionButton}>
-          <Ionicons name="chatbubble-outline" size={26} color="#777" />
-        </TouchableOpacity>
-        <TouchableOpacity 
-          style={[
-            carouselStyles.actionButton, 
-            favorite && carouselStyles.actionButtonActive
-          ]}
-          onPress={() => setFavorite(!favorite)}
-        >
-          <Ionicons 
-            name={favorite ? "heart" : "heart-outline"} 
-            size={26} 
-            color={favorite ? "#e74c3c" : "#777"} 
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <TouchableOpacity 
+        activeOpacity={1}
+        style={{ flex: 1 }}
+        onPress={() => console.log('Tap sur le carrousel')}
+        onLongPress={() => console.log('Long press sur le carrousel')}
+        delayLongPress={250}
+      >
+        <Animated.View style={[
+          carouselStyles.container,
+          {
+            transform: [
+              {
+                translateY: transitionAnim.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [0, screenWidth * 1.7]
+                })
+              },
+              {
+                scale: transitionAnim.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [1, 0.9]
+                })
+              }
+            ],
+            opacity: transitionAnim.interpolate({
+              inputRange: [0, 0.8, 1],
+              outputRange: [1, 0.7, 0]
+            })
+          }
+        ]}>
+          <View style={carouselStyles.headerBar}>
+            <TouchableOpacity 
+              style={carouselStyles.backButton} 
+              onPress={() => navigation.goBack()}
+            >
+              <Ionicons name="chevron-back" size={32} color="#fff" />
+            </TouchableOpacity>
+          </View>
+          
+          <Carousel
+            loop
+            width={screenWidth}
+            height={screenWidth * 1.7}
+            autoPlay={images.length > 1}
+            data={images}
+            scrollAnimationDuration={800}
+            onSnapToItem={setActiveIndex}
+            renderItem={renderItem}
+            autoPlayInterval={4000}
+            style={{ width: '100%' }}
           />
-        </TouchableOpacity>
-        <TouchableOpacity 
-          style={carouselStyles.actionButton}
-          onPress={handleShare}
-        >
-          <Ionicons name="share-social-outline" size={26} color="#777" />
-        </TouchableOpacity>
-      </View>
-    </View>
+          
+          {images.length > 1 && (
+            <View style={carouselStyles.pagination}>
+              {images.map((_, index) => (
+                <View
+                  key={index}
+                  style={[
+                    carouselStyles.paginationDot,
+                    index === activeIndex && carouselStyles.paginationDotActive,
+                  ]}
+                />
+              ))}
+            </View>
+          )}
+          
+          <View style={carouselStyles.productInfoOverlay}>
+            <Text style={carouselStyles.productTitle}>{product.title}</Text>
+            <Text style={carouselStyles.productPrice}>{formatProductPrice(product.price)}</Text>
+            <Text style={carouselStyles.publishDate}>
+              Publié le {new Date(product.created_at).toLocaleDateString('fr-FR')}
+            </Text>
+            
+            <TouchableOpacity 
+              style={carouselStyles.swipeIndicator}
+              onPress={animateTransition}
+            >
+              <Animated.View style={{ transform: [{ translateY: swipeAnim }] }}>
+                <Ionicons name="chevron-down" size={24} color="#fff" />
+              </Animated.View>
+              <Text style={carouselStyles.swipeText}>Appuyer pour voir plus de détails</Text>
+            </TouchableOpacity>
+          </View>
+          
+          <View style={carouselStyles.actionsBar}>
+            <TouchableOpacity 
+              style={carouselStyles.actionButton}
+              onPress={async () => {
+                if (product && product.phone) {
+                  Linking.openURL(`tel:${product.phone}`);
+                } else if (product && product.user_id) {
+                  try {
+                    // Vérifier si l'utilisateur essaie de s'envoyer un message à lui-même
+                    const userId = await AsyncStorage.getItem('userId');
+                    const currentUserId = userId ? parseInt(userId) : null;
+                    
+                    if (currentUserId && currentUserId === product.user_id) {
+                      Alert.alert("Information", "Vous ne pouvez pas vous envoyer un message à vous-même");
+                      return;
+                    }
+                    
+                    navigation.navigate('Chat', {
+                      receiverId: product.user_id,
+                      productId: product.id,
+                      productTitle: product.title
+                    });
+                  } catch (error) {
+                    console.error("Erreur lors de la vérification de l'ID utilisateur:", error);
+                    Alert.alert("Erreur", "Impossible de contacter le vendeur pour le moment");
+                  }
+                } else {
+                  Alert.alert("Information", "Aucun numéro de téléphone disponible pour ce produit");
+                }
+              }}
+            >
+              <Ionicons name="call-outline" size={26} color="#777" />
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={carouselStyles.actionButton}
+              onPress={async () => {
+                if (product && product.user_id) {
+                  try {
+                    // Vérifier si l'utilisateur essaie de s'envoyer un message à lui-même
+                    const userId = await AsyncStorage.getItem('userId');
+                    const currentUserId = userId ? parseInt(userId) : null;
+                    
+                    if (currentUserId && currentUserId === product.user_id) {
+                      Alert.alert("Information", "Vous ne pouvez pas vous envoyer un message à vous-même");
+                      return;
+                    }
+                    
+                    navigation.navigate('Chat', {
+                      receiverId: product.user_id,
+                      productId: product.id,
+                      productTitle: product.title
+                    });
+                  } catch (error) {
+                    console.error("Erreur lors de la vérification de l'ID utilisateur:", error);
+                    Alert.alert("Erreur", "Impossible de contacter le vendeur pour le moment");
+                  }
+                } else {
+                  Alert.alert("Erreur", "Impossible de contacter le vendeur");
+                }
+              }}
+            >
+              <Ionicons name="chatbubble-outline" size={26} color="#777" />
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={[
+                carouselStyles.actionButton, 
+                favorite && carouselStyles.actionButtonActive
+              ]}
+              onPress={() => setFavorite(!favorite)}
+            >
+              <Ionicons 
+                name={favorite ? "heart" : "heart-outline"} 
+                size={26} 
+                color={favorite ? "#e74c3c" : "#777"} 
+              />
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={carouselStyles.actionButton}
+              onPress={handleShare}
+            >
+              <Ionicons name="share-social-outline" size={26} color="#777" />
+            </TouchableOpacity>
+          </View>
+        </Animated.View>
+      </TouchableOpacity>
+    </GestureHandlerRootView>
   );
 };
 
@@ -637,6 +878,11 @@ export default function ProductDetailsScreen({ route, navigation }: any) {
           headers: { Authorization: `Bearer ${token}` }
         });
         setFavorite(false);
+        
+        // Mettre à jour le statut du favori dans le stockage local
+        await AsyncStorage.setItem('favoritesChanged', 'true');
+        await AsyncStorage.setItem(`favorite_${product.id}`, 'false');
+        
         Alert.alert('Succès', 'Produit retiré des favoris');
       } else {
         // Ajouter aux favoris
@@ -644,6 +890,11 @@ export default function ProductDetailsScreen({ route, navigation }: any) {
           headers: { Authorization: `Bearer ${token}` }
         });
         setFavorite(true);
+        
+        // Mettre à jour le statut du favori dans le stockage local
+        await AsyncStorage.setItem('favoritesChanged', 'true');
+        await AsyncStorage.setItem(`favorite_${product.id}`, 'true');
+        
         Alert.alert('Succès', 'Produit ajouté aux favoris');
       }
     } catch (error: any) {
@@ -656,10 +907,20 @@ export default function ProductDetailsScreen({ route, navigation }: any) {
         } else if (error.response.status === 422) {
           // Le produit est déjà dans les favoris
           setFavorite(true);
+          
+          // Mettre à jour le statut du favori dans le stockage local
+          await AsyncStorage.setItem('favoritesChanged', 'true');
+          await AsyncStorage.setItem(`favorite_${product.id}`, 'true');
+          
           Alert.alert('Information', 'Ce produit est déjà dans vos favoris');
         } else if (error.response.status === 404) {
           // Le produit n'est plus dans les favoris
           setFavorite(false);
+          
+          // Mettre à jour le statut du favori dans le stockage local
+          await AsyncStorage.setItem('favoritesChanged', 'true');
+          await AsyncStorage.setItem(`favorite_${product.id}`, 'false');
+          
           Alert.alert('Information', 'Ce produit a déjà été retiré des favoris');
         } else {
           Alert.alert('Erreur', 'Une erreur est survenue lors de la gestion des favoris');
@@ -671,12 +932,35 @@ export default function ProductDetailsScreen({ route, navigation }: any) {
   };
 
   // Fonction pour contacter le vendeur
-  const handleContactSeller = () => {
-    if (product && product.user_id) {
+  const handleContactSeller = async () => {
+    if (!product || !product.user_id) {
+      Alert.alert("Erreur", "Impossible de contacter le vendeur");
+      return;
+    }
+    
+    // Récupérer l'ID de l'utilisateur connecté
+    const token = await AsyncStorage.getItem('token');
+    
+    if (!token) {
+      setLoginDialogVisible(true);
+      return;
+    }
+    
+    try {
+      // Récupérer l'ID de l'utilisateur depuis AsyncStorage
+      const userId = await AsyncStorage.getItem('userId');
+      const currentUserId = userId ? parseInt(userId) : null;
+      
+      if (currentUserId && currentUserId === product.user_id) {
+        Alert.alert("Information", "Vous ne pouvez pas vous envoyer un message à vous-même");
+        return;
+      }
+      
       console.log('Navigation vers Chat depuis ProductDetails:', {
         productId: product.id,
         productTitle: product.title,
-        receiverId: product.user_id
+        receiverId: product.user_id,
+        currentUserId: currentUserId
       });
       
       navigation.navigate('Chat', {
@@ -684,8 +968,9 @@ export default function ProductDetailsScreen({ route, navigation }: any) {
         productId: product.id,
         productTitle: product.title
       });
-    } else {
-      Alert.alert("Erreur", "Impossible de contacter le vendeur");
+    } catch (error) {
+      console.error("Erreur lors de la vérification de l'utilisateur:", error);
+      Alert.alert("Erreur", "Impossible de contacter le vendeur pour le moment");
     }
   };
 
@@ -960,7 +1245,7 @@ export default function ProductDetailsScreen({ route, navigation }: any) {
               style={styles.backButton}
               onPress={() => navigation.goBack()}
             >
-              <Ionicons name="chevron-back" size={28} color="#fff" />
+              <Ionicons name="chevron-back" size={32} color="#fff" />
             </TouchableOpacity>
           </View>
           
@@ -1227,7 +1512,7 @@ export default function ProductDetailsScreen({ route, navigation }: any) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8f9fa',
+    backgroundColor: '#f5f5f5',
   },
   loadingContainer: {
     flex: 1,
@@ -1425,11 +1710,6 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: '#f0f0f0',
   },
-  actionButton: {
-    borderRadius: 25,
-    height: 50,
-    justifyContent: 'center',
-  },
   contactButton: {
     backgroundColor: '#6B3CE9',
   },
@@ -1483,7 +1763,7 @@ const styles = StyleSheet.create({
   },
   imageHeader: {
     position: 'absolute',
-    top: 0,
+    top: 20,
     left: 0,
     right: 0,
     height: 60,
@@ -1491,15 +1771,22 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 15,
-    backgroundColor: 'rgba(0,0,0,0.3)',
+    zIndex: 10,
   },
   backButton: {
-    width: 40,
-    height: 40,
+    width: 50,
+    height: 50,
     justifyContent: 'center',
     alignItems: 'center',
-    borderRadius: 20,
-    backgroundColor: 'rgba(0,0,0,0.3)',
+    borderRadius: 25,
+    backgroundColor: 'rgba(0,0,0,0.8)',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.5,
+    shadowRadius: 4,
+    elevation: 10,
+    margin: 5,
+    top: 20,
   },
   imageInfo: {
     position: 'absolute',
@@ -1547,5 +1834,10 @@ const styles = StyleSheet.create({
     height: 8,
     backgroundColor: '#fff',
     borderRadius: 4,
+  },
+  actionButton: {
+    borderRadius: 25,
+    height: 50,
+    justifyContent: 'center',
   },
 }); 

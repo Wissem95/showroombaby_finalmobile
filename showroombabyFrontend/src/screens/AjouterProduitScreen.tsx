@@ -1131,7 +1131,7 @@ export default function AjouterProduitScreen({ navigation, route }: any) {
         <TouchableOpacity
           style={[styles.successButton, styles.viewProductButton]}
           onPress={() => {
-            navigation.navigate('ProductDetails', { productId: publishedProductId });
+            navigation.navigate('ProductDetails', { productId: publishedProductId, fullscreenMode: true });
           }}
         >
           <Text style={styles.viewProductButtonText}>Voir mon produit</Text>

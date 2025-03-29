@@ -82,6 +82,7 @@ type RootStackParamList = {
   };
   ProductDetails: {
     productId: number;
+    fullscreenMode?: boolean;
   };
   Home: undefined;
   Auth: undefined;
@@ -485,7 +486,7 @@ export default function ChatScreen({ route, navigation }: Props) {
 
   const handleViewProduct = () => {
     if (product && product.id && product.id > 0) {
-      navigation.navigate('ProductDetails', { productId: product.id });
+      navigation.navigate('ProductDetails', { productId: product.id, fullscreenMode: true });
     } else {
       showErrorToast('Détails du produit non disponibles');
     }

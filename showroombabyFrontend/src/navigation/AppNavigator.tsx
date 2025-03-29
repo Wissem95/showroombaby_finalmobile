@@ -347,16 +347,17 @@ export default function AppNavigator() {
           name="ProductDetails" 
           component={ProductDetailsScreen}
           options={{ 
-            headerShown: true,
-            headerTitle: "",
-            presentation: 'modal',
-            animation: 'slide_from_bottom',
+            headerShown: false,
+            presentation: 'card',
+            animation: 'fade_from_bottom',
+            gestureEnabled: true,
+            fullScreenGestureEnabled: true,
           }}
         />
         
         <Stack.Screen 
           name="Chat" 
-          component={ChatScreen}
+          component={ChatScreen as any}
           options={{ 
             headerShown: false,
             animation: 'default'

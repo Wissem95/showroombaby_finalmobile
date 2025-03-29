@@ -130,6 +130,17 @@ const ProductItem = React.memo(({ item, navigation }: { item: Product; navigatio
   useEffect(() => {
     const checkIfFavorite = async () => {
       try {
+        // Vérifier d'abord le stockage local pour une réponse immédiate
+        const localStatus = await AsyncStorage.getItem(`favorite_${item.id}`);
+        if (localStatus === 'true') {
+          setIsFavorite(true);
+          return;
+        } else if (localStatus === 'false') {
+          setIsFavorite(false);
+          return;
+        }
+        
+        // Si pas d'information locale, requête au serveur
         const token = await AsyncStorage.getItem('token');
         if (!token) return;
         
@@ -138,13 +149,38 @@ const ProductItem = React.memo(({ item, navigation }: { item: Product; navigatio
         });
         
         let favorites = Array.isArray(response.data) ? response.data : response.data.data;
-        setIsFavorite(favorites.some((fav: any) => fav.product_id === item.id));
+        const isFav = favorites.some((fav: any) => fav.product_id === item.id);
+        setIsFavorite(isFav);
+        
+        // Sauvegarder le statut dans le stockage local pour les prochaines fois
+        await AsyncStorage.setItem(`favorite_${item.id}`, isFav ? 'true' : 'false');
       } catch (error) {
         console.error('Erreur vérification favoris:', error);
       }
     };
+    
+    // Vérifier les favoris au montage du composant et quand les favoris changent
     checkIfFavorite();
-  }, [item.id]);
+    
+    // Mettre en place un listener pour surveiller les changements de favoris
+    const checkFavoritesChanges = async () => {
+      const favoritesChanged = await AsyncStorage.getItem('favoritesChanged');
+      if (favoritesChanged === 'true') {
+        checkIfFavorite();
+        await AsyncStorage.removeItem('favoritesChanged');
+      }
+    };
+    
+    // Vérifier les changements quand le composant devient visible
+    const unsubscribe = navigation.addListener('focus', () => {
+      checkFavoritesChanges();
+    });
+    
+    // Nettoyer à la destruction du composant
+    return () => {
+      unsubscribe();
+    };
+  }, [item.id, navigation]);
 
   const handleFavorite = async () => {
     try {
@@ -160,11 +196,19 @@ const ProductItem = React.memo(({ item, navigation }: { item: Product; navigatio
           headers: { Authorization: `Bearer ${token}` }
         });
         setIsFavorite(false);
+        
+        // Mettre à jour le stockage local
+        await AsyncStorage.setItem('favoritesChanged', 'true');
+        await AsyncStorage.setItem(`favorite_${item.id}`, 'false');
       } else {
         await axios.post(`${API_URL}/api/favorites/${item.id}`, {}, {
           headers: { Authorization: `Bearer ${token}` }
         });
         setIsFavorite(true);
+        
+        // Mettre à jour le stockage local
+        await AsyncStorage.setItem('favoritesChanged', 'true');
+        await AsyncStorage.setItem(`favorite_${item.id}`, 'true');
       }
     } catch (error) {
       console.error('Erreur favoris:', error);
@@ -175,7 +219,7 @@ const ProductItem = React.memo(({ item, navigation }: { item: Product; navigatio
   return (
     <Card
       style={styles.productCard}
-      onPress={() => navigation.navigate('ProductDetails', { productId: item.id })}
+      onPress={() => navigation.navigate('ProductDetails', { productId: item.id, fullscreenMode: true })}
     >
       <View style={styles.productImageContainer}>
         <TouchableOpacity 

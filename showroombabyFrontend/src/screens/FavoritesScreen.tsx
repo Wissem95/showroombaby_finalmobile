@@ -267,7 +267,7 @@ export default function FavoritesScreen({ navigation }: any) {
     return (
       <TouchableOpacity 
         style={styles.productCard}
-        onPress={() => navigation.navigate('ProductDetails', { productId: item.id })}
+        onPress={() => navigation.navigate('ProductDetails', { productId: item.id, fullscreenMode: true })}
       >
         <Card>
           <View style={styles.productImageContainer}>
