@@ -145,12 +145,21 @@ export default function FavoritesScreen({ navigation }: any) {
       
       setFavorites(favorites.filter(item => item.id !== productId));
       
+      // Mettre à jour le statut global des favoris pour toutes les pages
+      await AsyncStorage.setItem('favoritesChanged', 'true');
+      await AsyncStorage.setItem(`favorite_${productId}`, 'false');
+      
       Alert.alert('Succès', 'Produit retiré des favoris');
     } catch (error: any) {
       console.error('Erreur lors de la suppression du favori:', error);
       
       if (error.response && error.response.status === 404) {
         setFavorites(favorites.filter(item => item.id !== productId));
+        
+        // Mettre à jour quand même le statut global
+        await AsyncStorage.setItem('favoritesChanged', 'true');
+        await AsyncStorage.setItem(`favorite_${productId}`, 'false');
+        
         Alert.alert('Information', 'Ce produit a déjà été retiré de vos favoris');
       } else {
         Alert.alert('Erreur', 'Impossible de retirer ce produit des favoris. Veuillez réessayer.');

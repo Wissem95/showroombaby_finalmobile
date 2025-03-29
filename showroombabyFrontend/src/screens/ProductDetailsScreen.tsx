@@ -1,11 +1,11 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { StyleSheet, View, ScrollView, Image, Share, ActivityIndicator, Alert, Dimensions, TouchableOpacity, Linking, Animated } from 'react-native';
 import { Button, Text, Card, Chip, Divider, IconButton, Dialog, Portal } from 'react-native-paper';
 import { Ionicons } from '@expo/vector-icons';
 import AuthService from '../services/auth';
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { widthPercentageToDP as wp, heightPercentageToDP as hp } from 'react-native-responsive-screen';
 import MapView, { Marker } from 'react-native-maps';
 import Geolocation from '@react-native-community/geolocation';
@@ -800,43 +800,62 @@ export default function ProductDetailsScreen({ route, navigation }: any) {
   }, [productId, route.params]);
 
   // Vérifier si le produit est en favori
-  useEffect(() => {
-    const checkIfFavorite = async () => {
-      try {
-        const token = await AsyncStorage.getItem('token');
+  useFocusEffect(
+    useCallback(() => {
+      const checkIfFavorite = async () => {
+        if (!productId) return;
         
-        if (!token) {
-          console.log('Utilisateur non connecté, impossible de vérifier les favoris');
-          return;
+        try {
+          // D'abord vérifier le stockage local pour une réponse immédiate
+          const localStatus = await AsyncStorage.getItem(`favorite_${productId}`);
+          if (localStatus === 'true') {
+            setFavorite(true);
+            return;
+          } else if (localStatus === 'false') {
+            setFavorite(false);
+            return;
+          }
+          
+          const token = await AsyncStorage.getItem('token');
+          
+          if (!token) {
+            console.log('Utilisateur non connecté, impossible de vérifier les favoris');
+            return;
+          }
+          
+          // Utiliser l'API pour récupérer la liste complète des favoris
+          const response = await axios.get(`${API_URL}/api/favorites`, {
+            headers: { Authorization: `Bearer ${token}` }
+          });
+          
+          // Vérifier si le produit actuel est dans la liste des favoris
+          let isFavorite = false;
+          
+          if (response.data && response.data.data && Array.isArray(response.data.data)) {
+            // Format API: { data: [ { product_id: 1, ... }, ... ] }
+            isFavorite = response.data.data.some((fav: any) => fav.product_id == productId);
+          } else if (response.data && Array.isArray(response.data)) {
+            // Format alternatif: [ { product_id: 1, ... }, ... ]
+            isFavorite = response.data.some((fav: any) => fav.product_id == productId);
+          }
+          
+          setFavorite(isFavorite);
+          
+          // Sauvegarder le statut dans le stockage local pour les prochaines fois
+          await AsyncStorage.setItem(`favorite_${productId}`, isFavorite ? 'true' : 'false');
+        } catch (error: any) {
+          console.error('Erreur lors de la vérification des favoris:', error);
+          setFavorite(false);
         }
-        
-        // Utiliser l'API pour récupérer la liste complète des favoris
-        const response = await axios.get(`${API_URL}/api/favorites`, {
-          headers: { Authorization: `Bearer ${token}` }
-        });
-        
-        // Vérifier si le produit actuel est dans la liste des favoris
-        let isFavorite = false;
-        
-        if (response.data && response.data.data && Array.isArray(response.data.data)) {
-          // Format API: { data: [ { product_id: 1, ... }, ... ] }
-          isFavorite = response.data.data.some((fav: any) => fav.product_id == productId);
-        } else if (response.data && Array.isArray(response.data)) {
-          // Format alternatif: [ { product_id: 1, ... }, ... ]
-          isFavorite = response.data.some((fav: any) => fav.product_id == productId);
-        }
-        
-        setFavorite(isFavorite);
-      } catch (error: any) {
-        console.error('Erreur lors de la vérification des favoris:', error);
-        setFavorite(false);
-      }
-    };
+      };
 
-    if (productId) {
       checkIfFavorite();
-    }
-  }, [productId]);
+      
+      return () => {
+        // Nettoyage si nécessaire
+      };
+    }, [productId])
+  );
 
   useEffect(() => {
     const checkAuth = async () => {

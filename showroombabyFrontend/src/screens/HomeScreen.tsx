@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { StyleSheet, View, Image, ScrollView, TouchableOpacity, FlatList, Dimensions, ActivityIndicator, Alert, SafeAreaView } from 'react-native';
 import { Text, Searchbar, Chip, Card } from 'react-native-paper';
 import { Ionicons } from '@expo/vector-icons';
@@ -6,6 +6,7 @@ import axios from 'axios';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { widthPercentageToDP as wp, heightPercentageToDP as hp } from 'react-native-responsive-screen';
+import { useFocusEffect } from '@react-navigation/native';
 
 type Props = NativeStackScreenProps<any, 'Home'>;
 
@@ -127,60 +128,50 @@ const ProductItem = React.memo(({ item, navigation }: { item: Product; navigatio
     return { uri: DEFAULT_IMAGE_URL };
   };
   
-  useEffect(() => {
-    const checkIfFavorite = async () => {
-      try {
-        // Vérifier d'abord le stockage local pour une réponse immédiate
-        const localStatus = await AsyncStorage.getItem(`favorite_${item.id}`);
-        if (localStatus === 'true') {
-          setIsFavorite(true);
-          return;
-        } else if (localStatus === 'false') {
-          setIsFavorite(false);
-          return;
+  useFocusEffect(
+    useCallback(() => {
+      const checkIfFavorite = async () => {
+        try {
+          // Vérifier d'abord le stockage local pour une réponse immédiate
+          const localStatus = await AsyncStorage.getItem(`favorite_${item.id}`);
+          if (localStatus === 'true') {
+            setIsFavorite(true);
+            return;
+          } else if (localStatus === 'false') {
+            setIsFavorite(false);
+            return;
+          }
+          
+          // Si pas d'information locale, requête au serveur
+          const token = await AsyncStorage.getItem('token');
+          if (!token) return;
+          
+          const response = await axios.get(`${API_URL}/api/favorites`, {
+            headers: { Authorization: `Bearer ${token}` }
+          });
+          
+          let favorites = Array.isArray(response.data) ? response.data : response.data.data;
+          const isFav = favorites.some((fav: any) => fav.product_id === item.id);
+          setIsFavorite(isFav);
+          
+          // Sauvegarder le statut dans le stockage local pour les prochaines fois
+          await AsyncStorage.setItem(`favorite_${item.id}`, isFav ? 'true' : 'false');
+        } catch (error) {
+          console.error('Erreur vérification favoris:', error);
         }
-        
-        // Si pas d'information locale, requête au serveur
-        const token = await AsyncStorage.getItem('token');
-        if (!token) return;
-        
-        const response = await axios.get(`${API_URL}/api/favorites`, {
-          headers: { Authorization: `Bearer ${token}` }
-        });
-        
-        let favorites = Array.isArray(response.data) ? response.data : response.data.data;
-        const isFav = favorites.some((fav: any) => fav.product_id === item.id);
-        setIsFavorite(isFav);
-        
-        // Sauvegarder le statut dans le stockage local pour les prochaines fois
-        await AsyncStorage.setItem(`favorite_${item.id}`, isFav ? 'true' : 'false');
-      } catch (error) {
-        console.error('Erreur vérification favoris:', error);
-      }
-    };
-    
-    // Vérifier les favoris au montage du composant et quand les favoris changent
-    checkIfFavorite();
-    
-    // Mettre en place un listener pour surveiller les changements de favoris
-    const checkFavoritesChanges = async () => {
-      const favoritesChanged = await AsyncStorage.getItem('favoritesChanged');
-      if (favoritesChanged === 'true') {
-        checkIfFavorite();
-        await AsyncStorage.removeItem('favoritesChanged');
-      }
-    };
-    
-    // Vérifier les changements quand le composant devient visible
-    const unsubscribe = navigation.addListener('focus', () => {
-      checkFavoritesChanges();
-    });
-    
-    // Nettoyer à la destruction du composant
-    return () => {
-      unsubscribe();
-    };
-  }, [item.id, navigation]);
+      };
+      
+      // Vérifier les favoris à chaque fois que l'écran est affiché
+      checkIfFavorite();
+      
+      // Pas besoin de listener ici car useFocusEffect s'exécute déjà à chaque focus
+      
+      // Nettoyer si besoin (optionnel dans ce cas)
+      return () => {
+        // Cleanup if needed
+      };
+    }, [item.id])
+  );
 
   const handleFavorite = async () => {
     try {

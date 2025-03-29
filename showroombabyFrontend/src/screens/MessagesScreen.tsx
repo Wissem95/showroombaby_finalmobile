@@ -23,100 +23,6 @@ const API_URL = Platform.OS === 'ios'
 const placeholderImage = require('../../assets/placeholder.png');
 const DEFAULT_AVATAR_URL = 'https://via.placeholder.com/100';
 
-// Fonction utilitaire pour résoudre les chemins d'images
-const resolveImagePath = (image: any): string => {
-  // Si image est null ou undefined, retourner l'image par défaut
-  if (image === null || image === undefined) {
-    return DEFAULT_AVATAR_URL;
-  }
-  
-  // Si l'image est une chaîne
-  if (typeof image === 'string') {
-    // Si c'est une URL complète
-    if (image.startsWith('http')) {
-      return image;
-    }
-    // Si c'est un chemin relatif
-    return `${API_URL}/storage/${image}`;
-  }
-  
-  // Si l'image est un tableau, prendre le premier élément
-  else if (Array.isArray(image)) {
-    if (image.length === 0) {
-      return DEFAULT_AVATAR_URL;
-    }
-    
-    const firstImage = image[0];
-    // Éviter la récursion infinie en vérifiant le type
-    if (typeof firstImage === 'string') {
-      return resolveImagePath(firstImage);
-    } else if (typeof firstImage === 'object' && firstImage !== null) {
-      // Extraire les chemins d'image directement sans appel récursif
-      if (firstImage.path) {
-        return firstImage.path.startsWith('http') 
-          ? firstImage.path 
-          : `${API_URL}/storage/${firstImage.path}`;
-      }
-      if (firstImage.url) return firstImage.url;
-      if (firstImage.public_path) {
-        return firstImage.public_path.startsWith('http')
-          ? firstImage.public_path
-          : `${API_URL}/storage/${firstImage.public_path}`;
-      }
-    }
-    return DEFAULT_AVATAR_URL;
-  }
-  
-  // Gestion des objets
-  else if (typeof image === 'object' && image !== null) {
-    // Chemins d'images possibles dans les différents formats d'API
-    if (image.path) {
-      if (image.path.startsWith('http')) {
-        return image.path;
-      }
-      return `${API_URL}/storage/${image.path}`;
-    }
-    if (image.url) {
-      return image.url;
-    }
-    if (image.public_path) {
-      if (image.public_path.startsWith('http')) {
-        return image.public_path;
-      }
-      return `${API_URL}/storage/${image.public_path}`;
-    }
-    if (image.filename) {
-      return `${API_URL}/storage/${image.filename}`;
-    }
-    if (image.uri) {
-      return image.uri;
-    }
-    // Ne pas utiliser d'appel récursif pour éviter les boucles
-    if (image.source && typeof image.source === 'string') {
-      return image.source.startsWith('http') 
-        ? image.source 
-        : `${API_URL}/storage/${image.source}`;
-    }
-    
-    // Tenter de trouver n'importe quelle propriété qui pourrait contenir un chemin d'image
-    for (const key in image) {
-      if (typeof image[key] === 'string' && 
-          (image[key].includes('.jpg') || 
-           image[key].includes('.jpeg') || 
-           image[key].includes('.png') || 
-           image[key].includes('.webp') ||
-           image[key].startsWith('http'))) {
-        return image[key].startsWith('http') 
-          ? image[key] 
-          : `${API_URL}/storage/${image[key]}`;
-      }
-    }
-  }
-  
-  // Image par défaut si rien ne correspond
-  return DEFAULT_AVATAR_URL;
-};
-
 interface Conversation {
   id: number;
   sender_id: number;
@@ -133,6 +39,7 @@ interface Conversation {
     description?: string;
     price?: number;
     images?: string[];
+    loadAttempts?: number;
   };
   sender?: {
     id: number;
@@ -214,6 +121,17 @@ const EmptyConversationsList = ({ navigation, isAuthenticated }: { navigation: a
   );
 };
 
+// Fonction utilitaire simplifiée pour résoudre les URL d'images
+const getImageUrl = (image: any): string => {
+  if (!image) return DEFAULT_AVATAR_URL;
+  
+  if (typeof image === 'string') {
+    return image.startsWith('http') ? image : `${API_URL}/storage/${image}`;
+  }
+  
+  return DEFAULT_AVATAR_URL;
+};
+
 export default function MessagesScreen({ navigation }: any) {
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [loading, setLoading] = useState(true);
@@ -225,7 +143,7 @@ export default function MessagesScreen({ navigation }: any) {
   const [currentPage, setCurrentPage] = useState(1);
   const conversationsPerPage = 10; // Nombre de conversations à charger par page
   
-  // Ajouter une référence pour suivre les produits en cours de chargement
+  // Référence pour stocker les produits en cours de chargement
   const loadingProducts = useRef<Record<string, boolean>>({});
 
   // Nettoyage des composants démontés pour éviter les fuites mémoire
@@ -263,6 +181,19 @@ export default function MessagesScreen({ navigation }: any) {
           // Rafraîchir les conversations toutes les 30 secondes au lieu de 15
           // et stocker l'ID de l'intervalle pour pouvoir l'annuler
           intervalId = setInterval(loadConversations, 30000);
+          
+          // Force refresh des images uniquement au premier chargement ou quand pas d'images
+          // pas à chaque focus pour éviter le clignotement
+          if (conversations.length > 0) {
+            conversations.slice(0, 5).forEach(conversation => {
+              if (conversation.product_id && 
+                  (!conversation.product?.images || 
+                   !Array.isArray(conversation.product.images) || 
+                   conversation.product.images.length === 0)) {
+                loadProductDetails(conversation.product_id, conversation.id);
+              }
+            });
+          }
         } else {
           setLoading(false);
         }
@@ -276,7 +207,7 @@ export default function MessagesScreen({ navigation }: any) {
           clearInterval(intervalId);
         }
       };
-    }, [])
+    }, []) // Supprimer la dépendance à conversations pour éviter les boucles
   );
 
   const getUserId = async () => {
@@ -483,10 +414,10 @@ export default function MessagesScreen({ navigation }: any) {
     };
   };
 
-  const onRefresh = () => {
+  const onRefresh = useCallback(() => {
     setRefreshing(true);
     loadConversations();
-  };
+  }, []);
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
@@ -512,7 +443,7 @@ export default function MessagesScreen({ navigation }: any) {
       return (
         <Avatar.Image 
           size={wp('12%')} 
-          source={{ uri: resolveImagePath(otherUser.avatar) }} 
+          source={{ uri: getImageUrl(otherUser.avatar) }} 
           style={styles.avatar}
         />
       );
@@ -530,189 +461,100 @@ export default function MessagesScreen({ navigation }: any) {
   };
 
   useEffect(() => {
-    // Ne charger les détails des produits que si les conversations sont chargées et si l'utilisateur est authentifié
-    if (conversations.length > 0 && isAuthenticated) {
-      // Éviter les logs répétitifs
-      
-      // Traquer les requêtes pour pouvoir les annuler au démontage
-      const controllers: AbortController[] = [];
-      
-      // Limiter le nombre de préchargements d'images pour éviter des fuites mémoire
-      const imagePromises: Promise<any>[] = [];
-      const maxPreloadImages = 5; // Limiter à 5 images préchargées maximum
-      
-      conversations.slice(0, maxPreloadImages).forEach(conversation => {
-        if (conversation.product?.images && Array.isArray(conversation.product.images) && conversation.product.images.length > 0) {
-          const imageToPreload = conversation.product.images[0];
-          const imageUri = resolveImagePath(imageToPreload);
-          
-          // Préchargement de l'image (indirectement via le composant Image)
-          const promise = Image.prefetch(imageUri).catch(error => {
-            // Ignorer les erreurs de préchargement
-          });
-          
-          imagePromises.push(promise);
-        }
-      });
-      
-      // Calculer l'index de début et de fin pour la pagination
-      const startIndex = 0;
-      const endIndex = currentPage * conversationsPerPage;
-      
-      // Charger uniquement les détails des conversations visibles selon la pagination
-      const visibleConversations = conversations.slice(startIndex, endIndex);
-      
-      visibleConversations.forEach(conversation => {
+    // Force le chargement des détails produits quand les conversations sont disponibles
+    if (conversations.length > 0) {
+      // Chargement immédiat pour les premières conversations visibles
+      conversations.slice(0, 5).forEach(conversation => {
         if (conversation.product_id) {
-          // Créer un AbortController pour chaque requête
-          const controller = new AbortController();
-          controllers.push(controller);
-          
-          // Forcer le chargement des produits pour obtenir les images
-          if (isMounted.current) {
-            loadProductDetails(conversation.product_id, conversation.id, controller.signal);
-          }
+          loadProductDetails(conversation.product_id, conversation.id);
         }
       });
-      
-      // Nettoyage à la démontage du composant
-      return () => {
-        // Annuler toutes les requêtes en cours
-        controllers.forEach(controller => {
-          try {
-            controller.abort();
-          } catch (e) {
-            // Ignorer les erreurs d'abandon
-          }
-        });
-      };
     }
-  }, [conversations, isAuthenticated, currentPage]);
+  }, [conversations.length]);
   
-  // Optimiser la fonction loadProductDetails pour éviter les logs verbeux qui causent des fuites mémoire
+  // Version simplifiée de loadProductDetails pour un chargement efficace
   const loadProductDetails = async (productId: number, conversationId: number, signal?: AbortSignal) => {
     try {
       if (!isMounted.current) return;
       
-      // Vérifier si ce produit est déjà chargé et a des images valides
-      const existingConversation = conversations.find(c => c.id === conversationId);
-      if (existingConversation?.product?.images && 
-          Array.isArray(existingConversation.product.images) && 
-          existingConversation.product.images.length > 0) {
-        // Déjà chargé avec des images, ne pas recharger
-        return;
-      }
-      
-      // Vérifier si ce produit est déjà en cours de chargement
+      // Vérifier si ce produit est déjà en cours de chargement pour éviter les doublons
       const productLoadingKey = `loading_product_${productId}_${conversationId}`;
       if (loadingProducts.current[productLoadingKey]) {
         return;
       }
       
-      // Marquer ce produit comme en cours de chargement
+      // Marquer comme en cours de chargement
       loadingProducts.current[productLoadingKey] = true;
       
+      // Récupérer le token
       const token = await AsyncStorage.getItem('token');
       if (!token) {
         loadingProducts.current[productLoadingKey] = false;
         return;
       }
       
+      // Appel API pour obtenir les détails du produit
       const response = await axios.get(`${API_URL}/api/products/${productId}`, {
         headers: { Authorization: `Bearer ${token}` },
         signal
       });
       
-      if (isMounted.current) {
-        let productData;
-        if (response.data && response.data.data) {
-          productData = response.data.data;
-        } else if (response.data) {
-          productData = response.data;
+      if (!isMounted.current) return;
+      
+      // Extraire les données
+      let productData = null;
+      if (response.data && response.data.data) {
+        productData = response.data.data;
+      } else if (response.data) {
+        productData = response.data;
+      }
+      
+      if (productData) {
+        // Traitement des images
+        if (typeof productData.images === 'string') {
+          try {
+            // Tentative de parse JSON
+            productData.images = JSON.parse(productData.images);
+          } catch (error) {
+            // Si l'image est une chaîne simple, la mettre dans un tableau
+            productData.images = [productData.images];
+          }
         }
         
-        if (productData) {
-          // S'assurer que les images sont correctement formatées
-          if (productData.images) {
-            // Si les images sont une chaîne JSON, les parser
-            if (typeof productData.images === 'string') {
-              try {
-                productData.images = JSON.parse(productData.images);
-              } catch (error) {
-                // Si le parsing échoue mais que la chaîne ressemble à un chemin d'image, l'utiliser directement
-                if (productData.images.includes('.jpg') || 
-                    productData.images.includes('.jpeg') || 
-                    productData.images.includes('.png') ||
-                    productData.images.includes('.webp') ||
-                    productData.images.includes('/')) {
-                  productData.images = [productData.images];
-                } else {
-                  productData.images = [];
-                }
-              }
-            }
-            
-            // Vérifier si les images sont un tableau
-            if (Array.isArray(productData.images)) {
-              // S'assurer que chaque élément du tableau est bien formé
-              productData.images = productData.images.filter((img: any) => img !== null && img !== undefined);
-              
-              // Convertir les objets complexes en chemins simples si nécessaire
-              productData.images = productData.images.map((img: any) => {
-                if (typeof img === 'object' && img !== null) {
-                  if (img.path) return img.path;
-                  if (img.url) return img.url;
-                  if (img.public_path) return img.public_path;
-                  if (img.filename) return img.filename;
-                  if (img.uri) return img.uri;
-                  
-                  // Chercher des chemins d'images dans les propriétés
-                  for (const key in img) {
-                    if (typeof img[key] === 'string' && 
-                        (img[key].includes('.jpg') || 
-                         img[key].includes('.jpeg') || 
-                         img[key].includes('.png') ||
-                         img[key].includes('.webp') ||
-                         img[key].startsWith('http'))) {
-                      return img[key];
-                    }
-                  }
-                }
-                return img;
-              });
-            } else if (typeof productData.images === 'object' && productData.images !== null) {
-              // Si c'est un objet mais pas un tableau, l'encapsuler dans un tableau
-              productData.images = [productData.images];
-            } else {
-              productData.images = [];
-            }
-          } else {
-            productData.images = [];
-          }
-          
-          // Mettre à jour la conversation avec les détails du produit
-          if (isMounted.current) {
-            setConversations(prevConversations => 
-              prevConversations.map(conv => {
-                if (conv.id === conversationId) {
-                  return { 
-                    ...conv, 
-                    product: productData,
-                    product_id: productId 
-                  };
-                }
-                return conv;
-              })
-            );
-          }
+        // S'assurer que les images sont un tableau
+        if (!Array.isArray(productData.images)) {
+          productData.images = productData.images ? [productData.images] : [];
         }
+        
+        // Mise à jour immédiate des données
+        setConversations(prevConversations => {
+          // Éviter de créer un nouveau tableau si rien ne change
+          const conversationToUpdate = prevConversations.find(conv => conv.id === conversationId);
+          if (!conversationToUpdate) return prevConversations;
+          
+          return prevConversations.map(conv => {
+            if (conv.id === conversationId) {
+              return { 
+                ...conv, 
+                product: {
+                  ...productData,
+                  // Force un rechargement si nécessaire
+                  images: productData.images
+                }
+              };
+            }
+            return conv;
+          });
+        });
       }
     } catch (error) {
-      // Ne pas logger l'erreur pour éviter de spammer la console
+      // Silencieux en cas d'erreur
     } finally {
-      // Marquer ce produit comme n'étant plus en cours de chargement
-      const productLoadingKey = `loading_product_${productId}_${conversationId}`;
-      loadingProducts.current[productLoadingKey] = false;
+      if (isMounted.current) {
+        // Fin du chargement
+        const productLoadingKey = `loading_product_${productId}_${conversationId}`;
+        loadingProducts.current[productLoadingKey] = false;
+      }
     }
   };
 
@@ -731,6 +573,12 @@ export default function MessagesScreen({ navigation }: any) {
   }, [userId]);
 
   const renderConversation = ({ item }: { item: Conversation }) => {
+    // Tentative de chargement du produit si nécessaire
+    if (item.product_id && (!item.product || !item.product.images || item.product.images.length === 0)) {
+      // On déclenche le chargement des détails dans le rendu
+      loadProductDetails(item.product_id, item.id);
+    }
+    
     const otherUserId = item.sender_id === userId ? item.recipient_id : item.sender_id;
     const otherUser = item.sender_id === userId ? item.recipient : item.sender;
     
@@ -752,6 +600,22 @@ export default function MessagesScreen({ navigation }: any) {
                     !!item.product.images && 
                     Array.isArray(item.product.images) && 
                     item.product.images.length > 0;
+    
+    // Préparer directement l'URL de l'image avec le format correct
+    let imageUrl = '';
+    if (hasImages) {
+      const image = item.product!.images![0];
+      if (typeof image === 'string') {
+        imageUrl = image.startsWith('http') ? image : `${API_URL}/storage/${image}`;
+      } else if (image && typeof image === 'object') {
+        const imgObj = image as any;
+        if (imgObj.path) {
+          imageUrl = imgObj.path.startsWith('http') ? imgObj.path : `${API_URL}/storage/${imgObj.path}`;
+        } else if (imgObj.url) {
+          imageUrl = imgObj.url;
+        }
+      }
+    }
 
     return (
       <Animated.View
@@ -798,40 +662,10 @@ export default function MessagesScreen({ navigation }: any) {
                       <View style={styles.productInfoRow}>
                         {item.product_id ? (
                           <View style={styles.productImageContainer}>
-                            {hasImages ? (
-                              <Image 
-                                source={{ 
-                                  uri: resolveImagePath(item.product!.images![0])
-                                }}
-                                style={styles.productImage}
-                                defaultSource={placeholderImage}
-                                onError={(e) => {
-                                  // Ne pas logger l'erreur pour éviter les logs répétitifs
-                                  // console.error("Erreur chargement image:", e.nativeEvent.error);
-                                  
-                                  // Utiliser une référence pour éviter les appels répétés
-                                  const productLoadingKey = `loading_product_${item.product_id}_${item.id}`;
-                                  if (!loadingProducts.current[productLoadingKey]) {
-                                    loadingProducts.current[productLoadingKey] = true;
-                                    // Nettoyer le flag après un délai
-                                    setTimeout(() => {
-                                      loadingProducts.current[productLoadingKey] = false;
-                                    }, 10000); // 10 secondes avant de pouvoir recharger
-                                    
-                                    // Tenter de recharger le produit
-                                    loadProductDetails(item.product_id!, item.id);
-                                  }
-                                }}
-                              />
-                            ) : (
-                              <View style={[styles.placeholderImageContainer, {backgroundColor: '#f0f0f0'}]}>
-                                <Image 
-                                  source={placeholderImage}
-                                  style={[styles.productImage, {opacity: 0.6}]}
-                                  resizeMode="cover"
-                                />
-                              </View>
-                            )}
+                            <Image 
+                              source={hasImages && imageUrl ? { uri: imageUrl } : placeholderImage}
+                              style={styles.productImage}
+                            />
                           </View>
                         ) : null}
                         
@@ -927,6 +761,22 @@ export default function MessagesScreen({ navigation }: any) {
       </View>
     );
   };
+
+  // Effet pour forcer un rafraîchissement après le chargement initial
+  useEffect(() => {
+    // Lorsque loading passe de true à false, c'est que les conversations ont été chargées pour la première fois
+    if (!loading && conversations.length > 0) {
+      // Petit délai pour laisser l'interface se stabiliser
+      const timer = setTimeout(() => {
+        // Force refresh pour s'assurer que les images s'affichent correctement
+        if (isMounted.current) {
+          loadConversations();
+        }
+      }, 300);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [loading, conversations.length]);
 
   return (
     <View style={styles.container}>
@@ -1208,20 +1058,17 @@ const styles = StyleSheet.create({
     width: '100%',
     height: '100%',
     borderRadius: 4,
-    resizeMode: 'cover',
   },
   // Conteneur pour les images du produit
   productImageContainer: {
-    width: 40,
-    height: 40,
-    borderRadius: 4,
+    width: 45,
+    height: 45,
+    borderRadius: 6,
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: '#f0f0f0',
-    marginRight: 8,
+    borderColor: '#e0e0e0',
+    marginRight: 10,
     backgroundColor: '#fff',
-    justifyContent: 'center',
-    alignItems: 'center',
   },
   // Placeholder pour les images du produit
   placeholderImageContainer: {
