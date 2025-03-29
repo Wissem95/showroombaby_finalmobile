@@ -459,15 +459,21 @@ export default function HomeScreen({ navigation }: Props) {
         />
         
         <View style={styles.searchBarContainer}>
-          <Searchbar
-            placeholder="Rechercher"
-            style={styles.searchBar}
-            inputStyle={styles.searchInput}
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-            icon={() => null}
-            right={() => <Ionicons name="search-outline" size={20} color="#666" />}
-          />
+          <TouchableOpacity
+            style={{ width: '100%' }}
+            onPress={() => navigation.navigate('Search')}
+          >
+            <Searchbar
+              placeholder="Rechercher"
+              style={styles.searchBar}
+              inputStyle={styles.searchInput}
+              value={searchQuery}
+              editable={false}
+              pointerEvents="none"
+              icon={() => null}
+              right={() => <Ionicons name="search-outline" size={20} color="#666" />}
+            />
+          </TouchableOpacity>
         </View>
 
         <ScrollView 

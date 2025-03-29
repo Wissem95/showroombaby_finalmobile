@@ -1,0 +1,279 @@
+import React from 'react';
+import { StyleSheet, View, TouchableOpacity, Image, Dimensions } from 'react-native';
+import { Text, Card, Surface } from 'react-native-paper';
+import { widthPercentageToDP as wp } from 'react-native-responsive-screen';
+import { Ionicons } from '@expo/vector-icons';
+
+// Image placeholder
+const placeholderImage = require('../../assets/placeholder.png');
+
+// API URL
+const API_URL = 'http://127.0.0.1:8000';
+
+// Largeur de l'écran
+const { width } = Dimensions.get('window');
+const CARD_WIDTH = (width / 2) - 16;
+
+interface ProductItemProps {
+  item: {
+    id: number;
+    title: string;
+    price: number;
+    condition?: string;
+    images?: string | string[] | { path: string; url?: string }[] | any[] | null;
+    city?: string;
+    created_at: string;
+  };
+  navigation: any;
+}
+
+const ProductItem: React.FC<ProductItemProps> = ({ item, navigation }) => {
+  // Fonction pour extraire l'URL de l'image
+  const getImageUrl = () => {
+    const DEFAULT_IMAGE_URL = 'https://placehold.co/400x300/f8bbd0/ffffff?text=Showroom+Baby';
+    
+    // Image par défaut
+    if (!item.images) {
+      return DEFAULT_IMAGE_URL;
+    }
+
+    try {
+      // Si images est une chaîne JSON, on essaie de l'analyser
+      if (typeof item.images === 'string') {
+        try {
+          const parsedImages = JSON.parse(item.images);
+          
+          if (Array.isArray(parsedImages) && parsedImages.length > 0) {
+            // Vérifier si l'image contient un chemin complet ou juste un nom de fichier
+            const imageUrl = parsedImages[0].includes('http') 
+              ? parsedImages[0] 
+              : `${API_URL}/storage/${parsedImages[0]}`;
+            
+            return imageUrl;
+          }
+        } catch (e) {
+          // Si ce n'est pas un JSON valide, on utilise directement la chaîne
+          const imageUrl = item.images.includes('http') 
+            ? item.images 
+            : `${API_URL}/storage/${item.images}`;
+          
+          return imageUrl;
+        }
+      } 
+      // Si c'est déjà un tableau d'objets avec propriété "path"
+      else if (Array.isArray(item.images) && item.images.length > 0) {
+        // Vérifier si c'est un tableau d'objets avec une propriété path
+        if (typeof item.images[0] === 'object' && item.images[0] !== null) {
+          // Si l'objet contient un champ path ou url
+          if (item.images[0].path) {
+            const imageUrl = item.images[0].path.includes('http') 
+              ? item.images[0].path 
+              : `${API_URL}/storage/${item.images[0].path}`;
+            
+            return imageUrl;
+          } else if (item.images[0].url) {
+            return item.images[0].url;
+          } else {
+            // Essayer de récupérer directement la première valeur
+            const firstImage = item.images[0];
+            
+            if (typeof firstImage === 'string') {
+              const imageUrl = firstImage.includes('http') 
+                ? firstImage 
+                : `${API_URL}/storage/${firstImage}`;
+              
+              return imageUrl;
+            }
+          }
+        } else if (typeof item.images[0] === 'string') {
+          // Si c'est un tableau de chaînes
+          const imageUrl = item.images[0].includes('http') 
+            ? item.images[0] 
+            : `${API_URL}/storage/${item.images[0]}`;
+          
+          return imageUrl;
+        }
+      }
+    } catch (e) {
+      // En cas d'erreur, on utilise l'image par défaut
+      console.error('Erreur lors du chargement de l\'image:', e);
+    }
+
+    return DEFAULT_IMAGE_URL;
+  };
+  
+  // Format de la date
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffTime = Math.abs(now.getTime() - date.getTime());
+    const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+    
+    if (diffDays === 0) {
+      return "Aujourd'hui";
+    } else if (diffDays === 1) {
+      return "Hier";
+    } else if (diffDays < 7) {
+      return `Il y a ${diffDays} jours`;
+    } else {
+      const day = date.getDate().toString().padStart(2, '0');
+      const month = (date.getMonth() + 1).toString().padStart(2, '0');
+      return `${day}/${month}`;
+    }
+  };
+  
+  // Obtenir la classe de condition
+  const getConditionStyle = () => {
+    switch (item.condition) {
+      case 'NEW':
+        return styles.conditionNew;
+      case 'LIKE_NEW':
+        return styles.conditionLikeNew;
+      case 'GOOD':
+        return styles.conditionGood;
+      case 'FAIR':
+        return styles.conditionFair;
+      default:
+        return {};
+    }
+  };
+  
+  // Obtenir le label de condition
+  const getConditionLabel = () => {
+    switch (item.condition) {
+      case 'NEW':
+        return 'Neuf';
+      case 'LIKE_NEW':
+        return 'Très bon état';
+      case 'GOOD':
+        return 'Bon état';
+      case 'FAIR':
+        return 'État satisfaisant';
+      default:
+        return '';
+    }
+  };
+
+  return (
+    <TouchableOpacity 
+      style={styles.cardContainer}
+      onPress={() => navigation.navigate('ProductDetails', { productId: item.id })}
+    >
+      <Surface style={styles.surface}>
+        <View style={styles.imageContainer}>
+          <Image
+            source={{ uri: getImageUrl() }}
+            style={styles.image}
+            resizeMode="cover"
+          />
+          {item.condition && (
+            <View style={[styles.conditionBadge, getConditionStyle()]}>
+              <Text style={styles.conditionText}>{getConditionLabel()}</Text>
+            </View>
+          )}
+        </View>
+        
+        <View style={styles.contentContainer}>
+          <Text style={styles.price}>{item.price}€</Text>
+          <Text numberOfLines={2} style={styles.title}>
+            {item.title}
+          </Text>
+          
+          <View style={styles.footer}>
+            {item.city && (
+              <View style={styles.locationContainer}>
+                <Ionicons name="location-outline" size={12} color="#888" />
+                <Text style={styles.locationText} numberOfLines={1}>
+                  {item.city}
+                </Text>
+              </View>
+            )}
+            <Text style={styles.dateText}>{formatDate(item.created_at)}</Text>
+          </View>
+        </View>
+      </Surface>
+    </TouchableOpacity>
+  );
+};
+
+const styles = StyleSheet.create({
+  cardContainer: {
+    width: CARD_WIDTH,
+    margin: 8,
+  },
+  surface: {
+    borderRadius: 10,
+    elevation: 1,
+    overflow: 'hidden',
+  },
+  imageContainer: {
+    position: 'relative',
+  },
+  image: {
+    width: '100%',
+    height: 150,
+    backgroundColor: '#f0f0f0',
+  },
+  contentContainer: {
+    padding: 10,
+  },
+  title: {
+    fontSize: 14,
+    marginBottom: 5,
+    color: '#333',
+  },
+  price: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginBottom: 5,
+    color: '#000',
+  },
+  footer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 5,
+  },
+  locationContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  locationText: {
+    fontSize: 12,
+    color: '#888',
+    marginLeft: 2,
+    flex: 1,
+  },
+  dateText: {
+    fontSize: 12,
+    color: '#888',
+  },
+  conditionBadge: {
+    position: 'absolute',
+    top: 5,
+    left: 5,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 4,
+  },
+  conditionText: {
+    fontSize: 10,
+    fontWeight: '500',
+    color: '#fff',
+  },
+  conditionNew: {
+    backgroundColor: '#4CAF50',
+  },
+  conditionLikeNew: {
+    backgroundColor: '#8BC34A',
+  },
+  conditionGood: {
+    backgroundColor: '#FFC107',
+  },
+  conditionFair: {
+    backgroundColor: '#FF9800',
+  },
+});
+
+export default ProductItem; 

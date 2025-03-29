@@ -16,6 +16,7 @@ import FavoritesScreen from '../screens/FavoritesScreen';
 import AjouterProduitScreen from '../screens/AjouterProduitScreen';
 import ChatScreen from '../screens/ChatScreen';
 import MessagesScreen from '../screens/MessagesScreen';
+import SearchScreen from '../screens/SearchScreen';
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
@@ -341,6 +342,15 @@ export default function AppNavigator() {
           name="Auth" 
           component={AuthNavigator}
           options={{ presentation: 'modal' }}
+        />
+        
+        <Stack.Screen 
+          name="Search" 
+          component={SearchScreen}
+          options={{ 
+            headerShown: false,
+            animation: 'default'
+          }}
         />
         
         <Stack.Screen 

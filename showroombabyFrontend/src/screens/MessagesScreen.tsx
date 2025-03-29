@@ -25,6 +25,11 @@ const DEFAULT_AVATAR_URL = 'https://via.placeholder.com/100';
 
 // Fonction utilitaire pour résoudre les chemins d'images
 const resolveImagePath = (image: any): string => {
+  // Si image est null ou undefined, retourner l'image par défaut
+  if (image === null || image === undefined) {
+    return DEFAULT_AVATAR_URL;
+  }
+  
   // Si l'image est une chaîne
   if (typeof image === 'string') {
     // Si c'est une URL complète
@@ -34,17 +39,59 @@ const resolveImagePath = (image: any): string => {
     // Si c'est un chemin relatif
     return `${API_URL}/storage/${image}`;
   }
-  // Si l'image est un objet avec path
-  else if (typeof image === 'object' && image !== null && image.path) {
-    if (image.path.startsWith('http')) {
-      return image.path;
+  
+  // Si l'image est un tableau, prendre le premier élément
+  else if (Array.isArray(image)) {
+    if (image.length === 0) {
+      return DEFAULT_AVATAR_URL;
     }
-    return `${API_URL}/storage/${image.path}`;
+    
+    const firstImage = image[0];
+    // Appel récursif pour résoudre le premier élément du tableau
+    return resolveImagePath(firstImage);
   }
-  // Si l'image est un objet avec url
-  else if (typeof image === 'object' && image !== null && image.url) {
-    return image.url;
+  
+  // Gestion des objets
+  else if (typeof image === 'object' && image !== null) {
+    // Chemins d'images possibles dans les différents formats d'API
+    if (image.path) {
+      if (image.path.startsWith('http')) {
+        return image.path;
+      }
+      return `${API_URL}/storage/${image.path}`;
+    }
+    if (image.url) {
+      return image.url;
+    }
+    if (image.public_path) {
+      if (image.public_path.startsWith('http')) {
+        return image.public_path;
+      }
+      return `${API_URL}/storage/${image.public_path}`;
+    }
+    if (image.filename) {
+      return `${API_URL}/storage/${image.filename}`;
+    }
+    if (image.uri) {
+      return image.uri;
+    }
+    if (image.source) {
+      return resolveImagePath(image.source);
+    }
+    
+    // Tenter de trouver n'importe quelle propriété qui pourrait contenir un chemin d'image
+    for (const key in image) {
+      if (typeof image[key] === 'string' && 
+          (image[key].includes('.jpg') || 
+           image[key].includes('.jpeg') || 
+           image[key].includes('.png') || 
+           image[key].includes('.webp') ||
+           image[key].startsWith('http'))) {
+        return resolveImagePath(image[key]);
+      }
+    }
   }
+  
   // Image par défaut si rien ne correspond
   return DEFAULT_AVATAR_URL;
 };
@@ -520,13 +567,6 @@ export default function MessagesScreen({ navigation }: any) {
   
   // Optimiser la fonction loadProductDetails pour éviter les logs verbeux qui causent des fuites mémoire
   const loadProductDetails = async (productId: number, conversationId: number, signal?: AbortSignal) => {
-    // Vérifier si le produit a déjà été chargé
-    const existingConversation = conversations.find(c => c.id === conversationId);
-    if (existingConversation && existingConversation.product && existingConversation.product.images) {
-      // Si le produit a déjà des images, ne pas le recharger
-      return;
-    }
-
     try {
       if (!isMounted.current) return;
       
@@ -538,7 +578,6 @@ export default function MessagesScreen({ navigation }: any) {
         signal
       });
       
-      // Limiter la taille des logs pour éviter les fuites mémoire
       if (isMounted.current) {
         let productData;
         if (response.data && response.data.data) {
@@ -559,6 +598,7 @@ export default function MessagesScreen({ navigation }: any) {
                 if (productData.images.includes('.jpg') || 
                     productData.images.includes('.jpeg') || 
                     productData.images.includes('.png') ||
+                    productData.images.includes('.webp') ||
                     productData.images.includes('/')) {
                   productData.images = [productData.images];
                 } else {
@@ -569,7 +609,32 @@ export default function MessagesScreen({ navigation }: any) {
             
             // Vérifier si les images sont un tableau
             if (Array.isArray(productData.images)) {
-              // Ne rien faire de plus pour éviter des logs excessifs
+              // S'assurer que chaque élément du tableau est bien formé
+              productData.images = productData.images.filter((img: any) => img !== null && img !== undefined);
+              
+              // Convertir les objets complexes en chemins simples si nécessaire
+              productData.images = productData.images.map((img: any) => {
+                if (typeof img === 'object' && img !== null) {
+                  if (img.path) return img.path;
+                  if (img.url) return img.url;
+                  if (img.public_path) return img.public_path;
+                  if (img.filename) return img.filename;
+                  if (img.uri) return img.uri;
+                  
+                  // Chercher des chemins d'images dans les propriétés
+                  for (const key in img) {
+                    if (typeof img[key] === 'string' && 
+                        (img[key].includes('.jpg') || 
+                         img[key].includes('.jpeg') || 
+                         img[key].includes('.png') ||
+                         img[key].includes('.webp') ||
+                         img[key].startsWith('http'))) {
+                      return img[key];
+                    }
+                  }
+                }
+                return img;
+              });
             } else if (typeof productData.images === 'object' && productData.images !== null) {
               // Si c'est un objet mais pas un tableau, l'encapsuler dans un tableau
               productData.images = [productData.images];
@@ -598,7 +663,7 @@ export default function MessagesScreen({ navigation }: any) {
         }
       }
     } catch (error) {
-      // Silence les erreurs pour éviter de surcharger la console
+      console.error(`Erreur chargement produit #${productId}:`, error instanceof Error ? error.message : 'Erreur inconnue');
     }
   };
 
@@ -691,13 +756,19 @@ export default function MessagesScreen({ navigation }: any) {
                                 }}
                                 style={styles.productImage}
                                 defaultSource={placeholderImage}
-                                onError={() => {
-                                  // Éviter de logger l'erreur
+                                onError={(e) => {
+                                  console.error("Erreur chargement image:", e.nativeEvent.error);
+                                  // Tenter de recharger les détails du produit si l'image échoue
+                                  loadProductDetails(item.product_id!, item.id);
                                 }}
                               />
                             ) : (
-                              <View style={styles.placeholderImageContainer}>
-                                <Ionicons name="image-outline" size={16} color="#999" />
+                              <View style={[styles.placeholderImageContainer, {backgroundColor: '#f0f0f0'}]}>
+                                <Image 
+                                  source={placeholderImage}
+                                  style={[styles.productImage, {opacity: 0.6}]}
+                                  resizeMode="cover"
+                                />
                               </View>
                             )}
                           </View>
@@ -1071,16 +1142,25 @@ const styles = StyleSheet.create({
     bottom: 0,
     backgroundColor: '#ff6b9b',
   },
+  // Style de l'image du produit
+  productImage: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 4,
+    resizeMode: 'cover',
+  },
   // Conteneur pour les images du produit
   productImageContainer: {
-    width: 36,
-    height: 36,
+    width: 40,
+    height: 40,
     borderRadius: 4,
     overflow: 'hidden',
     borderWidth: 1,
     borderColor: '#f0f0f0',
     marginRight: 8,
     backgroundColor: '#fff',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   // Placeholder pour les images du produit
   placeholderImageContainer: {
@@ -1089,12 +1169,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#f5f5f5',
     justifyContent: 'center',
     alignItems: 'center',
-    borderRadius: 4,
-  },
-  // Style de l'image du produit
-  productImage: {
-    width: '100%',
-    height: '100%',
     borderRadius: 4,
   },
   // Conteneur pour le bouton "Charger plus"
