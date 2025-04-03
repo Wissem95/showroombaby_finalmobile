@@ -20,6 +20,7 @@ import SearchScreen from '../screens/SearchScreen';
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import Icons3DStatic from '../components/Icons3DStatic';
 
 const API_URL = 'http://127.0.0.1:8000';
 
@@ -136,34 +137,41 @@ function CustomBottomBar({ navigation, activeRoute }: CustomBottomBarProps) {
       <TouchableOpacity
         onPress={() => navigation.navigate('Home')}
         style={styles.iconItem}>
-        <Ionicons 
-          name={activeRoute === 'Home' ? 'search' : 'search-outline'} 
-          size={24} 
-          color={activeRoute === 'Home' ? '#ff6b9b' : '#888'} 
+        <Icons3DStatic 
+          name="search"
+          size={32}
+          isActive={activeRoute === 'Home'}
         />
       </TouchableOpacity>
+      
       <TouchableOpacity 
         style={styles.iconItem}
         onPress={() => handleNavigate('Favoris')}>
-        <Ionicons 
-          name={activeRoute === 'Favoris' ? 'heart' : 'heart-outline'} 
-          size={24} 
-          color={activeRoute === 'Favoris' ? '#ff6b9b' : '#888'} 
+        <Icons3DStatic 
+          name="heart"
+          size={32}
+          isActive={activeRoute === 'Favoris'}
         />
       </TouchableOpacity>
+      
       <TouchableOpacity 
         style={[styles.iconItem, styles.addButton]}
         onPress={() => handleNavigate('AjouterProduit')}>
-        <Ionicons name="add" size={32} color="#ffffff" />
+        <Icons3DStatic 
+          name="add"
+          size={32}
+          color="#FFFFFF"
+        />
       </TouchableOpacity>
+      
       <TouchableOpacity 
         style={styles.iconItem}
         onPress={() => handleNavigate('Messages')}>
         <View>
-          <Ionicons 
-            name={activeRoute === 'Messages' ? 'chatbubble-ellipses' : 'chatbubble-ellipses-outline'} 
-            size={24} 
-            color={activeRoute === 'Messages' ? '#ff6b9b' : '#888'} 
+          <Icons3DStatic 
+            name="chat"
+            size={32}
+            isActive={activeRoute === 'Messages'}
           />
           {unreadCount > 0 && (
             <View style={styles.badge}>
@@ -172,18 +180,17 @@ function CustomBottomBar({ navigation, activeRoute }: CustomBottomBarProps) {
           )}
         </View>
       </TouchableOpacity>
+      
       <TouchableOpacity 
         style={styles.iconItem}
         onPress={() => isAuthenticated ? 
-          // Si connecté, afficher le profil
           navigation.navigate('Profile') : 
-          // Sinon, afficher la page de connexion
           navigation.navigate('Auth')
         }>
-        <Ionicons 
-          name={isAuthenticated ? 'person' : 'person-outline'} 
-          size={24} 
-          color={(activeRoute === 'Auth' || activeRoute === 'Profile') ? '#ff6b9b' : '#888'} 
+        <Icons3DStatic 
+          name="person"
+          size={32}
+          isActive={activeRoute === 'Auth' || activeRoute === 'Profile'}
         />
         {isAuthenticated && user && (
           <View style={styles.statusDot} />
@@ -301,6 +308,15 @@ export default function AppNavigator() {
           )}
         </Stack.Screen>
         
+        <Stack.Screen name="Messages">
+          {(props) => (
+            <SafeAreaView style={{ flex: 1 }}>
+              <MessagesScreen {...props} />
+              <CustomBottomBar navigation={props.navigation} activeRoute="Messages" />
+            </SafeAreaView>
+          )}
+        </Stack.Screen>
+        
         <Stack.Screen 
           name="AjouterProduit"
           component={AjouterProduitScreen}
@@ -319,15 +335,6 @@ export default function AppNavigator() {
             ),
           })}
         />
-        
-        <Stack.Screen name="Messages">
-          {(props) => (
-            <SafeAreaView style={{ flex: 1 }}>
-              <MessagesScreen {...props} />
-              <CustomBottomBar navigation={props.navigation} activeRoute="Messages" />
-            </SafeAreaView>
-          )}
-        </Stack.Screen>
         
         <Stack.Screen name="Profile">
           {(props) => (

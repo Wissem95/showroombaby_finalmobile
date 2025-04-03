@@ -5,7 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 import AuthService from '../services/auth';
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import { useNavigation, useRoute, useFocusEffect } from '@react-navigation/native';
 import { widthPercentageToDP as wp, heightPercentageToDP as hp } from 'react-native-responsive-screen';
 import MapView, { Marker } from 'react-native-maps';
 import Geolocation from '@react-native-community/geolocation';
@@ -260,7 +260,7 @@ const carouselStyles = StyleSheet.create({
 const ImageCarousel = ({ images, navigation, product }: { images: string[], navigation: any, product: Product }) => {
   const [activeIndex, setActiveIndex] = useState(0);
   const [imageLoadError, setImageLoadError] = useState<Record<string, boolean>>({});
-  const [favorite, setFavorite] = useState(false);
+  const [isFavorite, setIsFavorite] = useState(false);
   
   // Animation pour l'indicateur de swipe
   const swipeAnim = useRef(new Animated.Value(0)).current;
@@ -436,14 +436,14 @@ const ImageCarousel = ({ images, navigation, product }: { images: string[], navi
           <TouchableOpacity 
             style={[
               carouselStyles.actionButton, 
-              favorite && carouselStyles.actionButtonActive
+              isFavorite && carouselStyles.actionButtonActive
             ]}
-            onPress={() => setFavorite(!favorite)}
+            onPress={() => setIsFavorite(!isFavorite)}
           >
             <Ionicons 
-              name={favorite ? "heart" : "heart-outline"} 
+              name={isFavorite ? "heart" : "heart-outline"} 
               size={26} 
-              color={favorite ? "#e74c3c" : "#777"} 
+              color={isFavorite ? "#e74c3c" : "#777"} 
             />
           </TouchableOpacity>
           <TouchableOpacity 
@@ -649,14 +649,14 @@ const ImageCarousel = ({ images, navigation, product }: { images: string[], navi
             <TouchableOpacity 
               style={[
                 carouselStyles.actionButton, 
-                favorite && carouselStyles.actionButtonActive
+                isFavorite && carouselStyles.actionButtonActive
               ]}
-              onPress={() => setFavorite(!favorite)}
+              onPress={() => setIsFavorite(!isFavorite)}
             >
               <Ionicons 
-                name={favorite ? "heart" : "heart-outline"} 
+                name={isFavorite ? "heart" : "heart-outline"} 
                 size={26} 
-                color={favorite ? "#e74c3c" : "#777"} 
+                color={isFavorite ? "#e74c3c" : "#777"} 
               />
             </TouchableOpacity>
             <TouchableOpacity 
@@ -673,17 +673,48 @@ const ImageCarousel = ({ images, navigation, product }: { images: string[], navi
 };
 
 export default function ProductDetailsScreen({ route, navigation }: any) {
-  const { productId } = route.params || {};
-  
+  const { productId, fullscreenMode, transitionAnimation } = route.params || {};
   const [product, setProduct] = useState<Product | null>(null);
   const [seller, setSeller] = useState<Seller | null>(null);
+  const [category, setCategory] = useState<Category | null>(null);
+  const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  const [favorite, setFavorite] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [showingImageGallery, setShowingImageGallery] = useState(fullscreenMode);
+  const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  const [productImages, setProductImages] = useState<any[]>([]);
+  const [isFavorite, setIsFavorite] = useState(false);
+  const [showContactDialog, setShowContactDialog] = useState(false);
+  const [hiddenPhone, setHiddenPhone] = useState<string | null>(null);
   const [loginDialogVisible, setLoginDialogVisible] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [categories, setCategories] = useState<Category[]>([]);
-  const [location, setLocation] = useState<{ latitude: number; longitude: number } | null>(null);
+  const [location, setLocation] = useState<{latitude: number, longitude: number} | null>(null);
+  
+  // Animation de transition
+  const slideAnimation = useRef(new Animated.Value(
+    transitionAnimation === 'fromBottom' ? 1000 : 0
+  )).current;
+  const opacityAnimation = useRef(new Animated.Value(
+    transitionAnimation === 'fromBottom' ? 0 : 1
+  )).current;
+  
+  // Exécuter l'animation d'entrée si l'on accède à cette page par un swipe up
+  useEffect(() => {
+    if (transitionAnimation === 'fromBottom') {
+      Animated.parallel([
+        Animated.timing(slideAnimation, {
+          toValue: 0,
+          duration: 300,
+          useNativeDriver: true
+        }),
+        Animated.timing(opacityAnimation, {
+          toValue: 1,
+          duration: 200,
+          useNativeDriver: true
+        })
+      ]).start();
+    }
+  }, [transitionAnimation]);
 
   const navigationNative = useNavigation();
 
@@ -692,13 +723,10 @@ export default function ProductDetailsScreen({ route, navigation }: any) {
     const fetchCategories = async () => {
       try {
         const response = await axios.get(`${API_URL}/api/categories`);
-        if (response.data && Array.isArray(response.data)) {
-          setCategories(response.data);
-        } else if (response.data && response.data.data && Array.isArray(response.data.data)) {
-          setCategories(response.data.data);
-        }
+        console.log('Catégories récupérées:', response.data);
+        setCategories(response.data);
       } catch (error) {
-        console.error('Erreur lors du chargement des catégories:', error);
+        console.error('Erreur lors de la récupération des catégories:', error);
       }
     };
 
@@ -706,19 +734,23 @@ export default function ProductDetailsScreen({ route, navigation }: any) {
   }, []);
 
   // Obtenir le nom de la catégorie
-  const getCategoryName = (categoryId: number) => {
-    const category = categories.find(c => c.id === categoryId);
-    return category ? category.name : `Catégorie ${categoryId}`;
+  const getCategoryName = (categoryId: number | undefined | null): string => {
+    if (categoryId === undefined || categoryId === null) return 'Catégorie inconnue';
+    
+    const foundCategory = categories.find(cat => cat.id === categoryId);
+    return foundCategory ? foundCategory.name : `Catégorie inconnue`;
   };
 
   // Obtenir le nom de la sous-catégorie
-  const getSubcategoryName = (categoryId: number, subcategoryId: number) => {
-    const category = categories.find(c => c.id === categoryId);
-    if (category && category.subcategories) {
-      const subcategory = category.subcategories.find(sc => sc.id === subcategoryId);
-      return subcategory ? subcategory.name : `Sous-catégorie ${subcategoryId}`;
-    }
-    return `Sous-catégorie ${subcategoryId}`;
+  const getSubcategoryName = (categoryId: number | undefined | null, subcategoryId: number | undefined | null): string => {
+    if (subcategoryId === undefined || subcategoryId === null) return 'Sous-catégorie inconnue';
+    if (categoryId === undefined || categoryId === null) return 'Sous-catégorie inconnue';
+    
+    const category = categories.find(cat => cat.id === categoryId);
+    if (!category || !category.subcategories) return 'Sous-catégorie inconnue';
+    
+    const subcategory = category.subcategories.find(sub => sub.id === subcategoryId);
+    return subcategory ? subcategory.name : 'Sous-catégorie inconnue';
   };
 
   // Charger les détails du produit
@@ -809,10 +841,10 @@ export default function ProductDetailsScreen({ route, navigation }: any) {
           // D'abord vérifier le stockage local pour une réponse immédiate
           const localStatus = await AsyncStorage.getItem(`favorite_${productId}`);
           if (localStatus === 'true') {
-            setFavorite(true);
+            setIsFavorite(true);
             return;
           } else if (localStatus === 'false') {
-            setFavorite(false);
+            setIsFavorite(false);
             return;
           }
           
@@ -839,13 +871,13 @@ export default function ProductDetailsScreen({ route, navigation }: any) {
             isFavorite = response.data.some((fav: any) => fav.product_id == productId);
           }
           
-          setFavorite(isFavorite);
+          setIsFavorite(isFavorite);
           
           // Sauvegarder le statut dans le stockage local pour les prochaines fois
           await AsyncStorage.setItem(`favorite_${productId}`, isFavorite ? 'true' : 'false');
         } catch (error: any) {
           console.error('Erreur lors de la vérification des favoris:', error);
-          setFavorite(false);
+          setIsFavorite(false);
         }
       };
 
@@ -891,12 +923,12 @@ export default function ProductDetailsScreen({ route, navigation }: any) {
     }
     
     try {
-      if (favorite) {
+      if (isFavorite) {
         // Supprimer des favoris
         await axios.delete(`${API_URL}/api/favorites/${product.id}`, {
           headers: { Authorization: `Bearer ${token}` }
         });
-        setFavorite(false);
+        setIsFavorite(false);
         
         // Mettre à jour le statut du favori dans le stockage local
         await AsyncStorage.setItem('favoritesChanged', 'true');
@@ -908,7 +940,7 @@ export default function ProductDetailsScreen({ route, navigation }: any) {
         await axios.post(`${API_URL}/api/favorites/${product.id}`, {}, {
           headers: { Authorization: `Bearer ${token}` }
         });
-        setFavorite(true);
+        setIsFavorite(true);
         
         // Mettre à jour le statut du favori dans le stockage local
         await AsyncStorage.setItem('favoritesChanged', 'true');
@@ -925,7 +957,7 @@ export default function ProductDetailsScreen({ route, navigation }: any) {
           setLoginDialogVisible(true);
         } else if (error.response.status === 422) {
           // Le produit est déjà dans les favoris
-          setFavorite(true);
+          setIsFavorite(true);
           
           // Mettre à jour le statut du favori dans le stockage local
           await AsyncStorage.setItem('favoritesChanged', 'true');
@@ -934,7 +966,7 @@ export default function ProductDetailsScreen({ route, navigation }: any) {
           Alert.alert('Information', 'Ce produit est déjà dans vos favoris');
         } else if (error.response.status === 404) {
           // Le produit n'est plus dans les favoris
-          setFavorite(false);
+          setIsFavorite(false);
           
           // Mettre à jour le statut du favori dans le stockage local
           await AsyncStorage.setItem('favoritesChanged', 'true');
@@ -1221,310 +1253,318 @@ export default function ProductDetailsScreen({ route, navigation }: any) {
 
   // Interface normale (non fullscreen)
   return (
-    <ScrollView style={styles.container}>
-      <View style={styles.imageContainer}>
-        <TouchableOpacity 
-          style={styles.fullImageButton}
-          activeOpacity={0.95}
-          onPress={() => navigation.navigate('ProductDetails', { 
-            productId: product.id,
-            fullscreenMode: true
-          })}
-        >
-          {getProductImage(product).length > 0 ? (
-            <>
-              <Image
-                source={{ 
-                  uri: getProductImage(product).length > 0 
-                    ? (
-                      typeof getProductImage(product)[0] === 'string' && getProductImage(product)[0].startsWith('http')
-                        ? getProductImage(product)[0]
-                        : `${API_URL}/storage/${getProductImage(product)[0]}`
-                    )
-                    : placeholderImage
-                }}
-                style={styles.mainImage}
-                resizeMode="cover"
-              />
-              <View style={styles.imageOverlay} />
-            </>
-          ) : (
-            <>
-              <Image
-                source={placeholderImage}
-                style={styles.mainImage}
-                resizeMode="cover"
-              />
-              <View style={styles.imageOverlay} />
-            </>
-          )}
-          
-          <View style={styles.imageHeader}>
-            <TouchableOpacity 
-              style={styles.backButton}
-              onPress={() => navigation.goBack()}
-            >
-              <Ionicons name="chevron-back" size={32} color="#fff" />
-            </TouchableOpacity>
-          </View>
-          
-          <View style={styles.imageInfo}>
-            <Text style={styles.miniTitle}>{product.title}</Text>
-            <Text style={styles.miniPrice}>{formatPrice(product.price)}</Text>
-          </View>
-          
-          {getProductImage(product).length > 1 && (
-            <View style={styles.imagePagination}>
-              {getProductImage(product).map((_, index) => (
-                <View
-                  key={index}
-                  style={[
-                    styles.paginationDot,
-                    index === 0 && styles.paginationDotActive,
-                  ]}
+    <Animated.View style={[
+      styles.container,
+      {
+        opacity: opacityAnimation,
+        transform: [{ translateY: slideAnimation }]
+      }
+    ]}>
+      <ScrollView style={styles.container}>
+        <View style={styles.imageContainer}>
+          <TouchableOpacity 
+            style={styles.fullImageButton}
+            activeOpacity={0.95}
+            onPress={() => navigation.navigate('ProductDetails', { 
+              productId: product.id,
+              fullscreenMode: true
+            })}
+          >
+            {getProductImage(product).length > 0 ? (
+              <>
+                <Image
+                  source={{ 
+                    uri: getProductImage(product).length > 0 
+                      ? (
+                        typeof getProductImage(product)[0] === 'string' && getProductImage(product)[0].startsWith('http')
+                          ? getProductImage(product)[0]
+                          : `${API_URL}/storage/${getProductImage(product)[0]}`
+                      )
+                      : placeholderImage
+                  }}
+                  style={styles.mainImage}
+                  resizeMode="cover"
                 />
-              ))}
-            </View>
-          )}
-        </TouchableOpacity>
-      </View>
-      
-      <View style={styles.header}>
-        <Text style={styles.title}>{product.title}</Text>
-        <View style={styles.priceRow}>
-          <Text style={styles.price}>{formatPrice(product.price)}</Text>
-          <View style={styles.actions}>
-            <IconButton
-              icon={favorite ? "heart" : "heart-outline"}
-              iconColor={favorite ? "#e74c3c" : "#000"}
-              size={24}
-              onPress={handleFavorite}
-            />
-            <IconButton
-              icon="share-variant"
-              size={24}
-              onPress={handleShare}
-            />
-          </View>
-        </View>
-      </View>
-      
-      <Divider style={styles.divider} />
-      
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Description</Text>
-        <Text style={styles.description}>{product.description}</Text>
-      </View>
-
-      <Divider style={styles.divider} />
-      
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Détails</Text>
-        <View style={styles.detailsGrid}>
-          <View style={styles.detailItem}>
-            <Text style={styles.detailLabel}>État</Text>
-            <Text style={styles.detailValue}>{getConditionLabel(product.condition)}</Text>
-          </View>
-          
-          {product.size && (
-            <View style={styles.detailItem}>
-              <Text style={styles.detailLabel}>Taille</Text>
-              <Text style={styles.detailValue}>{product.size}</Text>
-            </View>
-          )}
-          
-          {product.color && (
-            <View style={styles.detailItem}>
-              <Text style={styles.detailLabel}>Couleur</Text>
-              <Text style={styles.detailValue}>{product.color}</Text>
-            </View>
-          )}
-          
-          {product.warranty && (
-            <View style={styles.detailItem}>
-              <Text style={styles.detailLabel}>Garantie</Text>
-              <Text style={styles.detailValue}>{getWarrantyLabel(product.warranty)}</Text>
-            </View>
-          )}
-          
-          <View style={styles.detailItem}>
-            <Text style={styles.detailLabel}>Catégorie</Text>
-            <Text style={styles.detailValue}>{getCategoryName(product.category_id)}</Text>
-          </View>
-          
-          {product.subcategory_id && (
-            <View style={styles.detailItem}>
-              <Text style={styles.detailLabel}>Sous-catégorie</Text>
-              <Text style={styles.detailValue}>
-                {getSubcategoryName(product.category_id, product.subcategory_id)}
-              </Text>
-            </View>
-          )}
-          
-          {(product.city || product.location) && (
-            <View style={styles.detailItem}>
-              <Text style={styles.detailLabel}>Localisation</Text>
-              <Text style={styles.detailValue}>
-                <Ionicons name="location-outline" size={16} color="#666" />
-                {' '}{product.city || product.location}
-                {product.zip_code && `, ${product.zip_code}`}
-              </Text>
-            </View>
-          )}
-          
-          <View style={styles.detailItem}>
-            <Text style={styles.detailLabel}>Vues</Text>
-            <Text style={styles.detailValue}>{product.view_count}</Text>
-          </View>
-          
-          <View style={styles.detailItem}>
-            <Text style={styles.detailLabel}>Date de publication</Text>
-            <Text style={styles.detailValue}>
-              {new Date(product.created_at).toLocaleDateString('fr-FR')}
-            </Text>
-          </View>
-          
-          {!product.hide_phone && product.phone && (
-            <View style={styles.detailItem}>
-              <Text style={styles.detailLabel}>Téléphone</Text>
-              <Text style={styles.detailValue}>{product.phone}</Text>
-            </View>
-          )}
-          
-          {product.brand && (
-            <View style={styles.detailItem}>
-              <Text style={styles.detailLabel}>Marque</Text>
-              <Text style={styles.detailValue}>{product.brand}</Text>
-            </View>
-          )}
-          
-          {product.model && (
-            <View style={styles.detailItem}>
-              <Text style={styles.detailLabel}>Modèle</Text>
-              <Text style={styles.detailValue}>{product.model}</Text>
-            </View>
-          )}
-          
-          {product.material && (
-            <View style={styles.detailItem}>
-              <Text style={styles.detailLabel}>Matériau</Text>
-              <Text style={styles.detailValue}>{product.material}</Text>
-            </View>
-          )}
-          
-          {product.dimensions && (
-            <View style={styles.detailItem}>
-              <Text style={styles.detailLabel}>Dimensions</Text>
-              <Text style={styles.detailValue}>{product.dimensions}</Text>
-            </View>
-          )}
-          
-          {product.weight && (
-            <View style={styles.detailItem}>
-              <Text style={styles.detailLabel}>Poids</Text>
-              <Text style={styles.detailValue}>{product.weight}</Text>
-            </View>
-          )}
-        </View>
-      </View>
-
-      {location && (
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Localisation</Text>
-          <View style={styles.mapContainerWrapper}>
-            <View style={styles.mapContainer}>
-              <MapView
-                style={styles.map}
-                initialRegion={{
-                  latitude: location.latitude,
-                  longitude: location.longitude,
-                  latitudeDelta: 0.01,
-                  longitudeDelta: 0.01,
-                }}
+                <View style={styles.imageOverlay} />
+              </>
+            ) : (
+              <>
+                <Image
+                  source={placeholderImage}
+                  style={styles.mainImage}
+                  resizeMode="cover"
+                />
+                <View style={styles.imageOverlay} />
+              </>
+            )}
+            
+            <View style={styles.imageHeader}>
+              <TouchableOpacity 
+                style={styles.backButton}
+                onPress={() => navigation.goBack()}
               >
-                <Marker
-                  coordinate={{
+                <Ionicons name="chevron-back" size={32} color="#fff" />
+              </TouchableOpacity>
+            </View>
+            
+            <View style={styles.imageInfo}>
+              <Text style={styles.miniTitle}>{product.title}</Text>
+              <Text style={styles.miniPrice}>{formatPrice(product.price)}</Text>
+            </View>
+            
+            {getProductImage(product).length > 1 && (
+              <View style={styles.imagePagination}>
+                {getProductImage(product).map((_, index) => (
+                  <View
+                    key={index}
+                    style={[
+                      styles.paginationDot,
+                      index === 0 && styles.paginationDotActive,
+                    ]}
+                  />
+                ))}
+              </View>
+            )}
+          </TouchableOpacity>
+        </View>
+        
+        <View style={styles.header}>
+          <Text style={styles.title}>{product.title}</Text>
+          <View style={styles.priceRow}>
+            <Text style={styles.price}>{formatPrice(product.price)}</Text>
+            <View style={styles.actions}>
+              <IconButton
+                icon={isFavorite ? "heart" : "heart-outline"}
+                iconColor={isFavorite ? "#e74c3c" : "#000"}
+                size={24}
+                onPress={handleFavorite}
+              />
+              <IconButton
+                icon="share-variant"
+                size={24}
+                onPress={handleShare}
+              />
+            </View>
+          </View>
+        </View>
+        
+        <Divider style={styles.divider} />
+        
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Description</Text>
+          <Text style={styles.description}>{product.description}</Text>
+        </View>
+
+        <Divider style={styles.divider} />
+        
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Détails</Text>
+          <View style={styles.detailsGrid}>
+            <View style={styles.detailItem}>
+              <Text style={styles.detailLabel}>État</Text>
+              <Text style={styles.detailValue}>{getConditionLabel(product.condition)}</Text>
+            </View>
+            
+            {product.size && (
+              <View style={styles.detailItem}>
+                <Text style={styles.detailLabel}>Taille</Text>
+                <Text style={styles.detailValue}>{product.size}</Text>
+              </View>
+            )}
+            
+            {product.color && (
+              <View style={styles.detailItem}>
+                <Text style={styles.detailLabel}>Couleur</Text>
+                <Text style={styles.detailValue}>{product.color}</Text>
+              </View>
+            )}
+            
+            {product.warranty && (
+              <View style={styles.detailItem}>
+                <Text style={styles.detailLabel}>Garantie</Text>
+                <Text style={styles.detailValue}>{getWarrantyLabel(product.warranty)}</Text>
+              </View>
+            )}
+            
+            <View style={styles.detailItem}>
+              <Text style={styles.detailLabel}>Catégorie</Text>
+              <Text style={styles.detailValue}>{getCategoryName(product.category_id)}</Text>
+            </View>
+            
+            {product.subcategory_id && (
+              <View style={styles.detailItem}>
+                <Text style={styles.detailLabel}>Sous-catégorie</Text>
+                <Text style={styles.detailValue}>
+                  {getSubcategoryName(product.category_id, product.subcategory_id)}
+                </Text>
+              </View>
+            )}
+            
+            {(product.city || product.location) && (
+              <View style={styles.detailItem}>
+                <Text style={styles.detailLabel}>Localisation</Text>
+                <Text style={styles.detailValue}>
+                  <Ionicons name="location-outline" size={16} color="#666" />
+                  {' '}{product.city || product.location}
+                  {product.zip_code && `, ${product.zip_code}`}
+                </Text>
+              </View>
+            )}
+            
+            <View style={styles.detailItem}>
+              <Text style={styles.detailLabel}>Vues</Text>
+              <Text style={styles.detailValue}>{product.view_count}</Text>
+            </View>
+            
+            <View style={styles.detailItem}>
+              <Text style={styles.detailLabel}>Date de publication</Text>
+              <Text style={styles.detailValue}>
+                {new Date(product.created_at).toLocaleDateString('fr-FR')}
+              </Text>
+            </View>
+            
+            {!product.hide_phone && product.phone && (
+              <View style={styles.detailItem}>
+                <Text style={styles.detailLabel}>Téléphone</Text>
+                <Text style={styles.detailValue}>{product.phone}</Text>
+              </View>
+            )}
+            
+            {product.brand && (
+              <View style={styles.detailItem}>
+                <Text style={styles.detailLabel}>Marque</Text>
+                <Text style={styles.detailValue}>{product.brand}</Text>
+              </View>
+            )}
+            
+            {product.model && (
+              <View style={styles.detailItem}>
+                <Text style={styles.detailLabel}>Modèle</Text>
+                <Text style={styles.detailValue}>{product.model}</Text>
+              </View>
+            )}
+            
+            {product.material && (
+              <View style={styles.detailItem}>
+                <Text style={styles.detailLabel}>Matériau</Text>
+                <Text style={styles.detailValue}>{product.material}</Text>
+              </View>
+            )}
+            
+            {product.dimensions && (
+              <View style={styles.detailItem}>
+                <Text style={styles.detailLabel}>Dimensions</Text>
+                <Text style={styles.detailValue}>{product.dimensions}</Text>
+              </View>
+            )}
+            
+            {product.weight && (
+              <View style={styles.detailItem}>
+                <Text style={styles.detailLabel}>Poids</Text>
+                <Text style={styles.detailValue}>{product.weight}</Text>
+              </View>
+            )}
+          </View>
+        </View>
+
+        {location && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Localisation</Text>
+            <View style={styles.mapContainerWrapper}>
+              <View style={styles.mapContainer}>
+                <MapView
+                  style={styles.map}
+                  initialRegion={{
                     latitude: location.latitude,
                     longitude: location.longitude,
+                    latitudeDelta: 0.01,
+                    longitudeDelta: 0.01,
                   }}
-                  title={product.title}
-                  description={`${product.city || product.location || ''}`}
-                />
-              </MapView>
-            </View>
-          </View>
-        </View>
-      )}
-
-      {seller && (
-        <>
-          <Divider style={styles.divider} />
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Vendeur</Text>
-            <View style={styles.sellerContainer}>
-              {seller.avatar ? (
-                <Image source={{ uri: seller.avatar }} style={styles.sellerAvatar} />
-              ) : (
-                <View style={[styles.sellerAvatar, styles.sellerAvatarPlaceholder]}>
-                  <Text style={styles.sellerAvatarText}>{(seller.name || seller.username || '?')[0].toUpperCase()}</Text>
-                </View>
-              )}
-              <View style={styles.sellerInfo}>
-                <Text style={styles.sellerName}>{seller.name || seller.username}</Text>
-                {seller.rating !== undefined && (
-                  <View style={styles.ratingContainer}>
-                    {Array.from({ length: 5 }).map((_, i) => (
-                      <Ionicons 
-                        key={i} 
-                        name={i < Math.floor(seller.rating || 0) ? "star" : i < (seller.rating || 0) ? "star-half-outline" : "star-outline"} 
-                        size={16} 
-                        color="#FFA000" 
-                        style={styles.starIcon}
-                      />
-                    ))}
-                    <Text style={styles.ratingText}>{seller.rating.toFixed(1)}</Text>
-                  </View>
-                )}
+                >
+                  <Marker
+                    coordinate={{
+                      latitude: location.latitude,
+                      longitude: location.longitude,
+                    }}
+                    title={product.title}
+                    description={`${product.city || product.location || ''}`}
+                  />
+                </MapView>
               </View>
             </View>
           </View>
-        </>
-      )}
+        )}
 
-      <View style={styles.actionButtons}>
-        <Button 
-          mode="contained" 
-          style={[styles.actionButton, styles.contactButton]}
-          onPress={handleContactSeller}
-        >
-          Contacter le vendeur
-        </Button>
-        <Button 
-          mode="outlined" 
-          style={styles.actionButton}
-          onPress={handleFavorite}
-        >
-          {favorite ? 'Retirer des favoris' : 'Ajouter aux favoris'}
-        </Button>
-      </View>
+        {seller && (
+          <>
+            <Divider style={styles.divider} />
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Vendeur</Text>
+              <View style={styles.sellerContainer}>
+                {seller.avatar ? (
+                  <Image source={{ uri: seller.avatar }} style={styles.sellerAvatar} />
+                ) : (
+                  <View style={[styles.sellerAvatar, styles.sellerAvatarPlaceholder]}>
+                    <Text style={styles.sellerAvatarText}>{(seller.name || seller.username || '?')[0].toUpperCase()}</Text>
+                  </View>
+                )}
+                <View style={styles.sellerInfo}>
+                  <Text style={styles.sellerName}>{seller.name || seller.username}</Text>
+                  {seller.rating !== undefined && (
+                    <View style={styles.ratingContainer}>
+                      {Array.from({ length: 5 }).map((_, i) => (
+                        <Ionicons 
+                          key={i} 
+                          name={i < Math.floor(seller.rating || 0) ? "star" : i < (seller.rating || 0) ? "star-half-outline" : "star-outline"} 
+                          size={16} 
+                          color="#FFA000" 
+                          style={styles.starIcon}
+                        />
+                      ))}
+                      <Text style={styles.ratingText}>{seller.rating.toFixed(1)}</Text>
+                    </View>
+                  )}
+                </View>
+              </View>
+            </View>
+          </>
+        )}
 
-      {/* Dialogue de connexion */}
-      <Portal>
-        <Dialog visible={loginDialogVisible} onDismiss={() => setLoginDialogVisible(false)}>
-          <Dialog.Title>Connexion requise</Dialog.Title>
-          <Dialog.Content>
-            <Text>Vous devez être connecté pour effectuer cette action.</Text>
-          </Dialog.Content>
-          <Dialog.Actions>
-            <Button onPress={() => setLoginDialogVisible(false)}>Annuler</Button>
-            <Button onPress={() => {
-              setLoginDialogVisible(false);
-              navigation.navigate('Auth');
-            }}>Se connecter</Button>
-          </Dialog.Actions>
-        </Dialog>
-      </Portal>
-    </ScrollView>
+        <View style={styles.actionButtons}>
+          <Button 
+            mode="contained" 
+            style={[styles.actionButton, styles.contactButton]}
+            onPress={handleContactSeller}
+          >
+            Contacter le vendeur
+          </Button>
+          <Button 
+            mode="outlined" 
+            style={styles.actionButton}
+            onPress={handleFavorite}
+          >
+            {isFavorite ? 'Retirer des favoris' : 'Ajouter aux favoris'}
+          </Button>
+        </View>
+
+        {/* Dialogue de connexion */}
+        <Portal>
+          <Dialog visible={loginDialogVisible} onDismiss={() => setLoginDialogVisible(false)}>
+            <Dialog.Title>Connexion requise</Dialog.Title>
+            <Dialog.Content>
+              <Text>Vous devez être connecté pour effectuer cette action.</Text>
+            </Dialog.Content>
+            <Dialog.Actions>
+              <Button onPress={() => setLoginDialogVisible(false)}>Annuler</Button>
+              <Button onPress={() => {
+                setLoginDialogVisible(false);
+                navigation.navigate('Auth');
+              }}>Se connecter</Button>
+            </Dialog.Actions>
+          </Dialog>
+        </Portal>
+      </ScrollView>
+    </Animated.View>
   );
 }
 

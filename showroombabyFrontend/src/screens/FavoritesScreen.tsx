@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -8,20 +8,26 @@ import {
   Image,
   Alert,
   ActivityIndicator,
-  RefreshControl
+  RefreshControl,
+  ImageBackground,
+  Platform,
+  Animated
 } from 'react-native';
-import { Card, Button, Searchbar, Divider } from 'react-native-paper';
+import { Card, Button, Searchbar, Divider, Chip, Surface } from 'react-native-paper';
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { StatusBar } from 'expo-status-bar';
 import { widthPercentageToDP as wp, heightPercentageToDP as hp } from 'react-native-responsive-screen';
+import { LinearGradient } from 'expo-linear-gradient';
+import { PanGestureHandler, State, PanGestureHandlerStateChangeEvent } from 'react-native-gesture-handler';
 
 // URL de l'API
 const API_URL = 'http://127.0.0.1:8000';
 
 // Importer l'image placeholder directement
 const placeholderImage = require('../../assets/placeholder.png');
+const backgroundImage = require('../../assets/images/IMG_3139-Photoroom.png');
 
 interface Product {
   id: number;
@@ -264,67 +270,162 @@ export default function FavoritesScreen({ navigation }: any) {
     });
   };
 
-  // Composant pour afficher un élément de produit favori
+  // Composant pour afficher un élément de produit favori avec style modernisé
   const ProductItem = React.memo(({ item, navigation, onRemove }: { 
     item: Product; 
     navigation: any; 
     onRemove: (id: number, title: string) => void;
   }) => {
-    const [imageLoading, setImageLoading] = useState(true);
     const [imageError, setImageError] = useState(false);
+    const translateY = useRef(new Animated.Value(0)).current;
+    const opacity = useRef(new Animated.Value(1)).current;
+    const scale = useRef(new Animated.Value(1)).current;
+    const indicatorOpacity = useRef(new Animated.Value(0)).current;
+    
+    // Animation pour faire apparaître/disparaître l'indicateur de swipe
+    useEffect(() => {
+      // Séquence d'animation qui se répète
+      Animated.sequence([
+        // Attendre un court instant
+        Animated.delay(500),
+        // Faire apparaître progressivement
+        Animated.timing(indicatorOpacity, {
+          toValue: 0.7,
+          duration: 800,
+          useNativeDriver: true
+        }),
+        // Maintenir visible
+        Animated.delay(1000),
+        // Faire disparaître progressivement
+        Animated.timing(indicatorOpacity, {
+          toValue: 0,
+          duration: 800,
+          useNativeDriver: true
+        })
+      ]).start();
+    }, []);
+
+    const onGestureEvent = Animated.event(
+      [{ nativeEvent: { translationY: translateY } }],
+      { useNativeDriver: true }
+    );
+
+    const onHandlerStateChange = (event: PanGestureHandlerStateChangeEvent) => {
+      if (event.nativeEvent.oldState === State.ACTIVE) {
+        const { translationY } = event.nativeEvent;
+        
+        // Si l'utilisateur glisse vers le haut (translationY négatif) et dépasse un certain seuil
+        if (translationY < -50) {
+          // Animation de sortie
+          Animated.parallel([
+            Animated.timing(translateY, {
+              toValue: -200,
+              duration: 300,
+              useNativeDriver: true
+            }),
+            Animated.timing(opacity, {
+              toValue: 0.5,
+              duration: 300,
+              useNativeDriver: true
+            }),
+            Animated.timing(scale, {
+              toValue: 0.9,
+              duration: 300,
+              useNativeDriver: true
+            })
+          ]).start(() => {
+            // Réinitialiser l'animation
+            translateY.setValue(0);
+            opacity.setValue(1);
+            scale.setValue(1);
+            
+            // Naviguer vers les détails du produit
+            navigation.navigate('ProductDetails', { 
+              productId: item.id, 
+              fullscreenMode: true,
+              transitionAnimation: 'fromBottom'
+            });
+          });
+        } else {
+          // Rebond à la position d'origine si pas assez glissé
+          Animated.spring(translateY, {
+            toValue: 0,
+            useNativeDriver: true,
+            friction: 5
+          }).start();
+        }
+      }
+    };
     
     return (
-      <TouchableOpacity 
-        style={styles.productCard}
-        onPress={() => navigation.navigate('ProductDetails', { productId: item.id, fullscreenMode: true })}
+      <PanGestureHandler
+        onGestureEvent={onGestureEvent}
+        onHandlerStateChange={onHandlerStateChange}
       >
-        <Card>
-          <View style={styles.productImageContainer}>
-            {imageLoading && (
-              <ActivityIndicator 
-                size="small" 
-                color="#e75480" 
-                style={styles.imageLoader} 
-              />
-            )}
-            {imageError && (
-              <View style={styles.imageErrorContainer}>
-                <Ionicons name="image-outline" size={24} color="#e75480" />
-                <Text style={styles.imageErrorText}>Image indisponible</Text>
-              </View>
-            )}
-            <Card.Cover 
-              source={getProductImage(item)} 
-              style={styles.productImage} 
-              onLoadStart={() => setImageLoading(true)}
-              onLoadEnd={() => setImageLoading(false)}
-              onError={() => {
-                setImageLoading(false);
-                setImageError(true);
-              }}
-            />
-          </View>
-          <Card.Content style={styles.cardContent}>
-            <View style={styles.productInfo}>
-              <Text style={styles.productTitle}>{item.title}</Text>
-              <Text style={styles.productPrice}>{formatPrice(item.price)}</Text>
-              {item.location && (
-                <Text style={styles.productLocation}>
-                  <Ionicons name="location-outline" size={14} color="#666" />
-                  {' '}{item.location}
-                </Text>
+        <Animated.View style={[
+          styles.productCard,
+          {
+            transform: [
+              { translateY },
+              { scale }
+            ],
+            opacity
+          }
+        ]}>
+          <TouchableOpacity 
+            style={{ flex: 1 }}
+            activeOpacity={0.85}
+            onPress={() => navigation.navigate('ProductDetails', { 
+              productId: item.id, 
+              fullscreenMode: true 
+            })}
+          >
+            <View style={styles.productImageContainer}>
+              {imageError ? (
+                <View style={styles.imageErrorContainer}>
+                  <Ionicons name="image-outline" size={24} color="#e75480" />
+                  <Text style={styles.imageErrorText}>Image indisponible</Text>
+                </View>
+              ) : (
+                <Image 
+                  source={getProductImage(item)} 
+                  style={styles.productImage}
+                  onError={() => setImageError(true)}
+                />
               )}
-              <Text style={styles.productDate}>Ajouté le {formatDate(item.created_at)}</Text>
+              <TouchableOpacity 
+                style={styles.removeButton}
+                onPress={() => onRemove(item.id, item.title)}
+                activeOpacity={0.8}
+              >
+                <Ionicons name="heart" size={22} color="#fff" />
+              </TouchableOpacity>
+              <View style={styles.priceTag}>
+                <Text style={styles.priceTagText}>{formatPrice(item.price)}</Text>
+              </View>
+              
+              {/* Indicateur de swipe avec opacité animée */}
+              <Animated.View style={[styles.swipeIndicator, { opacity: indicatorOpacity }]}>
+                <Ionicons name="chevron-up" size={18} color="#fff" />
+              </Animated.View>
             </View>
-            <TouchableOpacity 
-              style={styles.removeButton}
-              onPress={() => onRemove(item.id, item.title)}
-            >
-              <Ionicons name="heart-dislike" size={24} color="#e75480" />
-            </TouchableOpacity>
-          </Card.Content>
-        </Card>
-      </TouchableOpacity>
+            <View style={styles.cardContent}>
+              <View style={styles.productInfo}>
+                <Text style={styles.productTitle} numberOfLines={1} ellipsizeMode="tail">
+                  {item.title}
+                </Text>
+                {item.location && (
+                  <Text style={styles.productLocation} numberOfLines={1}>
+                    <Ionicons name="location-outline" size={14} color="#777" />
+                    {' '}{item.location}
+                  </Text>
+                )}
+                <Text style={styles.productDate}>Ajouté le {formatDate(item.created_at)}</Text>
+              </View>
+            </View>
+          </TouchableOpacity>
+        </Animated.View>
+      </PanGestureHandler>
     );
   });
 
@@ -359,6 +460,7 @@ export default function FavoritesScreen({ navigation }: any) {
           mode="contained" 
           onPress={() => navigation.navigate('Login')}
           style={styles.loginButton}
+          labelStyle={styles.buttonLabel}
         >
           Se connecter
         </Button>
@@ -375,6 +477,7 @@ export default function FavoritesScreen({ navigation }: any) {
           mode="contained" 
           onPress={loadFavorites}
           style={styles.retryButton}
+          labelStyle={styles.buttonLabel}
         >
           Réessayer
         </Button>
@@ -384,59 +487,93 @@ export default function FavoritesScreen({ navigation }: any) {
 
   return (
     <View style={styles.container}>
-      <StatusBar style="dark" />
+      <StatusBar style="light" backgroundColor="transparent" translucent={true} />
       
-      <View style={styles.header}>
-        <Text style={styles.title}>Mes favoris</Text>
-        <Searchbar
-          placeholder="Rechercher dans vos favoris"
-          onChangeText={handleSearch}
-          value={searchQuery}
-          style={styles.searchBar}
-          inputStyle={styles.searchInput}
-        />
-      </View>
-      
-      {favorites.length === 0 ? (
-        <View style={styles.emptyContainer}>
-          <Ionicons name="heart-outline" size={80} color="#ccc" />
-          <Text style={styles.emptyText}>Vous n'avez pas encore de favoris</Text>
-          <Text style={styles.emptySubtext}>
-            Ajoutez des produits à vos favoris pour les retrouver facilement
-          </Text>
-          <Button 
-            mode="contained" 
-            onPress={() => navigation.navigate('Home')}
-            style={styles.browseButton}
+      <View style={styles.mainContent}>
+        <View style={styles.headerSection}>
+          <ImageBackground
+            source={backgroundImage}
+            style={styles.backgroundImage}
+            imageStyle={styles.backgroundImageStyle}
+            resizeMode="cover"
           >
-            Parcourir les produits
-          </Button>
-        </View>
-      ) : (
-        <FlatList
-          data={filteredProducts}
-          renderItem={renderItem}
-          keyExtractor={item => item.id.toString()}
-          contentContainerStyle={styles.listContent}
-          refreshControl={
-            <RefreshControl
-              refreshing={refreshing}
-              onRefresh={onRefresh}
-              colors={['#e75480']}
-              tintColor="#e75480"
-            />
-          }
-          ListEmptyComponent={
-            searchQuery ? (
-              <View style={styles.noResultsContainer}>
-                <Text style={styles.noResultsText}>
-                  Aucun résultat pour "{searchQuery}"
+            <LinearGradient
+              colors={['rgba(0,0,0,0.3)', 'rgba(0,0,0,0.5)']}
+              style={styles.headerGradient}
+            >
+              <View style={styles.headerContent}>
+                <Text style={styles.title}>Mes Favoris</Text>
+                <Text style={styles.subtitle}>
+                  {favorites.length} {favorites.length > 1 ? 'articles' : 'article'} sauvegardé{favorites.length > 1 ? 's' : ''}
                 </Text>
+                
+                <View style={styles.searchBarContainer}>
+                  <Searchbar
+                    placeholder="Rechercher dans vos favoris"
+                    onChangeText={handleSearch}
+                    value={searchQuery}
+                    style={styles.searchBar}
+                    inputStyle={styles.searchInput}
+                    icon={() => <Ionicons name="search" size={20} color="#777" />}
+                    clearIcon={() => <Ionicons name="close" size={20} color="#777" />}
+                  />
+                </View>
               </View>
-            ) : null
-          }
-        />
-      )}
+            </LinearGradient>
+          </ImageBackground>
+        </View>
+        
+        {favorites.length === 0 ? (
+          <View style={styles.emptyContainer}>
+            <View style={styles.emptyIconContainer}>
+              <Ionicons name="heart-outline" size={80} color="#ffcce0" />
+            </View>
+            <Text style={styles.emptyText}>Vous n'avez pas encore de favoris</Text>
+            <Text style={styles.emptySubtext}>
+              Ajoutez des produits à vos favoris pour les retrouver facilement
+            </Text>
+            <Button 
+              mode="contained" 
+              onPress={() => navigation.navigate('Home')}
+              style={styles.browseButton}
+              labelStyle={styles.buttonLabel}
+              icon={() => <Ionicons name="search" size={20} color="#fff" />}
+            >
+              Parcourir les produits
+            </Button>
+          </View>
+        ) : (
+          <View style={styles.productsContainer}>
+            <FlatList
+              data={filteredProducts}
+              renderItem={renderItem}
+              keyExtractor={item => item.id.toString()}
+              numColumns={2}
+              showsVerticalScrollIndicator={false}
+              contentContainerStyle={styles.listContent}
+              columnWrapperStyle={styles.columnWrapper}
+              refreshControl={
+                <RefreshControl
+                  refreshing={refreshing}
+                  onRefresh={onRefresh}
+                  colors={['#e75480']}
+                  tintColor="#e75480"
+                />
+              }
+              ListEmptyComponent={
+                searchQuery ? (
+                  <View style={styles.noResultsContainer}>
+                    <Ionicons name="search-outline" size={50} color="#ccc" />
+                    <Text style={styles.noResultsText}>
+                      Aucun résultat pour "{searchQuery}"
+                    </Text>
+                  </View>
+                ) : null
+              }
+            />
+          </View>
+        )}
+      </View>
     </View>
   );
 }
@@ -447,32 +584,100 @@ const token = AsyncStorage.getItem('token');
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#ffffff',
+    backgroundColor: '#fff',
   },
-  header: {
-    paddingHorizontal: wp('4%'),
-    paddingTop: hp('2%'),
-    paddingBottom: hp('1%'),
+  mainContent: {
+    flex: 1,
+    backgroundColor: '#fff',
+  },
+  headerSection: {
+    height: hp('30%'),
+    zIndex: 1,
+    ...Platform.select({
+      ios: {
+        marginTop: -hp('10%'),
+      },
+      android: {
+        marginTop: -hp('8%'),
+      }
+    })
+  },
+  backgroundImage: {
+    width: '100%',
+    height: '100%',
+  },
+  backgroundImageStyle: {
+    opacity: 0.92,
+  },
+  headerGradient: {
+    flex: 1,
+    width: '100%',
+    height: '100%',
+  },
+  headerContent: {
+    flex: 1,
+    paddingHorizontal: wp('5%'),
+    paddingTop: hp('12%'),
+    justifyContent: 'flex-end',
   },
   title: {
-    fontSize: wp('6%'),
-    fontWeight: '600',
-    marginBottom: hp('2%'),
+    fontSize: wp('8.5%'),
+    fontWeight: '800',
+    color: '#fff',
+    textShadowColor: 'rgba(0, 0, 0, 0.4)',
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 4,
+    letterSpacing: 0.5,
+  },
+  subtitle: {
+    fontSize: wp('4.2%'),
+    color: '#fff',
+    marginTop: hp('0.5%'),
+    marginBottom: hp('2.5%'),
+    textShadowColor: 'rgba(0, 0, 0, 0.4)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
+    letterSpacing: 0.3,
+  },
+  searchBarContainer: {
+    marginBottom: hp('3.5%'),
+    width: '100%',
   },
   searchBar: {
-    marginBottom: hp('2%'),
+    elevation: 4,
     borderRadius: 30,
-    elevation: 0,
-    backgroundColor: '#f5f5f5',
+    height: hp('6.5%'),
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+    backgroundColor: '#fff',
   },
   searchInput: {
-    fontSize: 16,
+    fontSize: wp('3.8%'),
+    color: '#444',
+  },
+  productsContainer: {
+    flex: 1,
+    marginTop: hp('1.8%'),
+    paddingTop: 0,
+    backgroundColor: '#fff',
+    zIndex: 0,
+  },
+  listContent: {
+    paddingHorizontal: wp('2.5%'),
+    paddingTop: hp('1.5%'),
+    paddingBottom: hp('15%'),
+  },
+  columnWrapper: {
+    justifyContent: 'space-between',
   },
   centerContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#ffffff',
+    backgroundColor: '#f8f8fa',
+    padding: wp('5%'),
   },
   loadingText: {
     marginTop: hp('2%'),
@@ -484,130 +689,198 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#666',
     textAlign: 'center',
+    paddingHorizontal: wp('5%'),
   },
   loginButton: {
-    marginTop: 20,
+    marginTop: hp('2.5%'),
     backgroundColor: '#e75480',
+    borderRadius: 30,
+    paddingVertical: hp('0.5%'),
+    elevation: 3,
+  },
+  buttonLabel: {
+    fontSize: wp('3.8%'),
+    paddingVertical: hp('0.5%'),
+    letterSpacing: 0.5,
   },
   retryButton: {
-    marginTop: 20,
+    marginTop: hp('2.5%'),
     backgroundColor: '#e75480',
+    borderRadius: 30,
+    paddingVertical: hp('0.5%'),
+    elevation: 3,
   },
   emptyContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#ffffff',
-    padding: wp('4%'),
+    backgroundColor: '#f8f8fa',
+    padding: wp('8%'),
+  },
+  emptyIconContainer: {
+    width: wp('28%'),
+    height: wp('28%'),
+    borderRadius: wp('14%'),
+    backgroundColor: 'rgba(255, 107, 155, 0.1)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: hp('3.5%'),
+    shadowColor: '#e75480',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 10,
   },
   emptyText: {
-    fontSize: wp('4%'),
-    color: '#666',
+    fontSize: wp('5%'),
+    fontWeight: '600',
+    color: '#444',
     textAlign: 'center',
-    marginBottom: hp('2%'),
+    marginBottom: hp('1.5%'),
+    letterSpacing: 0.2,
   },
   emptySubtext: {
-    marginTop: 8,
-    fontSize: 16,
-    color: '#666',
+    fontSize: wp('4%'),
+    color: '#777',
     textAlign: 'center',
-    marginBottom: 24,
+    marginBottom: hp('3.5%'),
+    lineHeight: wp('6%'),
+    letterSpacing: 0.1,
   },
   browseButton: {
     backgroundColor: '#e75480',
-  },
-  listContent: {
-    paddingHorizontal: 16,
-    paddingTop: 16,
-    paddingBottom: 80,
+    borderRadius: 30,
+    paddingHorizontal: wp('5%'),
+    paddingVertical: hp('0.8%'),
+    elevation: 3,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 3,
   },
   productCard: {
-    marginHorizontal: wp('4%'),
-    marginBottom: hp('2%'),
-    borderRadius: 12,
+    width: '48.5%',
+    marginBottom: wp('3%'),
     overflow: 'hidden',
-    backgroundColor: '#ffffff',
-    elevation: 2,
+    backgroundColor: '#fff',
+    borderWidth: 0,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.08,
+        shadowRadius: 3,
+      },
+      android: {
+        elevation: 1.5,
+      }
+    })
   },
   productImageContainer: {
     position: 'relative',
-    borderTopLeftRadius: 12,
-    borderTopRightRadius: 12,
     overflow: 'hidden',
-  },
-  imageLoader: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.4)',
-    zIndex: 1,
+    height: wp('58%'),
+    backgroundColor: '#fff',
   },
   productImage: {
-    height: wp('50%'),
-    borderTopLeftRadius: 12,
-    borderTopRightRadius: 12,
+    height: wp('58%'),
+    width: '100%',
+    resizeMode: 'cover',
   },
   cardContent: {
     padding: wp('3%'),
+    paddingTop: wp('2.5%'),
+    backgroundColor: '#fff',
   },
   productInfo: {
     flex: 1,
   },
   productTitle: {
-    fontSize: wp('4%'),
-    fontWeight: '500',
-    marginBottom: hp('0.5%'),
-  },
-  productPrice: {
-    fontSize: wp('4.5%'),
-    fontWeight: 'bold',
-    color: '#ff6b9b',
-    marginBottom: hp('0.5%'),
+    fontSize: wp('4.2%'),
+    fontWeight: '600',
+    marginBottom: hp('0.8%'),
+    color: '#222',
+    letterSpacing: 0.2,
   },
   productLocation: {
-    fontSize: wp('3.5%'),
+    fontSize: wp('3.3%'),
     color: '#666',
-    marginBottom: hp('0.5%'),
+    marginBottom: hp('0.6%'),
+    letterSpacing: 0.1,
   },
   productDate: {
-    fontSize: wp('3%'),
+    fontSize: wp('3.1%'),
     color: '#999',
+    letterSpacing: 0.1,
   },
   removeButton: {
     position: 'absolute',
-    top: wp('2%'),
-    right: wp('2%'),
-    backgroundColor: 'rgba(255,255,255,0.9)',
+    top: wp('3%'),
+    right: wp('3%'),
+    backgroundColor: 'rgba(231, 84, 128, 0.85)',
     borderRadius: wp('6%'),
-    padding: wp('2%'),
-  },
-  noResultsContainer: {
-    padding: 20,
-    alignItems: 'center',
-  },
-  noResultsText: {
-    fontSize: 16,
-    color: '#666',
-    textAlign: 'center',
-  },
-  imageErrorContainer: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
+    width: wp('11%'),
+    height: wp('11%'),
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.4)',
-    zIndex: 1,
+    zIndex: 5,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 3,
+  },
+  priceTag: {
+    position: 'absolute',
+    bottom: wp('3%'),
+    left: wp('3%'),
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    borderRadius: 20,
+    paddingHorizontal: wp('3.5%'),
+    paddingVertical: hp('0.7%'),
+    zIndex: 5,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.15,
+    shadowRadius: 2,
+  },
+  priceTagText: {
+    fontSize: wp('3.8%'),
+    fontWeight: 'bold',
+    color: '#e75480',
+    letterSpacing: 0.2,
+  },
+  noResultsContainer: {
+    padding: wp('10%'),
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  noResultsText: {
+    fontSize: wp('4%'),
+    color: '#777',
+    textAlign: 'center',
+    marginTop: hp('2%'),
+  },
+  imageErrorContainer: {
+    height: wp('58%'),
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#f8f8f8',
   },
   imageErrorText: {
-    fontSize: 16,
+    fontSize: wp('3.2%'),
     color: '#e75480',
-    marginTop: 8,
+    marginTop: hp('1%'),
+    letterSpacing: 0.1,
+  },
+  swipeIndicator: {
+    position: 'absolute',
+    bottom: wp('3%'),
+    alignSelf: 'center',
+    width: wp('8%'),
+    height: wp('8%'),
+    borderRadius: wp('4%'),
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 10,
   },
 });
