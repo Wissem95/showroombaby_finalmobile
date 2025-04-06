@@ -1,7 +1,7 @@
 import React from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import { NavigationProp, ParamListBase, CommonActions } from '@react-navigation/native';
 import AuthService from '../services/auth';
@@ -22,7 +22,11 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import Icons3DStatic from '../components/Icons3DStatic';
 
-const API_URL = 'http://127.0.0.1:8000';
+// URL de l'API
+// Pour les appareils externes, utiliser votre adresse IP locale au lieu de 127.0.0.1
+const API_URL = process.env.NODE_ENV === 'development' || __DEV__ 
+  ? 'http://172.20.10.2:8000'  // Adresse IP locale de l'utilisateur
+  : 'https://api.showroombaby.com';
 
 // Définir les types pour les navigateurs
 const Stack = createNativeStackNavigator();
@@ -71,16 +75,55 @@ interface CustomBottomBarProps {
 
 // Composant de barre de navigation personnalisée
 function CustomBottomBar({ navigation, activeRoute }: CustomBottomBarProps) {
-  const isAuthenticated = AuthService.isAuthenticated();
-  const user = AuthService.getUser();
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [user, setUser] = useState<any>(null);
+  const intervalRef = useRef<NodeJS.Timeout | null>(null);
   
+  // Vérifier l'authentification
   useEffect(() => {
+    // Vérifier si l'utilisateur est connecté
+    const checkAuth = async () => {
+      try {
+        const token = await AsyncStorage.getItem('token');
+        if (token) {
+          setIsAuthenticated(true);
+          const userInfo = await AsyncStorage.getItem('userInfo');
+          if (userInfo) {
+            setUser(JSON.parse(userInfo));
+          }
+          
+          // Charge le nombre de messages non lus immédiatement
+          loadUnreadMessages();
+        } else {
+          setIsAuthenticated(false);
+          setUser(null);
+        }
+      } catch (error) {
+        console.error('Erreur vérification authentification:', error);
+      }
+    };
+
+    checkAuth();
+    
+    // Configurer un intervalle pour vérifier les messages non lus uniquement si authentifié
     if (isAuthenticated) {
-      loadUnreadMessages();
-      const interval = setInterval(loadUnreadMessages, 30000);
-      return () => clearInterval(interval);
+      // Nettoyer l'intervalle existant si nécessaire
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+      }
+      
+      // Définir un nouvel intervalle
+      intervalRef.current = setInterval(loadUnreadMessages, 180000); // Augmenté à 3 minutes
     }
+    
+    // Nettoyage à la désinstallation du composant
+    return () => {
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+        intervalRef.current = null;
+      }
+    };
   }, [isAuthenticated]);
 
   const loadUnreadMessages = async () => {
@@ -88,13 +131,26 @@ function CustomBottomBar({ navigation, activeRoute }: CustomBottomBarProps) {
       const token = await AsyncStorage.getItem('token');
       if (!token) return;
       
+      // Ajouter un cache pour éviter des requêtes trop fréquentes
+      const lastChecked = await AsyncStorage.getItem('lastUnreadMessagesCheck');
+      const now = Date.now();
+      
+      if (lastChecked && now - parseInt(lastChecked) < 60000) {
+        // Si moins d'une minute s'est écoulée depuis la dernière vérification, ne rien faire
+        return;
+      }
+      
       const response = await axios.get(`${API_URL}/api/messages/unread/count`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       
       setUnreadCount(response.data.count);
+      
+      // Mettre à jour le timestamp de dernière vérification
+      await AsyncStorage.setItem('lastUnreadMessagesCheck', now.toString());
     } catch (error) {
-      console.error('Erreur chargement messages non lus:', error);
+      // Réduire le log d'erreur pour éviter de spammer la console
+      console.error('Erreur chargement messages non lus');
     }
   };
   
@@ -333,6 +389,8 @@ export default function AppNavigator() {
                 <Ionicons name="close" size={24} color="#000" />
               </TouchableOpacity>
             ),
+            gestureEnabled: false,
+            contentStyle: { backgroundColor: '#fff' },
           })}
         />
         

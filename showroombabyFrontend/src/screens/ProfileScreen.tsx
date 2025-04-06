@@ -1,13 +1,19 @@
 import React, { useState, useEffect } from 'react';
-import { ScrollView, View, StyleSheet, TouchableOpacity, RefreshControl, Alert, ActivityIndicator } from 'react-native';
-import { Avatar, Text, Divider, List, Button, Card } from 'react-native-paper';
+import { ScrollView, View, StyleSheet, TouchableOpacity, RefreshControl, Alert, ActivityIndicator, Image, Modal } from 'react-native';
+import { Avatar, Text, Divider, List, Button, Card, TextInput, Surface, Portal, Provider, IconButton } from 'react-native-paper';
 import AuthService from '../services/auth';
 import { Props } from '../types/navigation';
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Ionicons } from '@expo/vector-icons';
+import { Ionicons, MaterialIcons } from '@expo/vector-icons';
+import { ImageBackground } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 
-const API_URL = 'http://127.0.0.1:8000';
+// URL de l'API
+// Pour les appareils externes, utiliser votre adresse IP locale au lieu de 127.0.0.1
+const API_URL = process.env.NODE_ENV === 'development' || __DEV__ 
+  ? 'http://172.20.10.2:8000'  // Adresse IP locale de l'utilisateur
+  : 'https://api.showroombaby.com';
 
 interface Product {
   id: number;
@@ -30,14 +36,66 @@ interface Product {
 const DEFAULT_IMAGE_URL = 'https://placehold.co/400x300/f8bbd0/ffffff?text=Showroom+Baby';
 
 export default function ProfileScreen({ navigation }: Props) {
-  const [user, setUser] = useState(AuthService.getUser());
+  const [user, setUser] = useState<any>(null);
   const [userProducts, setUserProducts] = useState<Product[]>([]);
   const [refreshing, setRefreshing] = useState(false);
   const [loading, setLoading] = useState(true);
-
+  
+  // État pour la modification du profil
+  const [editProfileVisible, setEditProfileVisible] = useState(false);
+  const [editAddressVisible, setEditAddressVisible] = useState(false);
+  const [changePasswordVisible, setChangePasswordVisible] = useState(false);
+  
+  // Champs du formulaire de profil
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
+  
+  // Champs pour l'adresse
+  const [street, setStreet] = useState('');
+  const [city, setCity] = useState('');
+  const [zipCode, setZipCode] = useState('');
+  
+  // Champs pour le mot de passe
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  
+  // Charger les informations de l'utilisateur et ses produits
   useEffect(() => {
+    loadUserData();
     loadUserProducts();
   }, []);
+  
+  // Charger les données de l'utilisateur depuis l'API
+  const loadUserData = async () => {
+    try {
+      const token = await AsyncStorage.getItem('token');
+      if (!token) return;
+      
+      const response = await axios.get(`${API_URL}/api/users/profile`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      
+      const userData = response.data.data || response.data;
+      setUser(userData);
+      
+      // Initialiser les champs de formulaire
+      setName(userData.name || '');
+      setEmail(userData.email || '');
+      setPhone(userData.phone || '');
+      
+      // Initialiser les champs d'adresse si disponibles
+      if (userData.address) {
+        setStreet(userData.address.street || '');
+        setCity(userData.address.city || '');
+        setZipCode(userData.address.zip_code || '');
+      }
+    } catch (error) {
+      console.error('Erreur lors du chargement des données utilisateur:', error);
+      Alert.alert('Erreur', 'Impossible de charger vos informations. Veuillez réessayer.');
+    }
+  };
 
   const loadUserProducts = async () => {
     try {
@@ -318,135 +376,661 @@ export default function ProfileScreen({ navigation }: Props) {
     />
   );
 
-  return (
-    <ScrollView 
-      style={styles.container}
-      refreshControl={
-        <RefreshControl 
-          refreshing={refreshing} 
-          onRefresh={onRefresh}
-          colors={['#E75A7C']}
-          tintColor="#E75A7C"
-          progressBackgroundColor="#ffffff"
-        />
+  // Fonction pour mettre à jour le profil
+  const updateProfile = async () => {
+    try {
+      const token = await AsyncStorage.getItem('token');
+      if (!token) {
+        Alert.alert('Erreur', 'Vous devez être connecté pour modifier votre profil');
+        return;
       }
-    >
-      <View style={styles.header}>
-        <Avatar.Text size={80} label={user?.name?.charAt(0) || 'U'} />
-        <Text style={styles.name}>{user?.name}</Text>
-        <Text style={styles.email}>{user?.email}</Text>
-      </View>
+      
+      const response = await axios.put(`${API_URL}/api/users/profile`, 
+        {
+          name,
+          email,
+          phone
+        },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      
+      if (response.data) {
+        setEditProfileVisible(false);
+        loadUserData(); // Recharger les données utilisateur
+        Alert.alert('Succès', 'Votre profil a été mis à jour avec succès');
+      }
+    } catch (error: any) {
+      console.error('Erreur lors de la mise à jour du profil:', error);
+      
+      let errorMessage = 'Une erreur est survenue lors de la mise à jour du profil';
+      
+      if (error.response) {
+        if (error.response.status === 401) {
+          errorMessage = 'Votre session a expiré. Veuillez vous reconnecter.';
+          // Rediriger vers la page de login
+          navigation.navigate('Auth');
+        } else if (error.response.status === 422) {
+          if (error.response.data?.errors) {
+            const errors = Object.values(error.response.data.errors).flat();
+            errorMessage = errors.join('\n');
+          } else if (error.response.data?.message) {
+            errorMessage = error.response.data.message;
+          }
+        }
+      } else if (error.request) {
+        // La requête a été faite mais pas de réponse reçue
+        errorMessage = 'Impossible de se connecter au serveur. Vérifiez votre connexion internet.';
+      }
+      
+      Alert.alert('Erreur', errorMessage);
+    }
+  };
+  
+  // Fonction pour mettre à jour l'adresse
+  const updateAddress = async () => {
+    try {
+      const token = await AsyncStorage.getItem('token');
+      if (!token) {
+        Alert.alert('Erreur', 'Vous devez être connecté pour modifier votre adresse');
+        return;
+      }
+      
+      // Inclure l'adresse dans la mise à jour du profil
+      const response = await axios.put(`${API_URL}/api/users/profile`,
+        {
+          address: {
+            street,
+            city,
+            zip_code: zipCode
+          }
+        },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      
+      if (response.data) {
+        setEditAddressVisible(false);
+        loadUserData(); // Recharger les données utilisateur
+        Alert.alert('Succès', 'Votre adresse a été mise à jour avec succès');
+      }
+    } catch (error: any) {
+      console.error('Erreur lors de la mise à jour de l\'adresse:', error);
+      
+      let errorMessage = 'Une erreur est survenue lors de la mise à jour de l\'adresse';
+      
+      if (error.response) {
+        if (error.response.status === 401) {
+          errorMessage = 'Votre session a expiré. Veuillez vous reconnecter.';
+          // Rediriger vers la page de login
+          navigation.navigate('Auth');
+        } else if (error.response.status === 422) {
+          if (error.response.data?.errors) {
+            const errors = Object.values(error.response.data.errors).flat();
+            errorMessage = errors.join('\n');
+          } else if (error.response.data?.message) {
+            errorMessage = error.response.data.message;
+          }
+        }
+      } else if (error.request) {
+        // La requête a été faite mais pas de réponse reçue
+        errorMessage = 'Impossible de se connecter au serveur. Vérifiez votre connexion internet.';
+      }
+      
+      Alert.alert('Erreur', errorMessage);
+    }
+  };
+  
+  // Fonction pour changer le mot de passe
+  const changePassword = async () => {
+    // Validation
+    if (newPassword !== confirmPassword) {
+      Alert.alert('Erreur', 'Les mots de passe ne correspondent pas');
+      return;
+    }
+    
+    if (newPassword.length < 8) {
+      Alert.alert('Erreur', 'Le mot de passe doit contenir au moins 8 caractères');
+      return;
+    }
+    
+    try {
+      const token = await AsyncStorage.getItem('token');
+      if (!token) {
+        Alert.alert('Erreur', 'Vous devez être connecté pour changer votre mot de passe');
+        return;
+      }
+      
+      const response = await axios.post(`${API_URL}/api/users/change-password`, 
+        { 
+          current_password: currentPassword,
+          password: newPassword,
+          password_confirmation: confirmPassword
+        },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      
+      setChangePasswordVisible(false);
+      // Réinitialiser les champs
+      setCurrentPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
+      
+      Alert.alert('Succès', 'Votre mot de passe a été modifié avec succès');
+    } catch (error: any) {
+      console.error('Erreur lors du changement de mot de passe:', error);
+      
+      let errorMessage = 'Une erreur est survenue lors du changement de mot de passe';
+      
+      if (error.response) {
+        if (error.response.status === 401) {
+          errorMessage = 'Votre session a expiré. Veuillez vous reconnecter.';
+          // Rediriger vers la page de login
+          navigation.navigate('Auth');
+        } else if (error.response.status === 422) {
+          if (error.response.data?.errors) {
+            const errors = Object.values(error.response.data.errors).flat();
+            errorMessage = errors.join('\n');
+          } else if (error.response.data?.message) {
+            errorMessage = error.response.data.message;
+          }
+        } else if (error.response.status === 400 || error.response.status === 403) {
+          // Mot de passe actuel incorrect
+          errorMessage = 'Le mot de passe actuel est incorrect';
+        }
+      } else if (error.request) {
+        // La requête a été faite mais pas de réponse reçue
+        errorMessage = 'Impossible de se connecter au serveur. Vérifiez votre connexion internet.';
+      }
+      
+      Alert.alert('Erreur', errorMessage);
+    }
+  };
 
-      <Divider />
-
-      <List.Section>
-        <List.Subheader>Mes annonces</List.Subheader>
-        <View style={styles.productsContainer}>
-          {loading ? (
-            <Text style={styles.loadingText}>Chargement de vos annonces...</Text>
-          ) : userProducts.length === 0 ? (
-            <View style={styles.emptyStateContainer}>
-              <Text style={styles.emptyStateText}>
-                Vous n'avez pas encore publié d'annonces
-              </Text>
-              <Button 
-                mode="contained" 
-                onPress={() => navigation.navigate('AjouterProduit')}
-                style={styles.addButton}
-              >
-                Publier une annonce
-              </Button>
-            </View>
-          ) : (
-            userProducts.map(product => (
-              <ProductItemCard 
-                key={product.id}
-                product={product} 
-                onDelete={handleDeleteProduct} 
-                onEdit={(id) => navigation.navigate('AjouterProduit', { productId: id })}
+  return (
+    <Provider>
+      <ScrollView 
+        style={styles.container}
+        refreshControl={
+          <RefreshControl 
+            refreshing={refreshing} 
+            onRefresh={onRefresh}
+            colors={['#E75A7C']}
+            tintColor="#E75A7C"
+            progressBackgroundColor="#ffffff"
+          />
+        }
+      >
+        <ImageBackground
+          source={require('../../assets/placeholder.png')}
+          style={styles.headerBackground}
+        >
+          <LinearGradient
+            colors={['rgba(231,90,140,0.7)', 'rgba(231,90,140,0.9)']}
+            style={styles.headerGradient}
+          >
+            <View style={styles.header}>
+              <Avatar.Image 
+                size={100} 
+                source={{ uri: user?.avatar || 'https://ui-avatars.com/api/?name=' + encodeURIComponent(user?.name || 'Utilisateur') + '&background=E75A7C&color=fff' }} 
+                style={styles.avatar}
               />
-            ))
-          )}
+              <Text style={styles.name}>{user?.name}</Text>
+              <Text style={styles.email}>{user?.email}</Text>
+              
+              <TouchableOpacity 
+                style={styles.editButton}
+                onPress={() => setEditProfileVisible(true)}
+              >
+                <Ionicons name="pencil" size={18} color="#fff" />
+                <Text style={styles.editButtonText}>Modifier le profil</Text>
+              </TouchableOpacity>
+            </View>
+          </LinearGradient>
+        </ImageBackground>
+
+        <Surface style={styles.statsContainer}>
+          <View style={styles.statItem}>
+            <Text style={styles.statValue}>{userProducts.length}</Text>
+            <Text style={styles.statLabel}>Annonces</Text>
+          </View>
+          <View style={styles.statDivider} />
+          <View style={styles.statItem}>
+            <Text style={styles.statValue}>{user?.favorites_count || 0}</Text>
+            <Text style={styles.statLabel}>Favoris</Text>
+          </View>
+          <View style={styles.statDivider} />
+          <View style={styles.statItem}>
+            <Text style={styles.statValue}>{user?.total_views || 0}</Text>
+            <Text style={styles.statLabel}>Vues</Text>
+          </View>
+        </Surface>
+
+        <List.Section>
+          <List.Subheader style={styles.sectionHeader}>Paramètres du compte</List.Subheader>
+          <List.Item
+            title="Informations personnelles"
+            description="Modifier vos informations de base"
+            left={props => <List.Icon {...props} icon="account-edit" color="#E75A7C" />}
+            right={props => <List.Icon {...props} icon="chevron-right" />}
+            onPress={() => setEditProfileVisible(true)}
+            style={styles.listItem}
+          />
+          <List.Item
+            title="Changer de mot de passe"
+            description="Mettre à jour votre mot de passe"
+            left={props => <List.Icon {...props} icon="lock-reset" color="#E75A7C" />}
+            right={props => <List.Icon {...props} icon="chevron-right" />}
+            onPress={() => setChangePasswordVisible(true)}
+            style={styles.listItem}
+          />
+          <List.Item
+            title="Adresses de livraison"
+            description="Gérer vos adresses de livraison"
+            left={props => <List.Icon {...props} icon="map-marker" color="#E75A7C" />}
+            right={props => <List.Icon {...props} icon="chevron-right" />}
+            onPress={() => setEditAddressVisible(true)}
+            style={styles.listItem}
+          />
+        </List.Section>
+
+        <Divider style={styles.divider} />
+
+        <List.Section>
+          <List.Subheader style={styles.sectionHeader}>Mes annonces</List.Subheader>
+          
+          <Button 
+            mode="contained" 
+            onPress={() => navigation.navigate('AjouterProduit')}
+            style={styles.addButton}
+            icon="plus"
+          >
+            Publier une nouvelle annonce
+          </Button>
+
+          <View style={styles.productsContainer}>
+            {loading ? (
+              <View style={styles.loadingContainer}>
+                <ActivityIndicator size="large" color="#E75A7C" />
+                <Text style={styles.loadingText}>Chargement de vos annonces...</Text>
+              </View>
+            ) : userProducts.length === 0 ? (
+              <View style={styles.emptyStateContainer}>
+                <Ionicons name="basket-outline" size={50} color="#E75A7C" />
+                <Text style={styles.emptyStateText}>
+                  Vous n'avez pas encore publié d'annonces
+                </Text>
+              </View>
+            ) : (
+              userProducts.map(product => (
+                <ProductItemCard 
+                  key={product.id}
+                  product={product} 
+                  onDelete={handleDeleteProduct} 
+                  onEdit={(id) => navigation.navigate('AjouterProduit', { productId: id })}
+                />
+              ))
+            )}
+          </View>
+        </List.Section>
+        
+        <Divider style={styles.divider} />
+
+        <List.Section>
+          <List.Subheader style={styles.sectionHeader}>Navigation rapide</List.Subheader>
+          <List.Item
+            title="Mes favoris"
+            description="Voir tous les articles que vous avez aimés"
+            left={props => <List.Icon {...props} icon="heart" color="#E75A7C" />}
+            right={props => <List.Icon {...props} icon="chevron-right" />}
+            onPress={() => navigation.navigate('Favoris')}
+            style={styles.listItem}
+          />
+          <List.Item
+            title="Messages"
+            description="Voir vos conversations avec les vendeurs"
+            left={props => <List.Icon {...props} icon="chat" color="#E75A7C" />}
+            right={props => <List.Icon {...props} icon="chevron-right" />}
+            onPress={() => navigation.navigate('Messages')}
+            style={styles.listItem}
+          />
+        </List.Section>
+
+        <View style={styles.logoutContainer}>
+          <Button 
+            mode="outlined" 
+            onPress={handleLogout} 
+            textColor="#E75A7C"
+            style={styles.logoutButton}
+            icon="logout"
+          >
+            Se déconnecter
+          </Button>
         </View>
-      </List.Section>
-
-      <Divider />
-
-      <List.Section>
-        <List.Subheader>Paramètres du compte</List.Subheader>
-        <List.Item
-          title="Informations personnelles"
-          left={props => <List.Icon {...props} icon="account" />}
-          onPress={() => {}}
-        />
-        <List.Item
-          title="Changer de mot de passe"
-          left={props => <List.Icon {...props} icon="lock" />}
-          onPress={() => {}}
-        />
-        <List.Item
-          title="Adresses de livraison"
-          left={props => <List.Icon {...props} icon="map-marker" />}
-          onPress={() => {}}
-        />
-      </List.Section>
-
-      <Divider />
-
-      <List.Section>
-        <List.Subheader>Mes favoris</List.Subheader>
-        <List.Item
-          title="Annonces sauvegardées"
-          left={props => <List.Icon {...props} icon="heart" />}
-          onPress={() => navigation.navigate('Favoris')}
-        />
-      </List.Section>
-
-      <View style={styles.logoutContainer}>
-        <Button mode="outlined" onPress={handleLogout} textColor="red">
-          Se déconnecter
-        </Button>
-      </View>
-    </ScrollView>
+        
+        {/* Modal pour modifier le profil */}
+        <Portal>
+          <Modal visible={editProfileVisible} onDismiss={() => setEditProfileVisible(false)}>
+            <View style={styles.modalContainer}>
+              <Text style={styles.modalTitle}>Modifier mon profil</Text>
+              
+              <TextInput
+                label="Nom"
+                value={name}
+                onChangeText={setName}
+                mode="outlined"
+                style={styles.input}
+                outlineColor="#E75A7C"
+                activeOutlineColor="#E75A7C"
+              />
+              
+              <TextInput
+                label="Email"
+                value={email}
+                onChangeText={setEmail}
+                mode="outlined"
+                style={styles.input}
+                keyboardType="email-address"
+                outlineColor="#E75A7C"
+                activeOutlineColor="#E75A7C"
+              />
+              
+              <TextInput
+                label="Téléphone"
+                value={phone}
+                onChangeText={setPhone}
+                mode="outlined"
+                style={styles.input}
+                keyboardType="phone-pad"
+                outlineColor="#E75A7C"
+                activeOutlineColor="#E75A7C"
+              />
+              
+              <View style={styles.modalActions}>
+                <Button mode="outlined" onPress={() => setEditProfileVisible(false)} style={styles.modalButton}>
+                  Annuler
+                </Button>
+                <Button mode="contained" onPress={updateProfile} style={[styles.modalButton, styles.primaryButton]}>
+                  Enregistrer
+                </Button>
+              </View>
+            </View>
+          </Modal>
+        </Portal>
+        
+        {/* Modal pour modifier l'adresse */}
+        <Portal>
+          <Modal visible={editAddressVisible} onDismiss={() => setEditAddressVisible(false)}>
+            <View style={styles.modalContainer}>
+              <Text style={styles.modalTitle}>Modifier mon adresse</Text>
+              
+              <TextInput
+                label="Rue et numéro"
+                value={street}
+                onChangeText={setStreet}
+                mode="outlined"
+                style={styles.input}
+                outlineColor="#E75A7C"
+                activeOutlineColor="#E75A7C"
+              />
+              
+              <TextInput
+                label="Ville"
+                value={city}
+                onChangeText={setCity}
+                mode="outlined"
+                style={styles.input}
+                outlineColor="#E75A7C"
+                activeOutlineColor="#E75A7C"
+              />
+              
+              <TextInput
+                label="Code postal"
+                value={zipCode}
+                onChangeText={setZipCode}
+                mode="outlined"
+                style={styles.input}
+                keyboardType="numeric"
+                outlineColor="#E75A7C"
+                activeOutlineColor="#E75A7C"
+              />
+              
+              <View style={styles.modalActions}>
+                <Button mode="outlined" onPress={() => setEditAddressVisible(false)} style={styles.modalButton}>
+                  Annuler
+                </Button>
+                <Button mode="contained" onPress={updateAddress} style={[styles.modalButton, styles.primaryButton]}>
+                  Enregistrer
+                </Button>
+              </View>
+            </View>
+          </Modal>
+        </Portal>
+        
+        {/* Modal pour changer le mot de passe */}
+        <Portal>
+          <Modal visible={changePasswordVisible} onDismiss={() => setChangePasswordVisible(false)}>
+            <View style={styles.modalContainer}>
+              <Text style={styles.modalTitle}>Changer de mot de passe</Text>
+              
+              <TextInput
+                label="Mot de passe actuel"
+                value={currentPassword}
+                onChangeText={setCurrentPassword}
+                mode="outlined"
+                style={styles.input}
+                secureTextEntry
+                outlineColor="#E75A7C"
+                activeOutlineColor="#E75A7C"
+              />
+              
+              <TextInput
+                label="Nouveau mot de passe"
+                value={newPassword}
+                onChangeText={setNewPassword}
+                mode="outlined"
+                style={styles.input}
+                secureTextEntry
+                outlineColor="#E75A7C"
+                activeOutlineColor="#E75A7C"
+              />
+              
+              <TextInput
+                label="Confirmer le mot de passe"
+                value={confirmPassword}
+                onChangeText={setConfirmPassword}
+                mode="outlined"
+                style={styles.input}
+                secureTextEntry
+                outlineColor="#E75A7C"
+                activeOutlineColor="#E75A7C"
+              />
+              
+              <View style={styles.modalActions}>
+                <Button mode="outlined" onPress={() => setChangePasswordVisible(false)} style={styles.modalButton}>
+                  Annuler
+                </Button>
+                <Button mode="contained" onPress={changePassword} style={[styles.modalButton, styles.primaryButton]}>
+                  Enregistrer
+                </Button>
+              </View>
+            </View>
+          </Modal>
+        </Portal>
+      </ScrollView>
+    </Provider>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: '#f8f9fa',
+  },
+  headerBackground: {
+    height: 220,
+  },
+  headerGradient: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   header: {
     alignItems: 'center',
     padding: 20,
-    backgroundColor: '#fff',
+  },
+  avatar: {
+    backgroundColor: '#E75A7C',
+    marginBottom: 10,
+    borderWidth: 3,
+    borderColor: '#fff',
   },
   name: {
     fontSize: 24,
     fontWeight: 'bold',
+    color: '#fff',
     marginTop: 10,
   },
   email: {
     fontSize: 16,
+    color: '#eee',
+    marginTop: 5,
+  },
+  editButton: {
+    marginTop: 15,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    paddingVertical: 8,
+    paddingHorizontal: 15,
+    borderRadius: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  editButtonText: {
+    color: '#fff',
+    marginLeft: 5,
+    fontWeight: '500',
+  },
+  statsContainer: {
+    flexDirection: 'row',
+    marginHorizontal: 15,
+    marginTop: -30,
+    borderRadius: 10,
+    elevation: 3,
+    padding: 15,
+    backgroundColor: '#fff',
+  },
+  statItem: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  statValue: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#E75A7C',
+  },
+  statLabel: {
+    fontSize: 14,
     color: '#666',
     marginTop: 5,
+  },
+  statDivider: {
+    width: 1,
+    backgroundColor: '#eee',
+  },
+  divider: {
+    marginVertical: 10,
+  },
+  sectionHeader: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#444',
+  },
+  listItem: {
+    backgroundColor: '#fff',
+    marginVertical: 2,
+    borderRadius: 5,
+    marginHorizontal: 15,
+  },
+  productsContainer: {
+    paddingHorizontal: 15,
+    paddingBottom: 15,
+  },
+  loadingContainer: {
+    alignItems: 'center',
+    padding: 30,
+  },
+  loadingText: {
+    textAlign: 'center',
+    marginTop: 10,
+    color: '#666',
+  },
+  emptyStateContainer: {
+    alignItems: 'center',
+    padding: 30,
+    backgroundColor: '#fff',
+    borderRadius: 10,
+    marginTop: 15,
+  },
+  emptyStateText: {
+    fontSize: 16,
+    color: '#666',
+    marginTop: 15,
+    textAlign: 'center',
+  },
+  addButton: {
+    margin: 15,
+    backgroundColor: '#E75A7C',
   },
   logoutContainer: {
     padding: 20,
     alignItems: 'center',
+    marginBottom: 20,
   },
-  productsContainer: {
-    padding: 16,
+  logoutButton: {
+    borderColor: '#E75A7C',
+    width: '80%',
+  },
+  modalContainer: {
+    backgroundColor: 'white',
+    padding: 20,
+    margin: 20,
+    borderRadius: 10,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    marginBottom: 20,
+    color: '#E75A7C',
+    textAlign: 'center',
+  },
+  input: {
+    marginBottom: 15,
+  },
+  modalActions: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 10,
+  },
+  modalButton: {
+    flex: 1,
+    marginHorizontal: 5,
+  },
+  primaryButton: {
+    backgroundColor: '#E75A7C',
   },
   productCard: {
     marginBottom: 16,
     elevation: 2,
+    backgroundColor: '#fff',
+    borderRadius: 10,
   },
   productImageContainer: {
     position: 'relative',
-    borderTopLeftRadius: 8,
-    borderTopRightRadius: 8,
-    overflow: 'hidden',
+    borderTopLeftRadius: 10,
+    borderTopRightRadius: 10,
+  },
+  productImage: {
+    height: 200,
+    borderTopLeftRadius: 10,
+    borderTopRightRadius: 10,
   },
   imageLoader: {
     position: 'absolute',
@@ -475,11 +1059,6 @@ const styles = StyleSheet.create({
     color: '#E75A7C',
     marginTop: 8,
   },
-  productImage: {
-    height: 200,
-    borderTopLeftRadius: 8,
-    borderTopRightRadius: 8,
-  },
   productContent: {
     padding: 8,
   },
@@ -501,23 +1080,5 @@ const styles = StyleSheet.create({
   productActions: {
     justifyContent: 'space-between',
     padding: 8,
-  },
-  loadingText: {
-    textAlign: 'center',
-    padding: 20,
-    color: '#666',
-  },
-  emptyStateContainer: {
-    alignItems: 'center',
-    padding: 20,
-  },
-  emptyStateText: {
-    fontSize: 16,
-    color: '#666',
-    marginBottom: 16,
-    textAlign: 'center',
-  },
-  addButton: {
-    backgroundColor: '#E75A7C',
   },
 }); 

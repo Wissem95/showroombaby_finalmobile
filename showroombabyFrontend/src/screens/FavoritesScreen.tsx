@@ -20,10 +20,13 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { StatusBar } from 'expo-status-bar';
 import { widthPercentageToDP as wp, heightPercentageToDP as hp } from 'react-native-responsive-screen';
 import { LinearGradient } from 'expo-linear-gradient';
-import { PanGestureHandler, State, PanGestureHandlerStateChangeEvent } from 'react-native-gesture-handler';
+import { PanGestureHandler, State, PanGestureHandlerStateChangeEvent, GestureHandlerRootView } from 'react-native-gesture-handler';
 
 // URL de l'API
-const API_URL = 'http://127.0.0.1:8000';
+// Pour les appareils externes, utiliser votre adresse IP locale au lieu de 127.0.0.1
+const API_URL = process.env.NODE_ENV === 'development' || __DEV__ 
+  ? 'http://172.20.10.2:8000'  // Adresse IP locale de l'utilisateur
+  : 'https://api.showroombaby.com';
 
 // Importer l'image placeholder directement
 const placeholderImage = require('../../assets/placeholder.png');
@@ -93,6 +96,27 @@ export default function FavoritesScreen({ navigation }: any) {
           .map((favorite: Favorite) => favorite.product);
         
         console.log('Produits favoris extraits:', extractedProducts.length);
+        
+        // Nettoyer les entrées de stockage local pour les produits qui ne sont plus en favoris
+        // afin de synchroniser l'état local avec le serveur
+        const localStorageFavorites = await AsyncStorage.getAllKeys();
+        const favoritesKeys = localStorageFavorites.filter(key => key.startsWith('favorite_'));
+        
+        // Récupération des IDs de produits réellement en favoris
+        const actualFavoriteIds = extractedProducts.map((product: Product) => product.id);
+        
+        // Nettoyage des entrées locales incorrectes
+        for (const key of favoritesKeys) {
+          const productId = key.replace('favorite_', '');
+          const isInFavorites = actualFavoriteIds.includes(parseInt(productId));
+          
+          if (await AsyncStorage.getItem(key) === 'true' && !isInFavorites) {
+            // Marquer comme non-favori si ce n'est pas dans les favoris actuels du serveur
+            await AsyncStorage.setItem(key, 'false');
+            console.log(`Corrigé l'état local du favori pour le produit ${productId}`);
+          }
+        }
+        
         setFavorites(extractedProducts);
       } else if (response.data && Array.isArray(response.data)) {
         // Format alternatif: [ { product: {...}, product_id: 1, ... }, ... ]
@@ -149,6 +173,7 @@ export default function FavoritesScreen({ navigation }: any) {
         headers: { Authorization: `Bearer ${token}` }
       });
       
+      // Mettre à jour la liste locale des favoris
       setFavorites(favorites.filter(item => item.id !== productId));
       
       // Mettre à jour le statut global des favoris pour toutes les pages
@@ -159,16 +184,28 @@ export default function FavoritesScreen({ navigation }: any) {
     } catch (error: any) {
       console.error('Erreur lors de la suppression du favori:', error);
       
-      if (error.response && error.response.status === 404) {
-        setFavorites(favorites.filter(item => item.id !== productId));
-        
-        // Mettre à jour quand même le statut global
-        await AsyncStorage.setItem('favoritesChanged', 'true');
-        await AsyncStorage.setItem(`favorite_${productId}`, 'false');
-        
-        Alert.alert('Information', 'Ce produit a déjà été retiré de vos favoris');
+      // Traitement spécifique selon le type d'erreur
+      if (error.response) {
+        if (error.response.status === 404) {
+          // Le produit n'est plus dans les favoris côté serveur, on le retire localement
+          setFavorites(favorites.filter(item => item.id !== productId));
+          
+          // Mettre à jour quand même le statut global
+          await AsyncStorage.setItem('favoritesChanged', 'true');
+          await AsyncStorage.setItem(`favorite_${productId}`, 'false');
+          
+          Alert.alert('Information', 'Ce produit a déjà été retiré de vos favoris');
+        } else if (error.response.status === 401) {
+          Alert.alert('Erreur d\'authentification', 'Votre session a expiré. Veuillez vous reconnecter.');
+          // On pourrait rediriger vers la page de login si nécessaire
+        } else {
+          Alert.alert('Erreur', 'Impossible de retirer ce produit des favoris. Veuillez réessayer.');
+        }
+      } else if (error.request) {
+        // La requête a été faite mais pas de réponse reçue (problème de connexion)
+        Alert.alert('Erreur de connexion', 'Impossible de se connecter au serveur. Vérifiez votre connexion internet.');
       } else {
-        Alert.alert('Erreur', 'Impossible de retirer ce produit des favoris. Veuillez réessayer.');
+        Alert.alert('Erreur', 'Une erreur inattendue s\'est produite. Veuillez réessayer.');
       }
     }
   };
@@ -277,155 +314,57 @@ export default function FavoritesScreen({ navigation }: any) {
     onRemove: (id: number, title: string) => void;
   }) => {
     const [imageError, setImageError] = useState(false);
-    const translateY = useRef(new Animated.Value(0)).current;
-    const opacity = useRef(new Animated.Value(1)).current;
-    const scale = useRef(new Animated.Value(1)).current;
-    const indicatorOpacity = useRef(new Animated.Value(0)).current;
-    
-    // Animation pour faire apparaître/disparaître l'indicateur de swipe
-    useEffect(() => {
-      // Séquence d'animation qui se répète
-      Animated.sequence([
-        // Attendre un court instant
-        Animated.delay(500),
-        // Faire apparaître progressivement
-        Animated.timing(indicatorOpacity, {
-          toValue: 0.7,
-          duration: 800,
-          useNativeDriver: true
-        }),
-        // Maintenir visible
-        Animated.delay(1000),
-        // Faire disparaître progressivement
-        Animated.timing(indicatorOpacity, {
-          toValue: 0,
-          duration: 800,
-          useNativeDriver: true
-        })
-      ]).start();
-    }, []);
-
-    const onGestureEvent = Animated.event(
-      [{ nativeEvent: { translationY: translateY } }],
-      { useNativeDriver: true }
-    );
-
-    const onHandlerStateChange = (event: PanGestureHandlerStateChangeEvent) => {
-      if (event.nativeEvent.oldState === State.ACTIVE) {
-        const { translationY } = event.nativeEvent;
-        
-        // Si l'utilisateur glisse vers le haut (translationY négatif) et dépasse un certain seuil
-        if (translationY < -50) {
-          // Animation de sortie
-          Animated.parallel([
-            Animated.timing(translateY, {
-              toValue: -200,
-              duration: 300,
-              useNativeDriver: true
-            }),
-            Animated.timing(opacity, {
-              toValue: 0.5,
-              duration: 300,
-              useNativeDriver: true
-            }),
-            Animated.timing(scale, {
-              toValue: 0.9,
-              duration: 300,
-              useNativeDriver: true
-            })
-          ]).start(() => {
-            // Réinitialiser l'animation
-            translateY.setValue(0);
-            opacity.setValue(1);
-            scale.setValue(1);
-            
-            // Naviguer vers les détails du produit
-            navigation.navigate('ProductDetails', { 
-              productId: item.id, 
-              fullscreenMode: true,
-              transitionAnimation: 'fromBottom'
-            });
-          });
-        } else {
-          // Rebond à la position d'origine si pas assez glissé
-          Animated.spring(translateY, {
-            toValue: 0,
-            useNativeDriver: true,
-            friction: 5
-          }).start();
-        }
-      }
-    };
     
     return (
-      <PanGestureHandler
-        onGestureEvent={onGestureEvent}
-        onHandlerStateChange={onHandlerStateChange}
-      >
-        <Animated.View style={[
-          styles.productCard,
-          {
-            transform: [
-              { translateY },
-              { scale }
-            ],
-            opacity
-          }
-        ]}>
-          <TouchableOpacity 
-            style={{ flex: 1 }}
-            activeOpacity={0.85}
-            onPress={() => navigation.navigate('ProductDetails', { 
-              productId: item.id, 
-              fullscreenMode: true 
-            })}
-          >
-            <View style={styles.productImageContainer}>
-              {imageError ? (
-                <View style={styles.imageErrorContainer}>
-                  <Ionicons name="image-outline" size={24} color="#e75480" />
-                  <Text style={styles.imageErrorText}>Image indisponible</Text>
-                </View>
-              ) : (
-                <Image 
-                  source={getProductImage(item)} 
-                  style={styles.productImage}
-                  onError={() => setImageError(true)}
-                />
-              )}
-              <TouchableOpacity 
-                style={styles.removeButton}
-                onPress={() => onRemove(item.id, item.title)}
-                activeOpacity={0.8}
-              >
-                <Ionicons name="heart" size={22} color="#fff" />
-              </TouchableOpacity>
-              <View style={styles.priceTag}>
-                <Text style={styles.priceTagText}>{formatPrice(item.price)}</Text>
+      <View style={styles.productCard}>
+        <TouchableOpacity 
+          style={{ flex: 1 }}
+          activeOpacity={0.85}
+          onPress={() => navigation.navigate('ProductDetails', { 
+            productId: item.id, 
+            fullscreenMode: true 
+          })}
+        >
+          <View style={styles.productImageContainer}>
+            {imageError ? (
+              <View style={styles.imageErrorContainer}>
+                <Ionicons name="image-outline" size={24} color="#e75480" />
+                <Text style={styles.imageErrorText}>Image indisponible</Text>
               </View>
-              
-              {/* Indicateur de swipe avec opacité animée */}
-              <Animated.View style={[styles.swipeIndicator, { opacity: indicatorOpacity }]}>
-                <Ionicons name="chevron-up" size={18} color="#fff" />
-              </Animated.View>
+            ) : (
+              <Image 
+                source={getProductImage(item)} 
+                style={styles.productImage}
+                onError={() => setImageError(true)}
+              />
+            )}
+            <TouchableOpacity 
+              style={styles.removeButton}
+              onPress={() => onRemove(item.id, item.title)}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="heart" size={22} color="#fff" />
+            </TouchableOpacity>
+            <View style={styles.priceTag}>
+              <Text style={styles.priceTagText}>{formatPrice(item.price)}</Text>
             </View>
-            <View style={styles.cardContent}>
-              <View style={styles.productInfo}>
-                <Text style={styles.productTitle} numberOfLines={1} ellipsizeMode="tail">
-                  {item.title}
+          </View>
+          <View style={styles.cardContent}>
+            <View style={styles.productInfo}>
+              <Text style={styles.productTitle} numberOfLines={1} ellipsizeMode="tail">
+                {item.title}
+              </Text>
+              {item.location && (
+                <Text style={styles.productLocation} numberOfLines={1}>
+                  <Ionicons name="location-outline" size={14} color="#777" />
+                  {' '}{item.location}
                 </Text>
-                {item.location && (
-                  <Text style={styles.productLocation} numberOfLines={1}>
-                    <Ionicons name="location-outline" size={14} color="#777" />
-                    {' '}{item.location}
-                  </Text>
-                )}
-                <Text style={styles.productDate}>Ajouté le {formatDate(item.created_at)}</Text>
-              </View>
+              )}
+              <Text style={styles.productDate}>Ajouté le {formatDate(item.created_at)}</Text>
             </View>
-          </TouchableOpacity>
-        </Animated.View>
-      </PanGestureHandler>
+          </View>
+        </TouchableOpacity>
+      </View>
     );
   });
 
@@ -444,137 +383,145 @@ export default function FavoritesScreen({ navigation }: any) {
 
   if (loading && !refreshing) {
     return (
-      <View style={styles.centerContainer}>
-        <ActivityIndicator size="large" color="#e75480" />
-        <Text style={styles.loadingText}>Chargement de vos favoris...</Text>
-      </View>
+      <GestureHandlerRootView style={{ flex: 1 }}>
+        <View style={styles.centerContainer}>
+          <ActivityIndicator size="large" color="#e75480" />
+          <Text style={styles.loadingText}>Chargement de vos favoris...</Text>
+        </View>
+      </GestureHandlerRootView>
     );
   }
 
   if (error && !token) {
     return (
-      <View style={styles.centerContainer}>
-        <Ionicons name="person-outline" size={64} color="#ccc" />
-        <Text style={styles.errorText}>{error}</Text>
-        <Button 
-          mode="contained" 
-          onPress={() => navigation.navigate('Login')}
-          style={styles.loginButton}
-          labelStyle={styles.buttonLabel}
-        >
-          Se connecter
-        </Button>
-      </View>
+      <GestureHandlerRootView style={{ flex: 1 }}>
+        <View style={styles.centerContainer}>
+          <Ionicons name="person-outline" size={64} color="#ccc" />
+          <Text style={styles.errorText}>{error}</Text>
+          <Button 
+            mode="contained" 
+            onPress={() => navigation.navigate('Login')}
+            style={styles.loginButton}
+            labelStyle={styles.buttonLabel}
+          >
+            Se connecter
+          </Button>
+        </View>
+      </GestureHandlerRootView>
     );
   }
 
   if (error) {
     return (
-      <View style={styles.centerContainer}>
-        <Ionicons name="alert-circle-outline" size={64} color="#e74c3c" />
-        <Text style={styles.errorText}>{error}</Text>
-        <Button 
-          mode="contained" 
-          onPress={loadFavorites}
-          style={styles.retryButton}
-          labelStyle={styles.buttonLabel}
-        >
-          Réessayer
-        </Button>
-      </View>
+      <GestureHandlerRootView style={{ flex: 1 }}>
+        <View style={styles.centerContainer}>
+          <Ionicons name="alert-circle-outline" size={64} color="#e74c3c" />
+          <Text style={styles.errorText}>{error}</Text>
+          <Button 
+            mode="contained" 
+            onPress={loadFavorites}
+            style={styles.retryButton}
+            labelStyle={styles.buttonLabel}
+          >
+            Réessayer
+          </Button>
+        </View>
+      </GestureHandlerRootView>
     );
   }
 
   return (
-    <View style={styles.container}>
-      <StatusBar style="light" backgroundColor="transparent" translucent={true} />
-      
-      <View style={styles.mainContent}>
-        <View style={styles.headerSection}>
-          <ImageBackground
-            source={backgroundImage}
-            style={styles.backgroundImage}
-            imageStyle={styles.backgroundImageStyle}
-            resizeMode="cover"
-          >
-            <LinearGradient
-              colors={['rgba(0,0,0,0.3)', 'rgba(0,0,0,0.5)']}
-              style={styles.headerGradient}
-            >
-              <View style={styles.headerContent}>
-                <Text style={styles.title}>Mes Favoris</Text>
-                <Text style={styles.subtitle}>
-                  {favorites.length} {favorites.length > 1 ? 'articles' : 'article'} sauvegardé{favorites.length > 1 ? 's' : ''}
-                </Text>
-                
-                <View style={styles.searchBarContainer}>
-                  <Searchbar
-                    placeholder="Rechercher dans vos favoris"
-                    onChangeText={handleSearch}
-                    value={searchQuery}
-                    style={styles.searchBar}
-                    inputStyle={styles.searchInput}
-                    icon={() => <Ionicons name="search" size={20} color="#777" />}
-                    clearIcon={() => <Ionicons name="close" size={20} color="#777" />}
-                  />
-                </View>
-              </View>
-            </LinearGradient>
-          </ImageBackground>
-        </View>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <View style={styles.container}>
+        <StatusBar style="light" backgroundColor="transparent" translucent={true} />
         
-        {favorites.length === 0 ? (
-          <View style={styles.emptyContainer}>
-            <View style={styles.emptyIconContainer}>
-              <Ionicons name="heart-outline" size={80} color="#ffcce0" />
-            </View>
-            <Text style={styles.emptyText}>Vous n'avez pas encore de favoris</Text>
-            <Text style={styles.emptySubtext}>
-              Ajoutez des produits à vos favoris pour les retrouver facilement
-            </Text>
-            <Button 
-              mode="contained" 
-              onPress={() => navigation.navigate('Home')}
-              style={styles.browseButton}
-              labelStyle={styles.buttonLabel}
-              icon={() => <Ionicons name="search" size={20} color="#fff" />}
+        <View style={styles.mainContent}>
+          <View style={styles.headerSection}>
+            <ImageBackground
+              source={backgroundImage}
+              style={styles.backgroundImage}
+              imageStyle={styles.backgroundImageStyle}
+              resizeMode="cover"
             >
-              Parcourir les produits
-            </Button>
-          </View>
-        ) : (
-          <View style={styles.productsContainer}>
-            <FlatList
-              data={filteredProducts}
-              renderItem={renderItem}
-              keyExtractor={item => item.id.toString()}
-              numColumns={2}
-              showsVerticalScrollIndicator={false}
-              contentContainerStyle={styles.listContent}
-              columnWrapperStyle={styles.columnWrapper}
-              refreshControl={
-                <RefreshControl
-                  refreshing={refreshing}
-                  onRefresh={onRefresh}
-                  colors={['#e75480']}
-                  tintColor="#e75480"
-                />
-              }
-              ListEmptyComponent={
-                searchQuery ? (
-                  <View style={styles.noResultsContainer}>
-                    <Ionicons name="search-outline" size={50} color="#ccc" />
-                    <Text style={styles.noResultsText}>
-                      Aucun résultat pour "{searchQuery}"
-                    </Text>
+              <LinearGradient
+                colors={['rgba(0,0,0,0.3)', 'rgba(0,0,0,0.5)']}
+                style={styles.headerGradient}
+              >
+                <View style={styles.headerContent}>
+                  <Text style={styles.title}>Mes Favoris</Text>
+                  <Text style={styles.subtitle}>
+                    {favorites.length} {favorites.length > 1 ? 'articles' : 'article'} sauvegardé{favorites.length > 1 ? 's' : ''}
+                  </Text>
+                  
+                  <View style={styles.searchBarContainer}>
+                    <Searchbar
+                      placeholder="Rechercher dans vos favoris"
+                      onChangeText={handleSearch}
+                      value={searchQuery}
+                      style={styles.searchBar}
+                      inputStyle={styles.searchInput}
+                      icon={() => <Ionicons name="search" size={20} color="#777" />}
+                      clearIcon={() => <Ionicons name="close" size={20} color="#777" />}
+                    />
                   </View>
-                ) : null
-              }
-            />
+                </View>
+              </LinearGradient>
+            </ImageBackground>
           </View>
-        )}
+          
+          {favorites.length === 0 ? (
+            <View style={styles.emptyContainer}>
+              <View style={styles.emptyIconContainer}>
+                <Ionicons name="heart-outline" size={80} color="#ffcce0" />
+              </View>
+              <Text style={styles.emptyText}>Vous n'avez pas encore de favoris</Text>
+              <Text style={styles.emptySubtext}>
+                Ajoutez des produits à vos favoris pour les retrouver facilement
+              </Text>
+              <Button 
+                mode="contained" 
+                onPress={() => navigation.navigate('Home')}
+                style={styles.browseButton}
+                labelStyle={styles.buttonLabel}
+                icon={() => <Ionicons name="search" size={20} color="#fff" />}
+              >
+                Parcourir les produits
+              </Button>
+            </View>
+          ) : (
+            <View style={styles.productsContainer}>
+              <FlatList
+                data={filteredProducts}
+                renderItem={renderItem}
+                keyExtractor={item => item.id.toString()}
+                numColumns={2}
+                showsVerticalScrollIndicator={false}
+                contentContainerStyle={styles.listContent}
+                columnWrapperStyle={styles.columnWrapper}
+                refreshControl={
+                  <RefreshControl
+                    refreshing={refreshing}
+                    onRefresh={onRefresh}
+                    colors={['#e75480']}
+                    tintColor="#e75480"
+                  />
+                }
+                ListEmptyComponent={
+                  searchQuery ? (
+                    <View style={styles.noResultsContainer}>
+                      <Ionicons name="search-outline" size={50} color="#ccc" />
+                      <Text style={styles.noResultsText}>
+                        Aucun résultat pour "{searchQuery}"
+                      </Text>
+                    </View>
+                  ) : null
+                }
+              />
+            </View>
+          )}
+        </View>
       </View>
-    </View>
+    </GestureHandlerRootView>
   );
 }
 
@@ -760,9 +707,9 @@ const styles = StyleSheet.create({
   productCard: {
     width: '48.5%',
     marginBottom: wp('3%'),
-    overflow: 'hidden',
     backgroundColor: '#fff',
     borderWidth: 0,
+    borderRadius: wp('3%'),
     ...Platform.select({
       ios: {
         shadowColor: '#000',
@@ -777,7 +724,8 @@ const styles = StyleSheet.create({
   },
   productImageContainer: {
     position: 'relative',
-    overflow: 'hidden',
+    borderTopLeftRadius: wp('3%'),
+    borderTopRightRadius: wp('3%'),
     height: wp('58%'),
     backgroundColor: '#fff',
   },
@@ -870,17 +818,5 @@ const styles = StyleSheet.create({
     color: '#e75480',
     marginTop: hp('1%'),
     letterSpacing: 0.1,
-  },
-  swipeIndicator: {
-    position: 'absolute',
-    bottom: wp('3%'),
-    alignSelf: 'center',
-    width: wp('8%'),
-    height: wp('8%'),
-    borderRadius: wp('4%'),
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    zIndex: 10,
   },
 });

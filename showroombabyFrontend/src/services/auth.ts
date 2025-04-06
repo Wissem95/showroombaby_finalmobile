@@ -2,21 +2,36 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
 
 // Utiliser l'adresse IP du réseau local plutôt que localhost pour les tests sur appareil physique
-const API_URL = 'http://127.0.0.1:8000/api';
+// Pour les appareils externes, utiliser votre adresse IP locale au lieu de 127.0.0.1
+// Exemple: "http://192.168.1.X:8000/api" où X est votre numéro d'IP
+const API_URL = process.env.NODE_ENV === 'development' || __DEV__ 
+  ? 'http://172.20.10.2:8000/api'  // Adresse IP locale de l'utilisateur
+  : 'https://api.showroombaby.com/api';  // URL de production
 
 // Configuration d'Axios pour déboguer les requêtes
+// Désactivation des logs en production
+const isDevelopment = process.env.NODE_ENV === 'development' || __DEV__;
+
+// Intercepteur des requêtes
 axios.interceptors.request.use(request => {
-  console.log('Request:', request.method, request.url, request.data);
+  if (isDevelopment) {
+    console.log('Request:', request.method, request.url, request.data);
+  }
   return request;
 });
 
+// Intercepteur des réponses
 axios.interceptors.response.use(
   response => {
-    console.log('Response:', response.status, response.data);
+    if (isDevelopment) {
+      console.log('Response:', response.status, response.data);
+    }
     return response;
   },
   error => {
-    console.log('Error Response:', error.response?.status, error.response?.data);
+    if (isDevelopment) {
+      console.log('Error Response:', error.response?.status, error.response?.data);
+    }
     return Promise.reject(error);
   }
 );

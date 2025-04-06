@@ -14,7 +14,10 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { PanGestureHandler, State } from 'react-native-gesture-handler';
 
 // URL de l'API
-const API_URL = 'http://127.0.0.1:8000';
+// Pour les appareils externes, utiliser votre adresse IP locale au lieu de 127.0.0.1
+const API_URL = process.env.NODE_ENV === 'development' || __DEV__ 
+  ? 'http://172.20.10.2:8000'  // Adresse IP locale de l'utilisateur
+  : 'https://api.showroombaby.com';
 
 // Importer l'image placeholder directement
 const placeholderImage = require('../../assets/placeholder.png');
@@ -736,6 +739,7 @@ export default function ProductDetailsScreen({ route, navigation }: any) {
   // Obtenir le nom de la catégorie
   const getCategoryName = (categoryId: number | undefined | null): string => {
     if (categoryId === undefined || categoryId === null) return 'Catégorie inconnue';
+    if (!categories || !Array.isArray(categories)) return 'Catégorie inconnue';
     
     const foundCategory = categories.find(cat => cat.id === categoryId);
     return foundCategory ? foundCategory.name : `Catégorie inconnue`;
@@ -745,6 +749,7 @@ export default function ProductDetailsScreen({ route, navigation }: any) {
   const getSubcategoryName = (categoryId: number | undefined | null, subcategoryId: number | undefined | null): string => {
     if (subcategoryId === undefined || subcategoryId === null) return 'Sous-catégorie inconnue';
     if (categoryId === undefined || categoryId === null) return 'Sous-catégorie inconnue';
+    if (!categories || !Array.isArray(categories)) return 'Sous-catégorie inconnue';
     
     const category = categories.find(cat => cat.id === categoryId);
     if (!category || !category.subcategories) return 'Sous-catégorie inconnue';
@@ -855,21 +860,14 @@ export default function ProductDetailsScreen({ route, navigation }: any) {
             return;
           }
           
-          // Utiliser l'API pour récupérer la liste complète des favoris
-          const response = await axios.get(`${API_URL}/api/favorites`, {
-            headers: { Authorization: `Bearer ${token}` }
+          // Utiliser la route dédiée pour vérifier si un produit est en favoris
+          const response = await axios.get(`${API_URL}/api/favorites/check/${productId}`, {
+            headers: { Authorization: `Bearer ${token}` },
+            timeout: 5000
           });
           
-          // Vérifier si le produit actuel est dans la liste des favoris
-          let isFavorite = false;
-          
-          if (response.data && response.data.data && Array.isArray(response.data.data)) {
-            // Format API: { data: [ { product_id: 1, ... }, ... ] }
-            isFavorite = response.data.data.some((fav: any) => fav.product_id == productId);
-          } else if (response.data && Array.isArray(response.data)) {
-            // Format alternatif: [ { product_id: 1, ... }, ... ]
-            isFavorite = response.data.some((fav: any) => fav.product_id == productId);
-          }
+          // Récupérer directement la valeur isFavorite de la réponse
+          const isFavorite = response.data?.isFavorite || false;
           
           setIsFavorite(isFavorite);
           
@@ -878,6 +876,8 @@ export default function ProductDetailsScreen({ route, navigation }: any) {
         } catch (error: any) {
           console.error('Erreur lors de la vérification des favoris:', error);
           setIsFavorite(false);
+          // En cas d'erreur, définir comme non-favori par défaut
+          await AsyncStorage.setItem(`favorite_${productId}`, 'false');
         }
       };
 
@@ -953,7 +953,7 @@ export default function ProductDetailsScreen({ route, navigation }: any) {
       
       if (error.response) {
         if (error.response.status === 401) {
-          Alert.alert('Erreur', 'Vous devez être connecté pour gérer vos favoris');
+          Alert.alert('Erreur d\'authentification', 'Vous devez être connecté pour gérer vos favoris');
           setLoginDialogVisible(true);
         } else if (error.response.status === 422) {
           // Le produit est déjà dans les favoris
@@ -965,19 +965,24 @@ export default function ProductDetailsScreen({ route, navigation }: any) {
           
           Alert.alert('Information', 'Ce produit est déjà dans vos favoris');
         } else if (error.response.status === 404) {
-          // Le produit n'est plus dans les favoris
+          // Le produit n'est plus dans les favoris ou n'existe pas
           setIsFavorite(false);
           
           // Mettre à jour le statut du favori dans le stockage local
           await AsyncStorage.setItem('favoritesChanged', 'true');
           await AsyncStorage.setItem(`favorite_${product.id}`, 'false');
           
-          Alert.alert('Information', 'Ce produit a déjà été retiré des favoris');
+          Alert.alert('Information', isFavorite ? 
+            'Ce produit a déjà été retiré des favoris' : 
+            'Ce produit n\'est pas disponible pour le moment');
         } else {
           Alert.alert('Erreur', 'Une erreur est survenue lors de la gestion des favoris');
         }
+      } else if (error.request) {
+        // La requête a été faite mais pas de réponse reçue (problème de connexion)
+        Alert.alert('Erreur de connexion', 'Impossible de se connecter au serveur. Vérifiez votre connexion internet.');
       } else {
-        Alert.alert('Erreur', 'Impossible de se connecter au serveur');
+        Alert.alert('Erreur', 'Une erreur inattendue s\'est produite. Veuillez réessayer.');
       }
     }
   };

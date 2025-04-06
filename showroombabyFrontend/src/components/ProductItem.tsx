@@ -8,7 +8,10 @@ import { Ionicons } from '@expo/vector-icons';
 const placeholderImage = require('../../assets/placeholder.png');
 
 // API URL
-const API_URL = 'http://127.0.0.1:8000';
+// Pour les appareils externes, utiliser votre adresse IP locale au lieu de 127.0.0.1
+const API_URL = process.env.NODE_ENV === 'development' || __DEV__ 
+  ? 'http://172.20.10.2:8000'  // Adresse IP locale de l'utilisateur
+  : 'https://api.showroombaby.com';
 
 // Largeur de l'écran
 const { width } = Dimensions.get('window');

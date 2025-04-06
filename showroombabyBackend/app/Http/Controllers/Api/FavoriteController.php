@@ -44,6 +44,13 @@ class FavoriteController extends Controller
         // Vérification que le produit existe
         $product = Product::findOrFail($productId);
 
+        // Vérification que l'utilisateur n'essaie pas d'ajouter son propre produit en favoris
+        if ($product->user_id === $request->user()->id) {
+            return response()->json([
+                'message' => 'Vous ne pouvez pas ajouter votre propre produit en favoris'
+            ], 422);
+        }
+
         // Vérification que le favori n'existe pas déjà
         $existingFavorite = Favorite::where('user_id', $request->user()->id)
             ->where('product_id', $productId)
@@ -78,7 +85,7 @@ class FavoriteController extends Controller
     {
         $favorite = Favorite::with('product.seller', 'product.category', 'product.images')
             ->findOrFail($id);
-            
+
         // Vérifier que l'utilisateur a accès à ce favori
         if ($favorite->user_id !== $request->user()->id) {
             return response()->json([
@@ -105,5 +112,23 @@ class FavoriteController extends Controller
         $favorite->delete();
 
         return response()->json(['message' => 'Produit retiré des favoris avec succès']);
+    }
+
+    /**
+     * Vérifie si un produit est dans les favoris de l'utilisateur
+     *
+     * @param Request $request
+     * @param string $productId
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function check(Request $request, $productId)
+    {
+        $isFavorite = Favorite::where('user_id', $request->user()->id)
+            ->where('product_id', $productId)
+            ->exists();
+
+        return response()->json([
+            'isFavorite' => $isFavorite
+        ]);
     }
 }

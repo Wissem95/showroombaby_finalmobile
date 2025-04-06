@@ -100,6 +100,7 @@ Route::middleware('auth:sanctum')->prefix('favorites')->group(function () {
     Route::post('/{productId}', [FavoriteController::class, 'store']);
     Route::delete('/{productId}', [FavoriteController::class, 'destroy']);
     Route::get('/', [FavoriteController::class, 'index']);
+    Route::get('/check/{productId}', [FavoriteController::class, 'check']);
     Route::get('/{id}', [FavoriteController::class, 'show']);
 });
 

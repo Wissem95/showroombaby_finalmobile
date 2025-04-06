@@ -9,7 +9,10 @@ import ProductItem from '../components/ProductItem';
 import Slider from '@react-native-community/slider';
 
 // URL de l'API
-const API_URL = 'http://127.0.0.1:8000';
+// Pour les appareils externes, utiliser votre adresse IP locale au lieu de 127.0.0.1
+const API_URL = process.env.NODE_ENV === 'development' || __DEV__ 
+  ? 'http://172.20.10.2:8000'  // Adresse IP locale de l'utilisateur
+  : 'https://api.showroombaby.com';
 
 // Importer l'image placeholder directement
 const placeholderImage = require('../../assets/placeholder.png');

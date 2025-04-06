@@ -16,9 +16,10 @@ LogBox.ignoreLogs([
 ]);
 
 // Adapter l'URL de l'API en fonction de la plateforme
-const API_URL = Platform.OS === 'ios' 
-  ? 'http://localhost:8000'   // iOS utilise localhost
-  : 'http://10.0.2.2:8000';   // Android utilise 10.0.2.2 pour se connecter à localhost de la machine hôte
+// Pour les appareils externes, utiliser votre adresse IP locale au lieu de 127.0.0.1
+const API_URL = process.env.NODE_ENV === 'development' || __DEV__ 
+  ? 'http://172.20.10.2:8000'  // Adresse IP locale de l'utilisateur
+  : 'https://api.showroombaby.com';
 
 const placeholderImage = require('../../assets/placeholder.png');
 const DEFAULT_AVATAR_URL = 'https://via.placeholder.com/100';

@@ -11,7 +11,10 @@ import { useFocusEffect } from '@react-navigation/native';
 type Props = NativeStackScreenProps<any, 'Home'>;
 
 // URL de l'API
-const API_URL = 'http://127.0.0.1:8000';
+// Pour les appareils externes, utiliser votre adresse IP locale au lieu de 127.0.0.1
+const API_URL = process.env.NODE_ENV === 'development' || __DEV__ 
+  ? 'http://172.20.10.2:8000'  // Adresse IP locale de l'utilisateur
+  : 'https://api.showroombaby.com';
 
 // URL des images par défaut
 const DEFAULT_IMAGE_URL = 'https://placehold.co/400x300/f8bbd0/ffffff?text=Showroom+Baby';
@@ -146,18 +149,22 @@ const ProductItem = React.memo(({ item, navigation }: { item: Product; navigatio
           const token = await AsyncStorage.getItem('token');
           if (!token) return;
           
-          const response = await axios.get(`${API_URL}/api/favorites`, {
-            headers: { Authorization: `Bearer ${token}` }
+          // Utiliser la nouvelle route de vérification des favoris
+          const response = await axios.get(`${API_URL}/api/favorites/check/${item.id}`, {
+            headers: { Authorization: `Bearer ${token}` },
+            timeout: 5000
           });
           
-          let favorites = Array.isArray(response.data) ? response.data : response.data.data;
-          const isFav = favorites.some((fav: any) => fav.product_id === item.id);
+          const isFav = response.data?.isFavorite || false;
           setIsFavorite(isFav);
           
           // Sauvegarder le statut dans le stockage local pour les prochaines fois
           await AsyncStorage.setItem(`favorite_${item.id}`, isFav ? 'true' : 'false');
         } catch (error) {
           console.error('Erreur vérification favoris:', error);
+          setIsFavorite(false);
+          // En cas d'erreur, définir comme non-favori par défaut
+          await AsyncStorage.setItem(`favorite_${item.id}`, 'false');
         }
       };
       
@@ -201,9 +208,37 @@ const ProductItem = React.memo(({ item, navigation }: { item: Product; navigatio
         await AsyncStorage.setItem('favoritesChanged', 'true');
         await AsyncStorage.setItem(`favorite_${item.id}`, 'true');
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Erreur favoris:', error);
-      Alert.alert('Erreur', 'Impossible de gérer les favoris');
+      
+      if (error.response) {
+        if (error.response.status === 422) {
+          if (error.response.data?.message.includes('propre produit')) {
+            Alert.alert('Information', 'Vous ne pouvez pas ajouter votre propre produit en favoris');
+          } else {
+            // Déjà en favoris
+            setIsFavorite(true);
+            await AsyncStorage.setItem(`favorite_${item.id}`, 'true');
+            Alert.alert('Information', 'Ce produit est déjà dans vos favoris');
+          }
+        } else if (error.response.status === 404) {
+          // Le produit n'existe plus ou n'est plus en favoris
+          setIsFavorite(false);
+          await AsyncStorage.setItem(`favorite_${item.id}`, 'false');
+          Alert.alert('Information', 'Ce produit n\'est plus disponible en favoris');
+        } else if (error.response.status === 401) {
+          // Session expirée
+          Alert.alert('Erreur d\'authentification', 'Votre session a expiré. Veuillez vous reconnecter.');
+          navigation.navigate('Auth');
+        } else {
+          Alert.alert('Erreur', 'Une erreur est survenue lors de la gestion des favoris');
+        }
+      } else if (error.request) {
+        // Erreur réseau
+        Alert.alert('Erreur de connexion', 'Impossible de se connecter au serveur. Vérifiez votre connexion internet.');
+      } else {
+        Alert.alert('Erreur', 'Une erreur inattendue s\'est produite');
+      }
     }
   };
 

@@ -23,6 +23,10 @@
     },
     "web": {
       "favicon": "./assets/favicon.png"
+    },
+    "hostUri": "172.20.10.2:8081",
+    "extra": {
+      "apiUrl": "http://172.20.10.2:8000"
     }
   }
 }

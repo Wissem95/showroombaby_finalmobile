@@ -12,7 +12,10 @@ import { useFocusEffect, CommonActions } from '@react-navigation/native';
 import AddressAutocomplete from '../components/AddressAutocomplete';
 
 // URL de l'API
-const API_URL = 'http://127.0.0.1:8000';
+// Pour les appareils externes, utiliser votre adresse IP locale au lieu de 127.0.0.1
+const API_URL = process.env.NODE_ENV === 'development' || __DEV__ 
+  ? 'http://172.20.10.2:8000'  // Adresse IP locale de l'utilisateur
+  : 'https://api.showroombaby.com';
 
 type Category = {
   id: number;
@@ -325,7 +328,7 @@ export default function AjouterProduitScreen({ navigation, route }: any) {
                   { 
                     text: 'Quitter', 
                     style: 'destructive',
-                    onPress: () => navigation.navigate('Home') 
+                    onPress: () => navigation.goBack() 
                   }
                 ]
               );
@@ -350,7 +353,7 @@ export default function AjouterProduitScreen({ navigation, route }: any) {
         { 
           text: 'Quitter', 
           style: 'destructive',
-          onPress: () => navigation.navigate('Home')
+          onPress: () => navigation.goBack()
         }
       ]
     );

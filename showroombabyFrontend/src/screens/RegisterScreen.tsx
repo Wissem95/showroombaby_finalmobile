@@ -7,7 +7,11 @@ import AuthService from '../services/auth';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import axios from 'axios';
 
-const API_URL = 'http://127.0.0.1:8000';
+// URL de l'API
+// Pour les appareils externes, utiliser votre adresse IP locale au lieu de 127.0.0.1
+const API_URL = process.env.NODE_ENV === 'development' || __DEV__ 
+  ? 'http://172.20.10.2:8000'  // Adresse IP locale de l'utilisateur
+  : 'https://api.showroombaby.com';
 
 type Props = NativeStackScreenProps<any, 'Register'>;
 
