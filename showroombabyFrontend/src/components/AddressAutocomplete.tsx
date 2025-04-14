@@ -30,8 +30,6 @@ export default function AddressAutocomplete({ onSelect, placeholder = "Entrez un
   }, 300);
 
   const searchAddress = async (text: string) => {
-    setQuery(text);
-    
     if (text.length > 2) {
       try {
         // Utiliser l'API Mapbox Geocoding pour la recherche d'adresses
@@ -97,7 +95,8 @@ export default function AddressAutocomplete({ onSelect, placeholder = "Entrez un
     
     console.log('Données d\'adresse extraites:', address);
     
-    setQuery(item.title || '');
+    // On ne modifie plus le champ de saisie, on garde la valeur entrée par l'utilisateur
+    // setQuery(item.title || '');
     setSuggestions([]);
     setShowSuggestions(false);
     onSelect(address);

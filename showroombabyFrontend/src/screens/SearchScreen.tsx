@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { StyleSheet, View, ScrollView, FlatList, TouchableOpacity, Image, Dimensions, Alert, SafeAreaView, Modal } from 'react-native';
-import { Text, Searchbar, Button, Chip, Card, Checkbox, Divider, ProgressBar } from 'react-native-paper';
+import { StyleSheet, View, ScrollView, FlatList, TouchableOpacity, Image, Dimensions, Alert, SafeAreaView, Modal, TextInput } from 'react-native';
+import { Text, Searchbar, Button, Chip, Card, Checkbox, Divider, ProgressBar, RadioButton } from 'react-native-paper';
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { widthPercentageToDP as wp, heightPercentageToDP as hp } from 'react-native-responsive-screen';
 import ProductItem from '../components/ProductItem';
 import Slider from '@react-native-community/slider';
+import { Animated } from 'react-native';
 
 // URL de l'API
 // Pour les appareils externes, utiliser votre adresse IP locale au lieu de 127.0.0.1
@@ -44,6 +45,13 @@ interface Product {
   zip_code?: string;
   brand?: string;
   model?: string;
+  user_type?: string; // Si le vendeur est professionnel ou particulier
+  user?: {
+    id: number;
+    name?: string;
+    email?: string;
+    is_professional?: boolean;
+  };
 }
 
 // Interface pour les catégories
@@ -57,7 +65,7 @@ interface Category {
 const CATEGORIES_DATA = [
   {
     id: 1,
-    name: 'Poussettes',
+    name: 'Poussette',
     subcategories: [
       { id: 1, name: 'Poussette canne' },
       { id: 2, name: 'Poussette 3 roues' },
@@ -187,6 +195,24 @@ const CATEGORIES_DATA = [
       { id: 84, name: 'Soutien gorge allaitement' },
     ]
   },
+  {
+    id: 9,
+    name: 'Sortie',
+    subcategories: [
+      { id: 85, name: 'Chancelière' },
+      { id: 86, name: 'Lit pliant' },
+      { id: 87, name: 'Sac a langer' },
+      { id: 88, name: 'Porte bébé' },
+    ]
+  },
+  {
+    id: 10,
+    name: 'Service',
+    subcategories: [
+      { id: 89, name: 'Garde d\'enfant' },
+      { id: 90, name: 'Aide au devoir' },
+    ]
+  }
 ];
 
 // Définition des tailles en fonction des catégories
@@ -236,7 +262,13 @@ export default function SearchScreen({ navigation }: any) {
   const [selectedSubcategory, setSelectedSubcategory] = useState<number | null>(null);
   const [selectedSize, setSelectedSize] = useState<string | null>(null);
   const [priceRange, setPriceRange] = useState<[number, number]>([0, 1000]);
+  const [minPrice, setMinPrice] = useState<string>('0');
+  const [maxPrice, setMaxPrice] = useState<string>('1000');
   const [selectedCondition, setSelectedCondition] = useState<string | null>(null);
+  const [sellerType, setSellerType] = useState<string | null>(null); // 'professional', 'individual', null (les deux)
+  
+  // Animation pour le filtre avancé
+  const [expandAnimation] = useState(new Animated.Value(0));
   
   // Modal
   const [modalVisible, setModalVisible] = useState<string | null>(null);
@@ -433,6 +465,11 @@ export default function SearchScreen({ navigation }: any) {
   };
 
   const applyAdvancedFilters = () => {
+    // Mettre à jour priceRange avec les valeurs des champs de texte
+    const min = Math.max(0, parseInt(minPrice) || 0);
+    const max = Math.max(min, parseInt(maxPrice) || 1000);
+    setPriceRange([min, max]);
+    
     // Commencer avec tous les produits ou le résultat de la recherche par texte
     let filtered = searchQuery.trim() 
       ? products.filter(product => 
@@ -441,31 +478,9 @@ export default function SearchScreen({ navigation }: any) {
         )
       : [...products];
     
-    // Filtrer par catégorie de manière plus robuste
+    // Filtrer par catégorie
     if (selectedCategory) {
-      filtered = filtered.filter(product => {
-        // Correspondance directe par ID
-        if (product.category_id === selectedCategory) {
-          return true;
-        }
-        
-        // Si le produit existe dans notre jeu de données, mais avec une catégorie différente
-        // nous pouvons vérifier si c'est une question de différence entre API et front
-        const selectedCategoryInfo = categories.find(c => c.id === selectedCategory);
-        if (selectedCategoryInfo) {
-          // Vérifier si les noms correspondent (ignorer les pluriels/singuliers et majuscules)
-          const normalizedSelectedName = selectedCategoryInfo.name.toLowerCase();
-          const selectedNameSingular = normalizedSelectedName.endsWith('s') 
-            ? normalizedSelectedName.slice(0, -1) 
-            : normalizedSelectedName;
-          
-          // On pourrait ajouter plus de logique ici pour des correspondances plus avancées
-          
-          // Pour l'instant, on s'en tient à la correspondance par ID
-        }
-        
-        return false;
-      });
+      filtered = filtered.filter(product => product.category_id === selectedCategory);
     }
     
     // Filtrer par sous-catégorie
@@ -483,6 +498,17 @@ export default function SearchScreen({ navigation }: any) {
       filtered = filtered.filter(product => product.condition === selectedCondition);
     }
     
+    // Filtrer par type de vendeur
+    if (sellerType) {
+      filtered = filtered.filter(product => {
+        if (sellerType === 'professional') {
+          return product.user_type === 'professional' || product.user?.is_professional === true;
+        } else {
+          return product.user_type !== 'professional' && product.user?.is_professional !== true;
+        }
+      });
+    }
+    
     // Filtrer par plage de prix
     filtered = filtered.filter(product => 
       product.price >= priceRange[0] && product.price <= priceRange[1]
@@ -491,12 +517,15 @@ export default function SearchScreen({ navigation }: any) {
     setFilteredProducts(filtered);
     setShowAdvancedSearch(false);
     
+    // Animation de fermeture
+    Animated.timing(expandAnimation, {
+      toValue: 0,
+      duration: 300,
+      useNativeDriver: false
+    }).start();
+    
     // Afficher des statistiques pour aider au débogage
     console.log(`Filtres appliqués - Résultats: ${filtered.length}/${products.length} produits`);
-    if (selectedCategory) {
-      const categoryName = categories.find(c => c.id === selectedCategory)?.name || 'Inconnu';
-      console.log(`Filtre par catégorie: ${categoryName} (ID: ${selectedCategory})`);
-    }
   };
 
   const resetFilters = () => {
@@ -505,6 +534,9 @@ export default function SearchScreen({ navigation }: any) {
     setSelectedSize(null);
     setSelectedCondition(null);
     setPriceRange([0, 1000]);
+    setMinPrice('0');
+    setMaxPrice('1000');
+    setSellerType(null);
     
     // Appliquer juste la recherche par texte
     if (searchQuery.trim()) {
@@ -514,6 +546,13 @@ export default function SearchScreen({ navigation }: any) {
     }
     
     setShowAdvancedSearch(false);
+    
+    // Animation de fermeture
+    Animated.timing(expandAnimation, {
+      toValue: 0,
+      duration: 300,
+      useNativeDriver: false
+    }).start();
   };
 
   const showSelectionModal = (type: string) => {
@@ -618,6 +657,15 @@ export default function SearchScreen({ navigation }: any) {
     );
   };
 
+  // Mise à jour pour l'animation lors de l'ouverture/fermeture des filtres avancés
+  useEffect(() => {
+    Animated.timing(expandAnimation, {
+      toValue: showAdvancedSearch ? 1 : 0,
+      duration: 300,
+      useNativeDriver: false
+    }).start();
+  }, [showAdvancedSearch]);
+
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
@@ -650,7 +698,17 @@ export default function SearchScreen({ navigation }: any) {
       </View>
       
       {showAdvancedSearch && (
-        <ScrollView style={styles.filtersContainer}>
+        <Animated.ScrollView 
+          style={[
+            styles.filtersContainer,
+            {
+              maxHeight: expandAnimation.interpolate({
+                inputRange: [0, 1],
+                outputRange: [0, 500]
+              })
+            }
+          ]}
+        >
           <View style={styles.filterSection}>
             <Text style={styles.filterTitle}>Catégorie</Text>
             <TouchableOpacity 
@@ -718,33 +776,76 @@ export default function SearchScreen({ navigation }: any) {
           </View>
           
           <View style={styles.filterSection}>
-            <Text style={styles.filterTitle}>Prix</Text>
-            <View style={styles.priceRangeContainer}>
-              <Text style={styles.priceValue}>{priceRange[0]}€</Text>
-              <Text style={styles.priceValue}>{priceRange[1]}€</Text>
+            <Text style={styles.filterTitle}>Type de vendeur</Text>
+            <View style={styles.radioContainer}>
+              <TouchableOpacity
+                style={styles.radioButton}
+                onPress={() => setSellerType(null)}
+              >
+                <RadioButton
+                  value="all"
+                  status={sellerType === null ? 'checked' : 'unchecked'}
+                  onPress={() => setSellerType(null)}
+                  color="#6B3CE9"
+                />
+                <Text style={styles.radioLabel}>Tous</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity
+                style={styles.radioButton}
+                onPress={() => setSellerType('professional')}
+              >
+                <RadioButton
+                  value="professional"
+                  status={sellerType === 'professional' ? 'checked' : 'unchecked'}
+                  onPress={() => setSellerType('professional')}
+                  color="#6B3CE9"
+                />
+                <Text style={styles.radioLabel}>Professionnel</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity
+                style={styles.radioButton}
+                onPress={() => setSellerType('individual')}
+              >
+                <RadioButton
+                  value="individual"
+                  status={sellerType === 'individual' ? 'checked' : 'unchecked'}
+                  onPress={() => setSellerType('individual')}
+                  color="#6B3CE9"
+                />
+                <Text style={styles.radioLabel}>Particulier</Text>
+              </TouchableOpacity>
             </View>
-            <Slider
-              style={{ width: '100%', height: 40 }}
-              minimumValue={0}
-              maximumValue={1000}
-              step={10}
-              value={priceRange[0]}
-              minimumTrackTintColor="#6B3CE9"
-              maximumTrackTintColor="#d3d3d3"
-              thumbTintColor="#6B3CE9"
-              onValueChange={(value) => setPriceRange([value, priceRange[1]])}
-            />
-            <Slider
-              style={{ width: '100%', height: 40 }}
-              minimumValue={0}
-              maximumValue={1000}
-              step={10}
-              value={priceRange[1]}
-              minimumTrackTintColor="#6B3CE9"
-              maximumTrackTintColor="#d3d3d3"
-              thumbTintColor="#6B3CE9"
-              onValueChange={(value) => setPriceRange([priceRange[0], value])}
-            />
+          </View>
+          
+          <View style={styles.filterSection}>
+            <Text style={styles.filterTitle}>Prix</Text>
+            <View style={styles.priceInputContainer}>
+              <View style={styles.priceInputWrapper}>
+                <Text style={styles.priceInputLabel}>Min</Text>
+                <TextInput 
+                  style={styles.priceInput}
+                  keyboardType="numeric"
+                  placeholder="0"
+                  value={minPrice}
+                  onChangeText={setMinPrice}
+                />
+                <Text style={styles.euroSymbol}>€</Text>
+              </View>
+              <View style={styles.priceInputDivider} />
+              <View style={styles.priceInputWrapper}>
+                <Text style={styles.priceInputLabel}>Max</Text>
+                <TextInput 
+                  style={styles.priceInput}
+                  keyboardType="numeric"
+                  placeholder="1000"
+                  value={maxPrice}
+                  onChangeText={setMaxPrice}
+                />
+                <Text style={styles.euroSymbol}>€</Text>
+              </View>
+            </View>
           </View>
           
           <View style={styles.filterButtons}>
@@ -763,7 +864,7 @@ export default function SearchScreen({ navigation }: any) {
               Appliquer
             </Button>
           </View>
-        </ScrollView>
+        </Animated.ScrollView>
       )}
       
       <FlatList
@@ -863,15 +964,40 @@ const styles = StyleSheet.create({
     color: '#999',
     fontSize: 15,
   },
-  priceRangeContainer: {
+  priceInputContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 5,
+    alignItems: 'center',
   },
-  priceValue: {
-    fontSize: 15,
+  priceInputWrapper: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 8,
+    padding: 10,
+    backgroundColor: '#fff',
+  },
+  priceInputLabel: {
+    fontSize: 14,
+    color: '#666',
+    marginRight: 5,
+  },
+  priceInput: {
+    flex: 1,
+    fontSize: 16,
     color: '#333',
-    fontWeight: '500',
+    textAlign: 'right',
+    padding: 0,
+  },
+  euroSymbol: {
+    fontSize: 16,
+    color: '#333',
+    marginLeft: 5,
+  },
+  priceInputDivider: {
+    width: 15,
   },
   filterButtons: {
     flexDirection: 'row',
@@ -943,5 +1069,18 @@ const styles = StyleSheet.create({
     padding: 20,
     textAlign: 'center',
     color: '#999',
+  },
+  radioContainer: {
+    marginVertical: 8,
+  },
+  radioButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginVertical: 4,
+  },
+  radioLabel: {
+    marginLeft: 8,
+    fontSize: 15,
+    color: '#333',
   },
 }); 

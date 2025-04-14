@@ -35,6 +35,11 @@ export default function RegisterScreen({ navigation }: Props) {
       return;
     }
 
+    if (name.length < 3) {
+      setError('Le nom doit contenir au moins 3 caractères');
+      return;
+    }
+
     if (password.length < 8) {
       setError('Le mot de passe doit contenir au moins 8 caractères');
       return;
@@ -42,6 +47,11 @@ export default function RegisterScreen({ navigation }: Props) {
 
     if (password !== passwordConfirmation) {
       setError('Les mots de passe ne correspondent pas');
+      return;
+    }
+
+    if (userType === 'professionnel' && !siret) {
+      setError('Le numéro de SIRET est obligatoire pour les professionnels');
       return;
     }
 
@@ -53,6 +63,7 @@ export default function RegisterScreen({ navigation }: Props) {
         email,
         password,
         username: name,
+        name: name, // Ajout du champ name pour le backend
         password_confirmation: passwordConfirmation,
         ...(userType === 'professionnel' && { siret }),
         user_type: userType
@@ -67,7 +78,15 @@ export default function RegisterScreen({ navigation }: Props) {
       }
     } catch (err: any) {
       console.error('Erreur inscription:', err.response?.data || err.message);
-      setError(err.response?.data?.message || 'Erreur lors de l\'inscription');
+      
+      // Gestion détaillée des erreurs de validation
+      if (err.response?.data?.errors) {
+        const errors = err.response.data.errors;
+        const errorMessages = Object.values(errors).flat().join('\n');
+        setError(errorMessages);
+      } else {
+        setError(err.response?.data?.message || 'Erreur lors de l\'inscription');
+      }
     } finally {
       setLoading(false);
     }

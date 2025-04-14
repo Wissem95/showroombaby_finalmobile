@@ -20,13 +20,20 @@ const API_URL = process.env.NODE_ENV === 'development' || __DEV__
 const DEFAULT_IMAGE_URL = 'https://placehold.co/400x300/f8bbd0/ffffff?text=Showroom+Baby';
 const BANNER_IMAGE_URL = require('../../assets/images/IMG_3139-Photoroom.png');
 
-// Catégories à afficher
+// Catégories à afficher avec leurs images correspondantes
 const categories = [
-  { id: 0, name: 'Tendance' },
-  { id: -1, name: 'Tous les produits' },
-  { id: 1, name: 'Siège auto' },
-  { id: 2, name: 'Chambre' },
-  { id: 3, name: 'Chaussure' },
+  { id: 0, name: 'Tendance', image: require('../../assets/images/2151157112.jpg') },                       // Cuillère bol repas pour bébé
+  { id: -1, name: 'Tous les produits', image: require('../../assets/images/IMG_3006-Photoroom.png') },     // Chambre
+  { id: 1, name: 'Poussette', image: require('../../assets/images/IMG_3127-Photoroom.png') },              // Poussette
+  { id: 2, name: 'Sièges auto', image: require('../../assets/images/Capture_decran_._2025-02-09_a_21.35.01.jpg') },            // Vêtement bébé (petit train avec fumée)
+  { id: 3, name: 'Chambre', image: require('../../assets/images/IMG_3139-Photoroom.png') },                          // Chaussure bébé
+  { id: 4, name: 'Chaussure / Vêtements', image: require('../../assets/images/IMG_3006-Photoroom.png') },  // Poussette noire (image connexion)
+  { id: 5, name: 'Jeux / Éveil', image: require('../../assets/images/2151157112.jpg') },    // Canapé avec nuages
+  { id: 6, name: 'Livre / Dvd', image: require('../../assets/images/IMG_3119.jpg') },                    // Cuillère bol repas pour bébé (même que Tendance)
+  { id: 7, name: 'Toilette', image: require('../../assets/images/IMG_3129.jpg') },                         // Baignoire avec mousse
+  { id: 8, name: 'Repas', image: require('../../assets/images/IMG_3132-Photoroom.png') },                  // Petit train avec fumée
+  { id: 9, name: 'Sortie', image: require('../../assets/images/IMG_3119.jpg') },                           // Livre avec nuage
+  { id: 10, name: 'Service', image: require('../../assets/images/Votre_texte_de_paragraphe.png.png') }, // Siège auto
 ];
 
 interface Product {
@@ -321,10 +328,19 @@ export default function HomeScreen({ navigation }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [selectedCategory, setSelectedCategory] = useState(0);
   const [searchQuery, setSearchQuery] = useState('');
+  const [backgroundImage, setBackgroundImage] = useState(categories[0].image);
 
   useEffect(() => {
     fetchProducts();
   }, []);
+  
+  // Mettre à jour l'image de fond lorsque la catégorie change
+  useEffect(() => {
+    const selectedCat = categories.find(cat => cat.id === selectedCategory);
+    if (selectedCat && selectedCat.image) {
+      setBackgroundImage(selectedCat.image);
+    }
+  }, [selectedCategory]);
 
   const fetchProducts = async () => {
     setIsLoading(true);
@@ -344,6 +360,12 @@ export default function HomeScreen({ navigation }: Props) {
 
   const handleCategorySelect = (selectedId: number) => {
     setSelectedCategory(selectedId);
+    
+    // Changer l'image de fond
+    const selectedCat = categories.find(cat => cat.id === selectedId);
+    if (selectedCat && selectedCat.image) {
+      setBackgroundImage(selectedCat.image);
+    }
     
     // Filtrer les produits en fonction de la catégorie sélectionnée
     if (selectedId === 0) {
@@ -479,7 +501,7 @@ export default function HomeScreen({ navigation }: Props) {
     <View style={styles.container}>
       <View style={styles.headerSection}>
         <Image 
-          source={require('../../assets/images/IMG_3139-Photoroom.png')}
+          source={backgroundImage}
           style={styles.backgroundImage}
           resizeMode="cover"
         />

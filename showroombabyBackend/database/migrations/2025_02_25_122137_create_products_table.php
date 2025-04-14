@@ -26,6 +26,7 @@ return new class extends Migration
             $table->string('city')->nullable();
             $table->string('zipCode')->nullable();
             $table->string('phone')->nullable();
+            $table->boolean('hide_phone')->default(false);
 
             // Relations
             $table->foreignId('category_id')->constrained()->onDelete('cascade');

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, StyleSheet, ScrollView, Image, TouchableOpacity, TextInput, Switch, Alert, ActivityIndicator, Modal, FlatList, Platform } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Image, TouchableOpacity, TextInput, Switch, Alert, ActivityIndicator, Modal, FlatList, Platform, KeyboardAvoidingView, Keyboard } from 'react-native';
 import { Button, Card, Checkbox, Divider, HelperText, Searchbar } from 'react-native-paper';
 import { Ionicons, MaterialIcons, Entypo, AntDesign } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
@@ -23,7 +23,7 @@ type Category = {
   subcategories?: { id: number; name: string }[];
 };
 
-type ProductData = {
+interface ProductData {
   title: string;
   description: string;
   price: string;
@@ -36,9 +36,12 @@ type ProductData = {
   location: string;
   telephone: string;
   hide_phone: boolean;
-  images: any[];
+  images: { uri: string; type: string; name: string }[];
   user_id: number | null;
-};
+  zipCode: string;
+  brand: string | null;
+  is_professional: boolean;
+}
 
 enum Step {
   INFOS_BASE = 0,
@@ -255,6 +258,9 @@ export default function AjouterProduitScreen({ navigation, route }: any) {
     hide_phone: false,
     images: [],
     user_id: null,
+    zipCode: '',
+    brand: null,
+    is_professional: false,
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [locationPermission, setLocationPermission] = useState<boolean | null>(null);
@@ -300,6 +306,9 @@ export default function AjouterProduitScreen({ navigation, route }: any) {
           hide_phone: false,
           images: [],
           user_id: null,
+          zipCode: '',
+          brand: null,
+          is_professional: false,
         });
         setCurrentStep(Step.INFOS_BASE);
         setErrors({});
@@ -498,54 +507,51 @@ export default function AjouterProduitScreen({ navigation, route }: any) {
     setProductData(prev => ({ ...prev, images: newImages }));
   };
 
-  const validateStep = useCallback((): boolean => {
-    const newErrors: Record<string, string> = {};
+  const validateStep = React.useCallback(() => {
+    const newErrors = {} as Record<string, string>;
     
     switch (currentStep) {
       case Step.INFOS_BASE:
-        if (!productData.title?.trim()) {
+        if (!productData.title) {
           newErrors.title = 'Veuillez saisir un titre.';
-        } else if (productData.title.length < 3) {
-          newErrors.title = 'Le titre doit contenir au moins 3 caractères.';
         }
         if (!productData.category_id) {
           newErrors.category = 'Veuillez sélectionner une catégorie.';
         }
         break;
-        
       case Step.DESCRIPTION_PRIX:
-        if (!productData.price?.trim()) {
-          newErrors.price = 'Veuillez indiquer un prix.';
-        } else if (isNaN(Number(productData.price)) || Number(productData.price) <= 0) {
-          newErrors.price = 'Veuillez saisir un prix valide.';
+        if (!productData.description) {
+          newErrors.description = 'Veuillez saisir une description.';
         }
-        if (!productData.description?.trim()) {
-          newErrors.description = 'Veuillez ajouter une description.';
-        } else if (productData.description.length < 20) {
-          newErrors.description = 'La description doit contenir au moins 20 caractères.';
+        if (!productData.price) {
+          newErrors.price = 'Veuillez saisir un prix.';
+        } else if (isNaN(parseFloat(productData.price))) {
+          newErrors.price = 'Le prix doit être un nombre.';
         }
         break;
-      
       case Step.FACTURE_GARANTIE:
-        if (!productData.condition?.trim()) {
-          newErrors.condition = 'Veuillez sélectionner l\'état du produit.';
+        if (!productData.condition) {
+          newErrors.condition = 'Veuillez sélectionner un état.';
         }
         break;
-        
       case Step.PHOTOS:
-        if (productData.images.length === 0) {
+        if (!productData.images || productData.images.length === 0) {
           newErrors.images = 'Veuillez ajouter au moins une photo.';
         }
         break;
-        
       case Step.LOCATION:
-        if (!productData.location?.trim()) {
-          newErrors.location = 'Veuillez indiquer la localisation du produit.';
+        if (!productData.location) {
+          newErrors.location = 'Veuillez saisir une adresse.';
         }
-        if (!productData.telephone?.trim()) {
-          newErrors.telephone = 'Veuillez saisir votre numéro de téléphone.';
-        } else if (!/^[0-9]{10}$/.test(productData.telephone.trim())) {
-          newErrors.telephone = 'Numéro de téléphone invalide (10 chiffres)';
+        if (!productData.zipCode) {
+          newErrors.zipCode = 'Veuillez saisir un code postal.';
+        } else if (!/^\d{5}$/.test(productData.zipCode)) {
+          newErrors.zipCode = 'Le code postal doit contenir 5 chiffres.';
+        }
+        if (!productData.telephone) {
+          newErrors.telephone = 'Veuillez saisir un numéro de téléphone.';
+        } else if (!/^\d{10}$/.test(productData.telephone)) {
+          newErrors.telephone = 'Le numéro de téléphone doit contenir 10 chiffres.';
         }
         if (!termsAccepted) {
           newErrors.terms = 'Veuillez accepter les conditions générales.';
@@ -591,13 +597,43 @@ export default function AjouterProduitScreen({ navigation, route }: any) {
       formData.append('description', productData.description);
       formData.append('price', productData.price);
       formData.append('condition', productData.condition);
-      formData.append('categoryId', productData.category_id?.toString() || '');
-      formData.append('latitude', '48.8566');
-      formData.append('longitude', '2.3522');
+      
+      if (productData.size) {
+        formData.append('size', productData.size);
+      }
+      
+      if (productData.color) {
+        formData.append('color', productData.color);
+      }
+      
+      if (productData.warranty) {
+        formData.append('warranty', productData.warranty);
+      }
+      
+      if (productData.category_id) {
+        formData.append('category_id', productData.category_id.toString());
+      }
+      
+      if (productData.subcategory_id) {
+        formData.append('subcategory_id', productData.subcategory_id.toString());
+      }
+      
       formData.append('address', productData.location);
-      formData.append('city', productData.location.split(',')[0] || 'Paris');
-      formData.append('zipCode', productData.location.split(',')[1]?.trim() || '75000');
+      
+      // Extraire la ville à partir de l'adresse
+      const locationParts = productData.location.split(',');
+      const city = locationParts[0]?.trim() || 'Paris';
+      
+      formData.append('city', city);
+      formData.append('zipCode', productData.zipCode);
       formData.append('phone', productData.telephone);
+      formData.append('hide_phone', productData.hide_phone ? '1' : '0');
+      formData.append('is_professional', productData.is_professional ? '1' : '0');
+      
+      // Ajout de la marque si elle est définie
+      if (productData.brand) {
+        formData.append('brand', productData.brand);
+      }
 
       // Ajout des images
       if (productData.images && productData.images.length > 0) {
@@ -691,7 +727,7 @@ export default function AjouterProduitScreen({ navigation, route }: any) {
         warranty: product.warranty || '',
         category_id: product.category_id || null,
         subcategory_id: product.subcategory_id || null,
-        location: product.city ? `${product.city}, ${product.zip_code}` : '',
+        location: product.city ? `${product.city}, ${product.zipCode}` : '',
         telephone: product.phone || '',
         hide_phone: product.hide_phone || false,
         images: product.images?.map((img: any) => ({
@@ -700,6 +736,9 @@ export default function AjouterProduitScreen({ navigation, route }: any) {
           name: 'photo.jpg'
         })) || [],
         user_id: product.user_id || null,
+        zipCode: product.zipCode || '',
+        brand: product.brand || null,
+        is_professional: product.is_professional || false,
       });
     } catch (error) {
       console.error('Erreur lors de la récupération du produit:', error);
@@ -837,8 +876,7 @@ export default function AjouterProduitScreen({ navigation, route }: any) {
         setProductData(prev => ({ ...prev, color: label }));
         break;
       case 'brand':
-        const brand = BRANDS.find(b => b.id === parseInt(value));
-        setProductData(prev => ({ ...prev, brand: brand ? brand.name : null }));
+        setProductData(prev => ({ ...prev, brand: label }));
         break;
     }
     setModalVisible(null);
@@ -848,18 +886,18 @@ export default function AjouterProduitScreen({ navigation, route }: any) {
     setProductData(prev => ({
       ...prev,
       location: `${address.street || ''} ${address.city || ''}`.trim(),
+      zipCode: address.postalCode || prev.zipCode || '',
       city: address.city || '',
-      zip_code: address.postalCode || '',
       latitude: address.latitude,
       longitude: address.longitude
     }));
   };
 
   const renderPhotoStep = () => (
-    <View style={styles.stepContainer}>
+    <View style={styles.pageContainer}>
       <Text style={styles.stepTitle}>Ajoutez des photos</Text>
       <Text style={styles.stepDescription}>
-        Sélectionnez vos plus belles photos afin de mettre en valeur votre produit :
+        Des photos de qualité augmentent vos chances de vendre rapidement. Ajoutez jusqu'à 5 images.
       </Text>
       
       <View style={styles.photosGrid}>
@@ -888,10 +926,10 @@ export default function AjouterProduitScreen({ navigation, route }: any) {
   );
 
   const renderLocationStep = () => (
-    <View style={styles.stepContainer}>
+    <View style={styles.pageContainer}>
       <Text style={styles.stepTitle}>Où se situe votre bien</Text>
       <Text style={styles.stepDescription}>
-        Ne vous inquiétez pas votre adresse personnelle reste confidentielle :
+        Indiquez l'adresse et vos coordonnées. Votre adresse personnelle restera confidentielle.
       </Text>
       
       <View style={styles.mapPreview}>
@@ -908,17 +946,37 @@ export default function AjouterProduitScreen({ navigation, route }: any) {
         style={styles.addressAutocomplete}
       />
       <Text style={styles.inputHint}>
-        Format recommandé: Rue, Ville, Code Postal
+        Format recommandé: Rue, Ville
       </Text>
       {errors.location && <Text style={styles.errorText}>{errors.location}</Text>}
+      
+      <Text style={styles.inputLabel}>Code postal</Text>
+      <TextInput
+        style={styles.input}
+        placeholder="Code postal"
+        keyboardType="number-pad"
+        value={productData.zipCode}
+        onChangeText={(text) => {
+          // Ne garder que les chiffres et limiter à 5
+          const postalCode = text.replace(/[^0-9]/g, '').slice(0, 5);
+          setProductData(prev => ({ ...prev, zipCode: postalCode }));
+        }}
+        maxLength={5}
+      />
+      {errors.zipCode && <Text style={styles.errorText}>{errors.zipCode}</Text>}
       
       <Text style={styles.inputLabel}>Téléphone</Text>
       <TextInput
         style={styles.input}
-        placeholder="Numéro de téléphone"
+        placeholder="Numéro de téléphone (10 chiffres)"
         keyboardType="phone-pad"
         value={productData.telephone}
-        onChangeText={(text) => setProductData(prev => ({ ...prev, telephone: text }))}
+        onChangeText={(text) => {
+          // Ne garder que les chiffres et limiter à 10
+          const phoneNumber = text.replace(/[^0-9]/g, '').slice(0, 10);
+          setProductData(prev => ({ ...prev, telephone: phoneNumber }));
+        }}
+        maxLength={10}
       />
       {errors.telephone && <Text style={styles.errorText}>{errors.telephone}</Text>}
       
@@ -970,8 +1028,11 @@ export default function AjouterProduitScreen({ navigation, route }: any) {
   // Création de la nouvelle étape pour les informations de base
   const renderInfosBaseStep = () => {
     return (
-      <View style={styles.stepContent}>
+      <View style={styles.pageContainer}>
         <Text style={styles.stepTitle}>Informations du produit</Text>
+        <Text style={styles.stepDescription}>
+          Commencez par renseigner les informations essentielles de votre produit.
+        </Text>
         
         <Text style={styles.inputLabel}>Titre de votre annonce</Text>
         <TextInput
@@ -1018,8 +1079,8 @@ export default function AjouterProduitScreen({ navigation, route }: any) {
           style={styles.selectButton}
           onPress={() => setModalVisible('brand')}
         >
-          <Text style={styles.selectPlaceholder}>
-            Sélectionnez une marque
+          <Text style={productData.brand ? styles.selectText : styles.selectPlaceholder}>
+            {productData.brand ? productData.brand : 'Sélectionnez une marque (optionnel)'}
           </Text>
           <MaterialIcons name="arrow-drop-down" size={24} color="#999" />
         </TouchableOpacity>
@@ -1030,8 +1091,11 @@ export default function AjouterProduitScreen({ navigation, route }: any) {
   // Étape de description et prix
   const renderDescriptionPrixStep = () => {
     return (
-      <View style={styles.stepContent}>
+      <View style={styles.pageContainer}>
         <Text style={styles.stepTitle}>Description et prix</Text>
+        <Text style={styles.stepDescription}>
+          Donnez plus de détails sur votre produit pour aider les acheteurs à mieux le comprendre.
+        </Text>
         
         <Text style={styles.inputLabel}>Prix (€)</Text>
         <TextInput
@@ -1060,8 +1124,11 @@ export default function AjouterProduitScreen({ navigation, route }: any) {
   // Étape facture, garantie, état
   const renderFactureGarantieStep = () => {
     return (
-      <View style={styles.stepContent}>
+      <View style={styles.pageContainer}>
         <Text style={styles.stepTitle}>Détails supplémentaires</Text>
+        <Text style={styles.stepDescription}>
+          Ces informations aideront les acheteurs à connaître l'état et les garanties de votre produit.
+        </Text>
         
         <Text style={styles.inputLabel}>Facture d'achat</Text>
         <TouchableOpacity
@@ -1163,7 +1230,11 @@ export default function AjouterProduitScreen({ navigation, route }: any) {
   }
 
   return (
-    <View style={styles.container}>
+    <KeyboardAvoidingView 
+      style={styles.container}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 80 : 0}
+    >
       <StatusBar style="dark" />
       
       <View style={styles.header}>
@@ -1173,11 +1244,11 @@ export default function AjouterProduitScreen({ navigation, route }: any) {
         
         <Text style={styles.headerTitle}>
           {productId ? 'Modifier l\'annonce' : 
-          currentStep === Step.INFOS_BASE ? 'Publier' :
+          currentStep === Step.INFOS_BASE ? 'Informations produit' :
           currentStep === Step.DESCRIPTION_PRIX ? 'Description et prix' :
-          currentStep === Step.FACTURE_GARANTIE ? 'Publier' :
-          currentStep === Step.PHOTOS ? 'Ajouter des photos' :
-          'Localisation'}
+          currentStep === Step.FACTURE_GARANTIE ? 'État et garantie' :
+          currentStep === Step.PHOTOS ? 'Photos du produit' :
+          'Localisation et contact'}
         </Text>
         
         <TouchableOpacity style={styles.closeButton} onPress={handleClosePress}>
@@ -1189,7 +1260,7 @@ export default function AjouterProduitScreen({ navigation, route }: any) {
         <View 
           style={[
             styles.progressIndicator, 
-            { width: `${(currentStep + 1) * 25}%` }
+            { width: `${(currentStep + 1) * 20}%` }
           ]} 
         />
       </View>
@@ -1212,30 +1283,31 @@ export default function AjouterProduitScreen({ navigation, route }: any) {
         style={styles.scrollView} 
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
       >
         {renderCurrentStep()}
-      </ScrollView>
-      
-      <View style={styles.buttonContainer}>
-        {currentStep > 0 && (
-          <TouchableOpacity 
-            style={[styles.button, styles.secondaryButton]} 
-            onPress={handleBackPress}
-          >
-            <Text style={styles.secondaryButtonText}>Retour</Text>
-          </TouchableOpacity>
-        )}
         
-        <TouchableOpacity 
-          style={[styles.button, styles.primaryButton]} 
-          onPress={currentStep === Step.LOCATION ? submitProduct : handleNext}
-          disabled={isLoading}
-        >
-          <Text style={styles.buttonText}>
-            {getButtonLabel()}
-          </Text>
-        </TouchableOpacity>
-      </View>
+        <View style={styles.buttonContainer}>
+          {currentStep > 0 && (
+            <TouchableOpacity 
+              style={[styles.button, styles.secondaryButton]} 
+              onPress={handleBackPress}
+            >
+              <Text style={styles.secondaryButtonText}>Retour</Text>
+            </TouchableOpacity>
+          )}
+          
+          <TouchableOpacity 
+            style={[styles.button, styles.primaryButton]} 
+            onPress={currentStep === Step.LOCATION ? submitProduct : handleNext}
+            disabled={isLoading}
+          >
+            <Text style={styles.buttonText}>
+              {getButtonLabel()}
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </ScrollView>
 
       {showSelectionModal()}
 
@@ -1244,7 +1316,7 @@ export default function AjouterProduitScreen({ navigation, route }: any) {
           <ActivityIndicator size="large" color="#E75A7C" />
         </View>
       )}
-    </View>
+    </KeyboardAvoidingView>
   );
 }
 
@@ -1255,17 +1327,17 @@ const styles = StyleSheet.create({
   },
   scrollView: {
     flex: 1,
-    paddingBottom: 80, // Espace pour le bouton en bas
   },
   scrollContent: {
-    paddingBottom: 20,
+    padding: 16,
+    paddingBottom: Platform.OS === 'ios' ? 50 : 30,
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
-    paddingTop: Platform.OS === 'ios' ? 50 : 12, // Ajout de padding supplémentaire pour iOS
+    paddingTop: Platform.OS === 'ios' ? 50 : 16,
     paddingBottom: 12,
     borderBottomWidth: 1,
     borderBottomColor: '#eee',
@@ -1275,15 +1347,16 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 2,
+    zIndex: 10,
   },
   backButton: {
     padding: 8,
-    width: 40, // Largeur fixe pour aligner
+    width: 40,
     alignItems: 'center',
   },
   closeButton: {
     padding: 8,
-    width: 40, // Largeur fixe pour aligner
+    width: 40,
     alignItems: 'center',
   },
   headerTitle: {
@@ -1292,27 +1365,35 @@ const styles = StyleSheet.create({
     color: '#000',
     flex: 1,
     textAlign: 'center',
-    marginHorizontal: 8, // Espacement entre le titre et les boutons
+    marginHorizontal: 8,
   },
   stepContainer: {
-    padding: 16,
     backgroundColor: '#fff',
+    marginBottom: 16,
+  },
+  pageContainer: {
+    backgroundColor: '#fff',
+    marginBottom: 16,
+    paddingVertical: 10,
+    minHeight: '70%',
   },
   stepTitle: {
-    fontSize: 22,
+    fontSize: 24,
     fontWeight: 'bold',
-    marginBottom: 8,
+    marginBottom: 12,
     color: '#333',
   },
   stepDescription: {
     fontSize: 16,
     color: '#666',
     marginBottom: 24,
+    lineHeight: 22,
   },
   photosGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     marginHorizontal: -8,
+    marginBottom: 16,
   },
   photoContainer: {
     width: '33%',
@@ -1387,16 +1468,17 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
   },
   textArea: {
-    height: 100,
+    height: 120,
     textAlignVertical: 'top',
     paddingTop: 12,
+    paddingBottom: 12,
   },
   switchContainer: {
     flexDirection: 'row',
-    alignItems: 'center',
     justifyContent: 'space-between',
-    marginTop: 16,
-    paddingVertical: 8,
+    alignItems: 'center',
+    marginVertical: 15,
+    paddingHorizontal: 5,
   },
   switchLabel: {
     fontSize: 16,
@@ -1432,22 +1514,22 @@ const styles = StyleSheet.create({
   buttonContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    padding: 16,
-    backgroundColor: '#fff',
-    borderTopWidth: 1,
-    borderTopColor: '#ddd',
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
+    marginTop: 24,
+    marginBottom: 16,
+    width: '100%',
   },
   button: {
     borderRadius: 8,
-    paddingVertical: 12,
+    paddingVertical: 14,
     paddingHorizontal: 20,
     minWidth: '45%',
     alignItems: 'center',
     justifyContent: 'center',
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 1,
   },
   primaryButton: {
     backgroundColor: '#E75A7C',

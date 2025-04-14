@@ -2,7 +2,7 @@ import React from 'react';
 import { StyleSheet, View, TouchableOpacity, Image, Dimensions } from 'react-native';
 import { Text, Card, Surface } from 'react-native-paper';
 import { widthPercentageToDP as wp } from 'react-native-responsive-screen';
-import { Ionicons } from '@expo/vector-icons';
+import { Ionicons, MaterialIcons } from '@expo/vector-icons';
 
 // Image placeholder
 const placeholderImage = require('../../assets/placeholder.png');
@@ -26,6 +26,12 @@ interface ProductItemProps {
     images?: string | string[] | { path: string; url?: string }[] | any[] | null;
     city?: string;
     created_at: string;
+    user_type?: string;
+    user?: {
+      id: number;
+      name?: string;
+      is_professional?: boolean;
+    };
   };
   navigation: any;
 }
@@ -157,6 +163,12 @@ const ProductItem: React.FC<ProductItemProps> = ({ item, navigation }) => {
     }
   };
 
+  // Vérifier si le vendeur est professionnel
+  const isProfessional = () => {
+    return item.user_type === 'professional' || 
+           item.user?.is_professional === true;
+  };
+
   return (
     <TouchableOpacity 
       style={styles.cardContainer}
@@ -174,6 +186,13 @@ const ProductItem: React.FC<ProductItemProps> = ({ item, navigation }) => {
               <Text style={styles.conditionText}>{getConditionLabel()}</Text>
             </View>
           )}
+          
+          {/* Badge Pro/Particulier */}
+          <View style={[styles.sellerBadge, isProfessional() ? styles.proBadge : styles.particulierBadge]}>
+            <Text style={styles.sellerBadgeText}>
+              {isProfessional() ? 'Pro' : 'Part.'}
+            </Text>
+          </View>
         </View>
         
         <View style={styles.contentContainer}>
@@ -276,6 +295,27 @@ const styles = StyleSheet.create({
   },
   conditionFair: {
     backgroundColor: '#FF9800',
+  },
+  // Styles pour les badges vendeur Pro/Particulier
+  sellerBadge: {
+    position: 'absolute',
+    top: 5,
+    right: 5,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 4,
+    backgroundColor: '#fff',
+  },
+  proBadge: {
+    backgroundColor: '#6B3CE9',
+  },
+  particulierBadge: {
+    backgroundColor: '#607D8B',
+  },
+  sellerBadgeText: {
+    fontSize: 10,
+    fontWeight: 'bold',
+    color: '#fff',
   },
 });
 
