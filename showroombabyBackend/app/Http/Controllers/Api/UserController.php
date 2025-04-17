@@ -145,6 +145,22 @@ class UserController extends Controller
         // On ne renvoie pas le mot de passe
         $user->makeHidden(['password']);
 
-        return response()->json($user);
+        // Formater la réponse pour inclure toutes les informations utiles
+        $response = [
+            'status' => 'success',
+            'data' => [
+                'id' => $user->id,
+                'name' => $user->name,
+                'username' => $user->username ?: $user->name,
+                'email' => $user->email,
+                'avatar' => $user->avatar,
+                'firstName' => $user->firstName,
+                'lastName' => $user->lastName,
+                'rating' => $user->rating ?: 0,
+                'created_at' => $user->created_at,
+            ]
+        ];
+
+        return response()->json($response);
     }
 }

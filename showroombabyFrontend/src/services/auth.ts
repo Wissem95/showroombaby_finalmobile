@@ -1,11 +1,11 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
+import { SERVER_IP } from '../config/ip';
 
 // Utiliser l'adresse IP du réseau local plutôt que localhost pour les tests sur appareil physique
 // Pour les appareils externes, utiliser votre adresse IP locale au lieu de 127.0.0.1
-// Exemple: "http://192.168.1.X:8000/api" où X est votre numéro d'IP
 const API_URL = process.env.NODE_ENV === 'development' || __DEV__ 
-  ? 'http://172.20.10.2:8000/api'  // Adresse IP locale de l'utilisateur
+  ? `http://${SERVER_IP}:8000/api`  // Adresse IP locale chargée depuis la configuration
   : 'https://api.showroombaby.com/api';  // URL de production
 
 // Configuration d'Axios pour déboguer les requêtes

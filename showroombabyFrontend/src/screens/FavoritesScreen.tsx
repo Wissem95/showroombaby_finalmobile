@@ -25,7 +25,7 @@ import { PanGestureHandler, State, PanGestureHandlerStateChangeEvent, GestureHan
 // URL de l'API
 // Pour les appareils externes, utiliser votre adresse IP locale au lieu de 127.0.0.1
 const API_URL = process.env.NODE_ENV === 'development' || __DEV__ 
-  ? 'http://172.20.10.2:8000'  // Adresse IP locale de l'utilisateur
+  ? 'http://192.168.0.34:8000/api'  // Adresse IP locale de l'utilisateur
   : 'https://api.showroombaby.com';
 
 // Importer l'image placeholder directement
@@ -83,7 +83,7 @@ export default function FavoritesScreen({ navigation }: any) {
         return;
       }
       
-      const response = await axios.get(`${API_URL}/api/favorites`, {
+      const response = await axios.get(`${API_URL}/favorites`, {
         headers: { Authorization: `Bearer ${token}` },
         timeout: 10000 // Ajouter un timeout pour éviter les attentes infinies
       });
@@ -169,7 +169,7 @@ export default function FavoritesScreen({ navigation }: any) {
         return;
       }
       
-      await axios.delete(`${API_URL}/api/favorites/${productId}`, {
+      await axios.delete(`${API_URL}/favorites/${productId}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       

@@ -12,7 +12,7 @@ import { Animated } from 'react-native';
 // URL de l'API
 // Pour les appareils externes, utiliser votre adresse IP locale au lieu de 127.0.0.1
 const API_URL = process.env.NODE_ENV === 'development' || __DEV__ 
-  ? 'http://172.20.10.2:8000'  // Adresse IP locale de l'utilisateur
+  ? 'http://192.168.0.34:8000/api'  // Adresse IP locale de l'utilisateur
   : 'https://api.showroombaby.com';
 
 // Importer l'image placeholder directement
@@ -356,7 +356,7 @@ export default function SearchScreen({ navigation }: any) {
   const fetchCategories = async () => {
     try {
       // Tenter d'abord de charger les catégories depuis l'API
-      const response = await axios.get(`${API_URL}/api/categories`);
+      const response = await axios.get(`${API_URL}/categories`);
       
       if (response.data) {
         const categoriesData = Array.isArray(response.data) 
@@ -430,7 +430,7 @@ export default function SearchScreen({ navigation }: any) {
     setIsLoading(true);
     setError(null);
     try {
-      const response = await axios.get(`${API_URL}/api/products`);
+      const response = await axios.get(`${API_URL}/products`);
       let productsData = Array.isArray(response.data) 
         ? response.data 
         : response.data.data || response.data.items || [];

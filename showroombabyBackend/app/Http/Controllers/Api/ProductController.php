@@ -123,12 +123,13 @@ class ProductController extends Controller
             'price' => 'required|numeric|min:0',
             'condition' => 'required|string|in:NEW,LIKE_NEW,GOOD,FAIR',
             'categoryId' => 'required|exists:categories,id',
+            'subcategoryId' => 'required|exists:categories,id',
             'images.*' => 'image|mimes:jpeg,png,jpg,gif|max:2048',
             'latitude' => 'required|numeric',
             'longitude' => 'required|numeric',
             'address' => 'required|string',
             'city' => 'required|string',
-            'zipCode' => 'required|string',
+            'zipcode' => 'required|string',
             'phone' => 'required|string',
         ]);
 
@@ -140,12 +141,13 @@ class ProductController extends Controller
         $product->condition = $request->condition;
         $product->status = 'PUBLISHED';
         $product->category_id = $request->categoryId;
+        $product->subcategory_id = $request->subcategoryId;
         $product->user_id = $request->user()->id;
         $product->latitude = $request->latitude;
         $product->longitude = $request->longitude;
         $product->address = $request->address;
         $product->city = $request->city;
-        $product->zip_code = $request->zipCode;
+        $product->zipCode = $request->input('zipcode', $request->input('zipCode'));
         $product->phone = $request->phone;
         $product->view_count = 0;
         $product->save();
@@ -176,13 +178,63 @@ class ProductController extends Controller
      */
     public function show($id)
     {
-        $product = Product::with(['category', 'images'])
-            ->findOrFail($id);
+        $product = Product::with(['category', 'subcategory'])->find($id);
 
-        // Incrémentation du compteur de vues
+        if (!$product) {
+            return response()->json([
+                'message' => 'Produit non trouvé'
+            ], 404);
+        }
+
+        // Incrémenter le compteur de vues
         $product->increment('view_count');
 
-        return response()->json(['data' => $product]);
+        // Formater la réponse
+        $response = [
+            'id' => $product->id,
+            'title' => $product->title,
+            'description' => $product->description,
+            'price' => $product->price,
+            'condition' => $product->condition,
+            'status' => $product->status,
+            'categoryId' => $product->category_id,
+            'subcategoryId' => $product->subcategory_id,
+            'category' => $product->category ? [
+                'id' => $product->category->id,
+                'name' => $product->category->name
+            ] : null,
+            'subcategory' => $product->subcategory ? [
+                'id' => $product->subcategory->id,
+                'name' => $product->subcategory->name
+            ] : null,
+            'city' => $product->city,
+            'location' => $product->location,
+            'view_count' => $product->view_count,
+            'created_at' => $product->created_at,
+            'updated_at' => $product->updated_at,
+            'images' => $product->images,
+            'is_trending' => $product->is_trending,
+            'is_featured' => $product->is_featured,
+            'user_id' => $product->user_id,
+            'size' => $product->size,
+            'color' => $product->color,
+            'warranty' => $product->warranty,
+            'phone' => $product->phone,
+            'hide_phone' => $product->hide_phone,
+            'zip_code' => $product->zip_code,
+            'brand' => $product->brand,
+            'model' => $product->model,
+            'material' => $product->material,
+            'dimensions' => $product->dimensions,
+            'weight' => $product->weight,
+            'latitude' => $product->latitude,
+            'longitude' => $product->longitude
+        ];
+
+        return response()->json([
+            'status' => 'success',
+            'data' => $response
+        ]);
     }
 
     /**
@@ -208,6 +260,7 @@ class ProductController extends Controller
             'price' => 'sometimes|numeric|min:0',
             'condition' => 'sometimes|string|in:NEW,LIKE_NEW,GOOD,FAIR',
             'categoryId' => 'sometimes|exists:categories,id',
+            'subcategoryId' => 'sometimes|exists:categories,id',
             'images.*' => 'sometimes|image|mimes:jpeg,png,jpg,gif|max:2048',
             'latitude' => 'sometimes|numeric',
             'longitude' => 'sometimes|numeric',
@@ -223,11 +276,12 @@ class ProductController extends Controller
         if ($request->has('price')) $product->price = $request->price;
         if ($request->has('condition')) $product->condition = $request->condition;
         if ($request->has('categoryId')) $product->category_id = $request->categoryId;
+        if ($request->has('subcategoryId')) $product->subcategory_id = $request->subcategoryId;
         if ($request->has('latitude')) $product->latitude = $request->latitude;
         if ($request->has('longitude')) $product->longitude = $request->longitude;
         if ($request->has('address')) $product->address = $request->address;
         if ($request->has('city')) $product->city = $request->city;
-        if ($request->has('zipCode')) $product->zip_code = $request->zipCode;
+        if ($request->has('zipCode')) $product->zipCode = $request->input('zipcode', $request->input('zipCode'));
         if ($request->has('phone')) $product->phone = $request->phone;
 
         $product->save();
@@ -319,7 +373,10 @@ class ProductController extends Controller
 
         $similarProducts = Product::with(['category', 'images'])
             ->where('id', '!=', $id)
-            ->where('category_id', $product->category_id)
+            ->where(function($query) use ($product) {
+                $query->where('category_id', $product->category_id)
+                      ->orWhere('subcategory_id', $product->subcategory_id);
+            })
             ->where('status', 'PUBLISHED')
             ->take(4)
             ->get();

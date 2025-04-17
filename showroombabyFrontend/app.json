@@ -24,9 +24,12 @@
     "web": {
       "favicon": "./assets/favicon.png"
     },
-    "hostUri": "172.20.10.2:8081",
+    "hostUri": "172.20.10.3:8081",
     "extra": {
-      "apiUrl": "http://172.20.10.2:8000"
+      "eas": {
+        "projectId": "7c0ffdf3-8dc5-42dd-9aa1-214f28ca28f7"
+      },
+      "apiUrl": "http://192.168.0.34:8000"
     }
   }
 }

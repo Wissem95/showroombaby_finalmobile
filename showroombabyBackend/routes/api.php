@@ -70,6 +70,9 @@ Route::middleware('auth:sanctum')->prefix('users')->group(function () {
     Route::delete('/account', [UserController::class, 'deleteAccount']);
 });
 
+// Route publique pour récupérer les informations d'un utilisateur
+Route::get('/users/{id}', [UserController::class, 'showProfile']);
+
 // Routes des messages
 Route::middleware('auth:sanctum')->prefix('messages')->group(function () {
     Route::post('/', [MessageController::class, 'store']);

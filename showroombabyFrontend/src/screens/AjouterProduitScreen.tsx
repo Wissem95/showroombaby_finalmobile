@@ -14,7 +14,7 @@ import AddressAutocomplete from '../components/AddressAutocomplete';
 // URL de l'API
 // Pour les appareils externes, utiliser votre adresse IP locale au lieu de 127.0.0.1
 const API_URL = process.env.NODE_ENV === 'development' || __DEV__ 
-  ? 'http://172.20.10.2:8000'  // Adresse IP locale de l'utilisateur
+  ? 'http://192.168.0.34:8000/api'  // Adresse IP locale de l'utilisateur
   : 'https://api.showroombaby.com';
 
 type Category = {
@@ -41,6 +41,9 @@ interface ProductData {
   zipCode: string;
   brand: string | null;
   is_professional: boolean;
+  latitude?: number;
+  longitude?: number;
+  city?: string;
 }
 
 enum Step {
@@ -380,7 +383,7 @@ export default function AjouterProduitScreen({ navigation, route }: any) {
     try {
       const token = await AsyncStorage.getItem('token');
       if (token) {
-        const response = await axios.get(`${API_URL}/api/users/profile`, {
+        const response = await axios.get(`${API_URL}/users/profile`, {
           headers: { Authorization: `Bearer ${token}` }
         });
         if (response.data && response.data.id) {
@@ -507,61 +510,78 @@ export default function AjouterProduitScreen({ navigation, route }: any) {
     setProductData(prev => ({ ...prev, images: newImages }));
   };
 
-  const validateStep = React.useCallback(() => {
-    const newErrors = {} as Record<string, string>;
+  const validateStep = () => {
+    let valid = true;
+    let tempErrors: Record<string, string> = {};
     
+    // Validation de l'étape actuelle
     switch (currentStep) {
       case Step.INFOS_BASE:
         if (!productData.title) {
-          newErrors.title = 'Veuillez saisir un titre.';
+          tempErrors.title = 'Veuillez saisir un titre.';
+          valid = false;
         }
         if (!productData.category_id) {
-          newErrors.category = 'Veuillez sélectionner une catégorie.';
+          tempErrors.category = 'Veuillez sélectionner une catégorie.';
+          valid = false;
         }
         break;
       case Step.DESCRIPTION_PRIX:
         if (!productData.description) {
-          newErrors.description = 'Veuillez saisir une description.';
+          tempErrors.description = 'Veuillez saisir une description.';
+          valid = false;
         }
         if (!productData.price) {
-          newErrors.price = 'Veuillez saisir un prix.';
+          tempErrors.price = 'Veuillez saisir un prix.';
+          valid = false;
         } else if (isNaN(parseFloat(productData.price))) {
-          newErrors.price = 'Le prix doit être un nombre.';
+          tempErrors.price = 'Le prix doit être un nombre.';
+          valid = false;
         }
         break;
       case Step.FACTURE_GARANTIE:
         if (!productData.condition) {
-          newErrors.condition = 'Veuillez sélectionner un état.';
+          tempErrors.condition = 'Veuillez sélectionner un état.';
+          valid = false;
         }
         break;
       case Step.PHOTOS:
         if (!productData.images || productData.images.length === 0) {
-          newErrors.images = 'Veuillez ajouter au moins une photo.';
+          tempErrors.images = 'Veuillez ajouter au moins une photo.';
+          valid = false;
         }
         break;
       case Step.LOCATION:
         if (!productData.location) {
-          newErrors.location = 'Veuillez saisir une adresse.';
+          tempErrors.location = "L'adresse est obligatoire";
+          valid = false;
         }
-        if (!productData.zipCode) {
-          newErrors.zipCode = 'Veuillez saisir un code postal.';
-        } else if (!/^\d{5}$/.test(productData.zipCode)) {
-          newErrors.zipCode = 'Le code postal doit contenir 5 chiffres.';
+        if (!productData.zipCode || productData.zipCode.length !== 5) {
+          tempErrors.zipCode = "Le code postal est obligatoire (5 chiffres)";
+          valid = false;
         }
-        if (!productData.telephone) {
-          newErrors.telephone = 'Veuillez saisir un numéro de téléphone.';
-        } else if (!/^\d{10}$/.test(productData.telephone)) {
-          newErrors.telephone = 'Le numéro de téléphone doit contenir 10 chiffres.';
+        if (!productData.telephone || productData.telephone.length !== 10) {
+          tempErrors.telephone = "Le numéro de téléphone est obligatoire (10 chiffres)";
+          valid = false;
         }
         if (!termsAccepted) {
-          newErrors.terms = 'Veuillez accepter les conditions générales.';
+          tempErrors.terms = "Vous devez accepter les conditions générales";
+          valid = false;
         }
+        
+        // Vérifier que les coordonnées sont présentes
+        if (productData.latitude === undefined || productData.latitude === null || 
+            productData.longitude === undefined || productData.longitude === null) {
+          tempErrors.location = "Veuillez sélectionner une adresse dans la liste des suggestions";
+          valid = false;
+        }
+        
         break;
     }
-
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  }, [currentStep, productData, termsAccepted]);
+    
+    setErrors(tempErrors);
+    return valid;
+  };
 
   const handleNext = () => {
     if (validateStep()) {
@@ -574,134 +594,153 @@ export default function AjouterProduitScreen({ navigation, route }: any) {
   };
 
   const submitProduct = async () => {
-    if (!validateStep()) {
-      Alert.alert('Erreur', 'Veuillez corriger les erreurs avant de continuer.');
-      return;
-    }
-
-    setIsLoading(true);
-    
     try {
-      const token = await AsyncStorage.getItem('token');
+      setIsLoading(true);
       
-      if (!token) {
-        Alert.alert('Erreur', 'Vous devez être connecté pour publier une annonce.');
-        navigation.navigate('Auth');
+      if (!validateStep()) {
+        setIsLoading(false);
         return;
       }
-
+      
+      // Vérifier si l'utilisateur est connecté et a un ID
+      if (!productData.user_id) {
+        // Tenter de récupérer l'ID de l'utilisateur si pas déjà fait
+        await getUserInfo();
+        
+        if (!productData.user_id) {
+          Alert.alert(
+            'Connexion requise',
+            'Vous devez être connecté pour publier une annonce.',
+            [
+              {
+                text: 'Se connecter',
+                onPress: () => navigation.navigate('Auth', { backToAjoutProduit: true })
+              },
+              {
+                text: 'Annuler',
+                style: 'cancel'
+              }
+            ]
+          );
+          setIsLoading(false);
+          return;
+        }
+      }
+      
+      // Préparer les données du produit pour l'envoi
       const formData = new FormData();
       
-      // Ajout des données du produit
+      // Ajouter les champs textuels
       formData.append('title', productData.title);
       formData.append('description', productData.description);
       formData.append('price', productData.price);
       formData.append('condition', productData.condition);
       
+      // Important: Le backend attend 'address' et pas 'location'
+      formData.append('address', productData.location);
+      // Aussi requis par le backend
+      formData.append('city', productData.city || '');
+      // Téléphone (le backend attend 'phone' et pas 'telephone')
+      formData.append('phone', productData.telephone);
+      
+      formData.append('hide_phone', productData.hide_phone ? '1' : '0');
+      
+      // Coordonnées géographiques
+      if (productData.latitude !== undefined && productData.latitude !== null) {
+        formData.append('latitude', productData.latitude.toString());
+      }
+      if (productData.longitude !== undefined && productData.longitude !== null) {
+        formData.append('longitude', productData.longitude.toString());
+      }
+      
+      // Ajouter d'autres champs si présents
+      if (productData.category_id) {
+        // Le backend attend 'categoryId' et pas 'category_id'
+        formData.append('categoryId', productData.category_id.toString());
+      }
+      if (productData.subcategory_id) {
+        // Le backend attend 'subcategoryId' et pas 'subcategory_id'
+        formData.append('subcategoryId', productData.subcategory_id.toString());
+      }
+      if (productData.zipCode) {
+        formData.append('zipcode', productData.zipCode);
+      }
+      if (productData.brand) {
+        formData.append('brand', productData.brand);
+      }
       if (productData.size) {
         formData.append('size', productData.size);
       }
-      
       if (productData.color) {
         formData.append('color', productData.color);
       }
-      
       if (productData.warranty) {
         formData.append('warranty', productData.warranty);
       }
       
-      if (productData.category_id) {
-        formData.append('category_id', productData.category_id.toString());
+      // Ajouter les images
+      for (let i = 0; i < productData.images.length; i++) {
+        const imgFile = productData.images[i];
+        formData.append('images[]', {
+          uri: imgFile.uri,
+          type: imgFile.type || 'image/jpeg',
+          name: imgFile.name || `image_${i}.jpg`
+        } as any);
       }
       
-      if (productData.subcategory_id) {
-        formData.append('subcategory_id', productData.subcategory_id.toString());
+      // Obtenir le token d'authentification
+      const token = await AsyncStorage.getItem('token');
+      
+      if (!token) {
+        throw new Error('Non authentifié');
       }
       
-      formData.append('address', productData.location);
+      // Envoi vers l'API
+      // Déboguer les données envoyées
+      console.log('Envoi des données au serveur:', {
+        title: productData.title,
+        address: productData.location,
+        city: productData.city || '',
+        phone: productData.telephone,
+        categoryId: productData.category_id,
+        zipcode: productData.zipCode,
+        latitude: productData.latitude,
+        longitude: productData.longitude
+      });
       
-      // Extraire la ville à partir de l'adresse
-      const locationParts = productData.location.split(',');
-      const city = locationParts[0]?.trim() || 'Paris';
-      
-      formData.append('city', city);
-      formData.append('zipCode', productData.zipCode);
-      formData.append('phone', productData.telephone);
-      formData.append('hide_phone', productData.hide_phone ? '1' : '0');
-      formData.append('is_professional', productData.is_professional ? '1' : '0');
-      
-      // Ajout de la marque si elle est définie
-      if (productData.brand) {
-        formData.append('brand', productData.brand);
-      }
-
-      // Ajout des images
-      if (productData.images && productData.images.length > 0) {
-        productData.images.forEach((image, index) => {
-          if (!image.uri.includes(API_URL)) {
-            const uri = Platform.OS === 'ios' ? image.uri.replace('file://', '') : image.uri;
-            formData.append(`images[${index}]`, {
-              uri: uri,
-              type: 'image/jpeg',
-              name: `image_${index}.jpg`
-            } as any);
-          }
-        });
-      }
-
-      let response;
-      if (productId) {
-        // Mise à jour d'un produit existant
-        response = await axios.post(`${API_URL}/api/products/${productId}`, formData, {
-          headers: {
-            'Accept': 'application/json',
-            'Content-Type': 'multipart/form-data',
-            'Authorization': `Bearer ${token}`
-          }
-        });
-      } else {
-        // Création d'un nouveau produit
-        response = await axios.post(`${API_URL}/api/products`, formData, {
-          headers: {
-            'Accept': 'application/json',
-            'Content-Type': 'multipart/form-data',
-            'Authorization': `Bearer ${token}`
-          }
-        });
-      }
-
-      console.log('Réponse du serveur:', response.data);
-
-      if (response.data && (response.data.id || (response.data.data && response.data.data.id))) {
-        const responseProductId = response.data.id || response.data.data.id;
-        setPublishedProductId(responseProductId);
-        setShowSuccessPage(true);
-      } else {
-        throw new Error('Réponse invalide du serveur');
-      }
-
-    } catch (error: any) {
-      console.error('Erreur complète:', error);
-      
-      let message = 'Une erreur est survenue lors de la publication.';
-      
-      if (error.response) {
-        console.error('Erreur de réponse:', error.response.data);
-        const errors = error.response.data.errors;
-        if (errors) {
-          message = Object.values(errors).flat().join('\n');
-        } else {
-          message = error.response.data.message || error.response.data.error || message;
+      const response = await axios.post(`${API_URL}/products`, formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+          'Authorization': `Bearer ${token}`
         }
-      } else if (error.request) {
-        console.error('Erreur de requête:', error.request);
-        message = 'Impossible de contacter le serveur';
-      } else {
-        console.error('Erreur:', error.message);
-        message = error.message;
+      });
+      
+      // Log de la réponse pour debug
+      console.log('Réponse API:', response.data);
+      
+      // Si tout va bien, afficher l'écran de succès
+      setShowSuccessPage(true);
+      
+    } catch (error: any) {
+      console.error('Erreur soumission produit:', error);
+      
+      // Afficher un message d'erreur spécifique si possible
+      let errorMessage = 'Une erreur est survenue lors de la publication de votre annonce.';
+      
+      if (error.response && error.response.data) {
+        if (error.response.data.message) {
+          errorMessage = error.response.data.message;
+        } else if (error.response.data.errors) {
+          // Récupérer la première erreur de validation
+          console.log('Erreurs de validation:', JSON.stringify(error.response.data.errors));
+          const firstError = Object.values(error.response.data.errors)[0];
+          if (Array.isArray(firstError) && firstError.length > 0) {
+            errorMessage = firstError[0];
+          }
+        }
       }
       
-      Alert.alert('Erreur', message);
+      Alert.alert('Erreur', errorMessage);
     } finally {
       setIsLoading(false);
     }
@@ -711,7 +750,7 @@ export default function AjouterProduitScreen({ navigation, route }: any) {
     try {
       setIsLoading(true);
       const token = await AsyncStorage.getItem('token');
-      const response = await axios.get(`${API_URL}/api/products/${productId}`, {
+      const response = await axios.get(`${API_URL}/products/${productId}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
 
@@ -739,6 +778,7 @@ export default function AjouterProduitScreen({ navigation, route }: any) {
         zipCode: product.zipCode || '',
         brand: product.brand || null,
         is_professional: product.is_professional || false,
+        city: product.city || '',
       });
     } catch (error) {
       console.error('Erreur lors de la récupération du produit:', error);
@@ -883,14 +923,32 @@ export default function AjouterProduitScreen({ navigation, route }: any) {
   };
 
   const handleAddressSelect = (address: any) => {
+    console.log('Adresse sélectionnée dans AjouterProduitScreen:', address);
+    
+    // Vérifier que toutes les données nécessaires sont présentes
+    if (!address) return;
+    
+    // Créer l'adresse complète à partir de la rue et de la ville
+    const fullAddress = `${address.street || ''} ${address.city || ''}`.trim();
+    
+    // Mettre à jour les données du produit
     setProductData(prev => ({
       ...prev,
-      location: `${address.street || ''} ${address.city || ''}`.trim(),
+      location: fullAddress,
       zipCode: address.postalCode || prev.zipCode || '',
       city: address.city || '',
-      latitude: address.latitude,
-      longitude: address.longitude
+      // S'assurer que les coordonnées sont incluses dans les données du produit
+      latitude: address.latitude || null,
+      longitude: address.longitude || null
     }));
+    
+    // Réinitialiser l'erreur d'adresse si elle existe
+    if (errors.location) {
+      setErrors(prev => ({ ...prev, location: '' }));
+    }
+    
+    console.log('Données du produit mises à jour avec les coordonnées:', 
+      { location: fullAddress, lat: address.latitude, lng: address.longitude });
   };
 
   const renderPhotoStep = () => (

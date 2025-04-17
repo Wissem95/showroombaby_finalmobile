@@ -30,6 +30,7 @@ class Product extends Model
         'zipCode',
         'phone',
         'category_id',
+        'subcategory_id',
         'user_id',
     ];
 
@@ -51,6 +52,14 @@ class Product extends Model
     public function category(): BelongsTo
     {
         return $this->belongsTo(Category::class);
+    }
+
+    /**
+     * Obtenir la sous-catégorie du produit.
+     */
+    public function subcategory(): BelongsTo
+    {
+        return $this->belongsTo(Category::class, 'subcategory_id');
     }
 
     /**

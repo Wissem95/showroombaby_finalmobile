@@ -32,7 +32,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 // API URL
 // Pour les appareils externes, utiliser votre adresse IP locale au lieu de 127.0.0.1
 const API_URL = process.env.NODE_ENV === 'development' || __DEV__ 
-  ? 'http://172.20.10.2:8000'  // Adresse IP locale de l'utilisateur
+  ? 'http://192.168.0.34:8000/api'  // Adresse IP locale de l'utilisateur
   : 'https://api.showroombaby.com';
 const DEFAULT_AVATAR_URL = 'https://ui-avatars.com/api/?background=ff6b9b&color=fff&name=User';
 const placeholderImage = require('../../assets/placeholder.png');
@@ -253,7 +253,7 @@ export default function ChatScreen({ route, navigation }: Props) {
       const token = await AsyncStorage.getItem('token');
       console.log(`Chargement des détails du produit #${productId}`);
       
-      const response = await axios.get(`${API_URL}/api/products/${productId}`, {
+      const response = await axios.get(`${API_URL}/products/${productId}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       
@@ -319,7 +319,7 @@ export default function ChatScreen({ route, navigation }: Props) {
       
       console.log(`Chargement des détails de l'utilisateur #${receiverId}`);
       
-      const response = await axios.get(`${API_URL}/api/users/profile/${receiverId}`, {
+      const response = await axios.get(`${API_URL}/users/profile/${receiverId}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       
@@ -365,7 +365,7 @@ export default function ChatScreen({ route, navigation }: Props) {
       }
 
       const response = await axios.get(
-        `${API_URL}/api/messages/conversation/${receiverId}`,
+        `${API_URL}/messages/conversation/${receiverId}`,
         { headers: { Authorization: `Bearer ${token}` } }
       );
       
@@ -467,7 +467,7 @@ export default function ChatScreen({ route, navigation }: Props) {
       
       // Envoyer le message au serveur
       await axios.post(
-        `${API_URL}/api/messages`,
+        `${API_URL}/messages`,
         messageData,
         { headers: { Authorization: `Bearer ${token}` } }
       );

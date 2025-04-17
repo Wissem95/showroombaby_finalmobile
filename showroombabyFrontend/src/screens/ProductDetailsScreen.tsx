@@ -16,7 +16,7 @@ import { PanGestureHandler, State } from 'react-native-gesture-handler';
 // URL de l'API
 // Pour les appareils externes, utiliser votre adresse IP locale au lieu de 127.0.0.1
 const API_URL = process.env.NODE_ENV === 'development' || __DEV__ 
-  ? 'http://172.20.10.2:8000'  // Adresse IP locale de l'utilisateur
+  ? 'http://192.168.0.34:8000/api'  // Adresse IP locale de l'utilisateur
   : 'https://api.showroombaby.com';
 
 // Importer l'image placeholder directement
@@ -32,8 +32,16 @@ interface Product {
   price: number;
   condition: string;
   status: string;
-  category_id: number;
-  subcategory_id?: number;
+  categoryId: number;
+  subcategoryId?: number;
+  category?: {
+    id: number;
+    name: string;
+  };
+  subcategory?: {
+    id: number;
+    name: string;
+  };
   city?: string;
   location?: string;
   view_count: number;
@@ -461,11 +469,24 @@ const ImageCarousel = ({ images, navigation, product }: { images: string[], navi
   }
 
   const renderItem = ({ item }: { item: string }) => {
-    const imageUrl = typeof item === 'string' && item.startsWith('http') 
-      ? item 
-      : typeof item === 'string'
-        ? `${API_URL}/storage/${item}`
-        : placeholderImage;
+    // Construire l'URL de l'image correctement
+    let imageUrl = '';
+    try {
+      if (typeof item === 'string') {
+        if (item.startsWith('http')) {
+          imageUrl = item;
+        } else {
+          imageUrl = `${API_URL.replace('/api', '')}/storage/${item}`;
+        }
+      } else {
+        imageUrl = placeholderImage;
+      }
+      
+      console.log('Image URL corrigée:', imageUrl);
+    } catch (error) {
+      console.error('Erreur lors de la construction de l\'URL de l\'image:', error);
+      imageUrl = placeholderImage;
+    }
 
     return (
       <View style={carouselStyles.item}>
@@ -692,6 +713,7 @@ export default function ProductDetailsScreen({ route, navigation }: any) {
   const [loginDialogVisible, setLoginDialogVisible] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [location, setLocation] = useState<{latitude: number, longitude: number} | null>(null);
+  const [categoryName, setCategoryName] = useState<string>('Catégorie');
   
   // Animation de transition
   const slideAnimation = useRef(new Animated.Value(
@@ -725,9 +747,13 @@ export default function ProductDetailsScreen({ route, navigation }: any) {
   useEffect(() => {
     const fetchCategories = async () => {
       try {
-        const response = await axios.get(`${API_URL}/api/categories`);
-        console.log('Catégories récupérées:', response.data);
-        setCategories(response.data);
+        const response = await axios.get(`${API_URL}/categories`);
+        console.log('Catégories récupérées:', response);
+        if (response.data && response.data.data) {
+          setCategories(response.data.data);
+        } else {
+          console.error('Format de réponse inattendu:', response);
+        }
       } catch (error) {
         console.error('Erreur lors de la récupération des catégories:', error);
       }
@@ -736,26 +762,34 @@ export default function ProductDetailsScreen({ route, navigation }: any) {
     fetchCategories();
   }, []);
 
+  // Mettre à jour le nom de la catégorie quand le produit change
+  useEffect(() => {
+    if (product && product.categoryId) {
+      const foundCategory = categories.find(cat => cat.id === product.categoryId);
+      if (foundCategory) {
+        setCategoryName(foundCategory.name);
+      } else if (product.category) {
+        setCategoryName(product.category.name);
+      }
+    }
+  }, [product, categories]);
+
   // Obtenir le nom de la catégorie
   const getCategoryName = (categoryId: number | undefined | null): string => {
-    if (categoryId === undefined || categoryId === null) return 'Catégorie inconnue';
-    if (!categories || !Array.isArray(categories)) return 'Catégorie inconnue';
-    
-    const foundCategory = categories.find(cat => cat.id === categoryId);
-    return foundCategory ? foundCategory.name : `Catégorie inconnue`;
+    if (!categoryId || !categories) return 'Catégorie inconnue';
+    const category = categories.find((cat: Category) => cat.id === categoryId);
+    return category ? category.name : 'Catégorie inconnue';
   };
 
   // Obtenir le nom de la sous-catégorie
   const getSubcategoryName = (categoryId: number | undefined | null, subcategoryId: number | undefined | null): string => {
-    if (subcategoryId === undefined || subcategoryId === null) return 'Sous-catégorie inconnue';
-    if (categoryId === undefined || categoryId === null) return 'Sous-catégorie inconnue';
-    if (!categories || !Array.isArray(categories)) return 'Sous-catégorie inconnue';
-    
-    const category = categories.find(cat => cat.id === categoryId);
-    if (!category || !category.subcategories) return 'Sous-catégorie inconnue';
-    
-    const subcategory = category.subcategories.find(sub => sub.id === subcategoryId);
-    return subcategory ? subcategory.name : 'Sous-catégorie inconnue';
+    if (!subcategoryId || !categories) return '';
+    const category = categories.find((cat: Category) => cat.id === categoryId);
+    if (category && category.subcategories) {
+      const subcategory = category.subcategories.find(sub => sub.id === subcategoryId);
+      return subcategory ? subcategory.name : '';
+    }
+    return '';
   };
 
   // Charger les détails du produit
@@ -782,7 +816,7 @@ export default function ProductDetailsScreen({ route, navigation }: any) {
 
       try {
         setLoading(true);
-        const response = await axios.get(`${API_URL}/api/products/${productId}`);
+        const response = await axios.get(`${API_URL}/products/${productId}`);
         
         if (response.data) {
           const productData = response.data.data || response.data;
@@ -801,24 +835,46 @@ export default function ProductDetailsScreen({ route, navigation }: any) {
                 // Créer un vendeur minimal sans appeler l'API si pas de token
                 setSeller({
                   id: productData.user_id,
-                  name: "Utilisateur",
+                  name: productData.seller_name || "3Wsolution",
                 });
                 return;
               }
               
-              // Utiliser la route correcte pour récupérer les informations du vendeur
-              // D'après l'API, la route correcte pourrait être /api/users/profile pour l'utilisateur courant
-              // Comme il n'y a pas de route spécifique pour obtenir un autre utilisateur, nous créons un vendeur minimal
-              setSeller({
-                id: productData.user_id,
-                name: `Vendeur #${productData.user_id}`,
-              });
+              // Tenter de récupérer les informations du vendeur depuis l'API
+              try {
+                const sellerResponse = await axios.get(`${API_URL}/users/${productData.user_id}`, {
+                  headers: { Authorization: `Bearer ${token}` },
+                  timeout: 5000
+                });
+                
+                if (sellerResponse.data && sellerResponse.data.data) {
+                  setSeller({
+                    id: productData.user_id,
+                    name: sellerResponse.data.data.name || sellerResponse.data.data.username || "3Wsolution",
+                    username: sellerResponse.data.data.username,
+                    email: sellerResponse.data.data.email,
+                    avatar: sellerResponse.data.data.avatar,
+                    rating: sellerResponse.data.data.rating || 0,
+                  });
+                } else {
+                  setSeller({
+                    id: productData.user_id,
+                    name: productData.seller_name || "3Wsolution",
+                  });
+                }
+              } catch (error) {
+                console.log('Impossible de récupérer les infos du vendeur, utilisation du nom par défaut');
+                setSeller({
+                  id: productData.user_id,
+                  name: productData.seller_name || "3Wsolution",
+                });
+              }
             } catch (sellerError) {
               console.error('Erreur lors du chargement des informations du vendeur:', sellerError);
               // Créer un vendeur minimal avec l'ID uniquement
               setSeller({
                 id: productData.user_id,
-                name: "Utilisateur",
+                name: productData.seller_name || "3Wsolution",
               });
             }
           }
@@ -861,7 +917,7 @@ export default function ProductDetailsScreen({ route, navigation }: any) {
           }
           
           // Utiliser la route dédiée pour vérifier si un produit est en favoris
-          const response = await axios.get(`${API_URL}/api/favorites/check/${productId}`, {
+          const response = await axios.get(`${API_URL}/favorites/check/${productId}`, {
             headers: { Authorization: `Bearer ${token}` },
             timeout: 5000
           });
@@ -925,7 +981,7 @@ export default function ProductDetailsScreen({ route, navigation }: any) {
     try {
       if (isFavorite) {
         // Supprimer des favoris
-        await axios.delete(`${API_URL}/api/favorites/${product.id}`, {
+        await axios.delete(`${API_URL}/favorites/${product.id}`, {
           headers: { Authorization: `Bearer ${token}` }
         });
         setIsFavorite(false);
@@ -937,7 +993,7 @@ export default function ProductDetailsScreen({ route, navigation }: any) {
         Alert.alert('Succès', 'Produit retiré des favoris');
       } else {
         // Ajouter aux favoris
-        await axios.post(`${API_URL}/api/favorites/${product.id}`, {}, {
+        await axios.post(`${API_URL}/favorites/${product.id}`, {}, {
           headers: { Authorization: `Bearer ${token}` }
         });
         setIsFavorite(true);
@@ -1030,7 +1086,7 @@ export default function ProductDetailsScreen({ route, navigation }: any) {
     }
   };
 
-  // Obtenir l'image principale d'un produit
+  // Obtenir l'image principale d'un produit - version améliorée pour gérer tous les formats
   const getProductImage = (product: Product | null): string[] => {
     if (!product || !product.images) {
       console.log('Produit sans images');
@@ -1041,6 +1097,7 @@ export default function ProductDetailsScreen({ route, navigation }: any) {
       // Si les images sont stockées sous forme de chaîne JSON
       if (typeof product.images === 'string') {
         try {
+          // Tentative de parse JSON
           const parsedImages = JSON.parse(product.images);
           if (Array.isArray(parsedImages)) {
             return parsedImages.map((img: ImageType | string) => {
@@ -1058,16 +1115,35 @@ export default function ProductDetailsScreen({ route, navigation }: any) {
               return '';
             }).filter(Boolean);
           }
-          // Si c'est une chaîne JSON mais pas un tableau
+          // Si c'est une chaîne JSON mais pas un tableau (peut-être un objet unique)
+          if (typeof parsedImages === 'object' && parsedImages !== null) {
+            if (parsedImages.path) {
+              return [parsedImages.path];
+            }
+            if (parsedImages.url) {
+              return [parsedImages.url];
+            }
+          }
+          // Si c'est une autre forme de JSON, essayer de l'utiliser comme URL
           return [product.images];
         } catch (e) {
-          // Si ce n'est pas un JSON valide, utiliser directement la chaîne
-          return [product.images];
+          // Si ce n'est pas un JSON valide, essayer d'utiliser directement comme une URL
+          if (product.images.includes('.jpg') || 
+              product.images.includes('.jpeg') || 
+              product.images.includes('.png')) {
+            return [product.images];
+          }
+          console.log('Format d\'image non reconnu (chaîne):', product.images);
+          return [];
         }
       }
 
       // Si c'est déjà un tableau
       if (Array.isArray(product.images)) {
+        if (product.images.length === 0) {
+          return [];
+        }
+        
         return product.images.map((img: ImageType | string) => {
           if (typeof img === 'string') {
             return img;
@@ -1175,21 +1251,30 @@ export default function ProductDetailsScreen({ route, navigation }: any) {
   // Utiliser l'effet pour obtenir les coordonnées
   useEffect(() => {
     if (product) {
-      // Construire une adresse complète avec tous les éléments disponibles
-      const addressParts = [];
-      
-      if (product.location) addressParts.push(product.location);
-      if (product.city) addressParts.push(product.city);
-      if (product.zip_code) addressParts.push(product.zip_code);
-      
-      // Ajouter le pays par défaut si aucun élément n'indique le pays
-      const address = addressParts.join(' ');
-      
-      if (address) {
-        console.log("🏙️ Construction de l'adresse pour la géolocalisation:", address);
+      // Privilégier la ville si elle existe
+      if (product.city && !product.city.includes("Val-d'Oise")) {
+        const address = product.city + (product.zip_code ? `, ${product.zip_code}` : "");
+        console.log("🏙️ Utilisation de la ville pour la géolocalisation:", address);
         getCoordinates(address);
-      } else {
-        console.warn("⚠️ Impossible de construire une adresse à partir des données du produit");
+      }
+      // Sinon utiliser l'adresse complète
+      else {
+        // Construire une adresse complète avec tous les éléments disponibles
+        const addressParts = [];
+        
+        if (product.location) addressParts.push(product.location);
+        if (product.city && !product.city.includes("Val-d'Oise")) addressParts.push(product.city);
+        if (product.zip_code) addressParts.push(product.zip_code);
+        
+        // Ajouter le pays par défaut si aucun élément n'indique le pays
+        const address = addressParts.join(' ');
+        
+        if (address) {
+          console.log("🏙️ Construction de l'adresse pour la géolocalisation:", address);
+          getCoordinates(address);
+        } else {
+          console.warn("⚠️ Impossible de construire une adresse à partir des données du produit");
+        }
       }
     }
   }, [product]);
@@ -1283,12 +1368,15 @@ export default function ProductDetailsScreen({ route, navigation }: any) {
                       ? (
                         typeof getProductImage(product)[0] === 'string' && getProductImage(product)[0].startsWith('http')
                           ? getProductImage(product)[0]
-                          : `${API_URL}/storage/${getProductImage(product)[0]}`
+                          : `${API_URL.replace('/api', '')}/storage/${getProductImage(product)[0]}`
                       )
                       : placeholderImage
                   }}
                   style={styles.mainImage}
                   resizeMode="cover"
+                  onError={(e) => {
+                    console.log('Erreur de chargement image principale:', e.nativeEvent.error);
+                  }}
                 />
                 <View style={styles.imageOverlay} />
               </>
@@ -1393,24 +1481,27 @@ export default function ProductDetailsScreen({ route, navigation }: any) {
             
             <View style={styles.detailItem}>
               <Text style={styles.detailLabel}>Catégorie</Text>
-              <Text style={styles.detailValue}>{getCategoryName(product.category_id)}</Text>
+              <Text style={styles.detailValue}>
+                {product.category ? product.category.name : getCategoryName(product.categoryId)}
+                {product.subcategory ? 
+                  ` > ${product.subcategory.name}` : 
+                  product.subcategoryId ? 
+                    ` > ${getSubcategoryName(product.categoryId, product.subcategoryId)}` : 
+                    ''}
+              </Text>
             </View>
-            
-            {product.subcategory_id && (
-              <View style={styles.detailItem}>
-                <Text style={styles.detailLabel}>Sous-catégorie</Text>
-                <Text style={styles.detailValue}>
-                  {getSubcategoryName(product.category_id, product.subcategory_id)}
-                </Text>
-              </View>
-            )}
             
             {(product.city || product.location) && (
               <View style={styles.detailItem}>
                 <Text style={styles.detailLabel}>Localisation</Text>
                 <Text style={styles.detailValue}>
                   <Ionicons name="location-outline" size={16} color="#666" />
-                  {' '}{product.city || product.location}
+                  {' '}
+                  {product.location && !product.location.includes("Val-d'Oise") 
+                    ? product.location 
+                    : product.city && !product.city.includes("Val-d'Oise") 
+                      ? product.city
+                      : "Garges-lès-Gonesse"}
                   {product.zip_code && `, ${product.zip_code}`}
                 </Text>
               </View>
@@ -1515,20 +1606,6 @@ export default function ProductDetailsScreen({ route, navigation }: any) {
                 )}
                 <View style={styles.sellerInfo}>
                   <Text style={styles.sellerName}>{seller.name || seller.username}</Text>
-                  {seller.rating !== undefined && (
-                    <View style={styles.ratingContainer}>
-                      {Array.from({ length: 5 }).map((_, i) => (
-                        <Ionicons 
-                          key={i} 
-                          name={i < Math.floor(seller.rating || 0) ? "star" : i < (seller.rating || 0) ? "star-half-outline" : "star-outline"} 
-                          size={16} 
-                          color="#FFA000" 
-                          style={styles.starIcon}
-                        />
-                      ))}
-                      <Text style={styles.ratingText}>{seller.rating.toFixed(1)}</Text>
-                    </View>
-                  )}
                 </View>
               </View>
             </View>

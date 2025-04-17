@@ -23,6 +23,7 @@ export default function AddressAutocomplete({ onSelect, placeholder = "Entrez un
   const [query, setQuery] = useState('');
   const [suggestions, setSuggestions] = useState<any[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
+  const [selectedItem, setSelectedItem] = useState<any>(null);
 
   // Appliquer un debounce pour éviter trop d'appels API
   const debouncedSearch = debounce((text: string) => {
@@ -37,6 +38,8 @@ export default function AddressAutocomplete({ onSelect, placeholder = "Entrez un
           `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(text)}.json?access_token=${MAPBOX_ACCESS_TOKEN}&country=fr&types=address,place,postcode`
         );
         
+        console.log("Response complète de Mapbox:", JSON.stringify(response.data));
+        
         // Transformation des résultats de l'API en suggestions
         const apiSuggestions = response.data.features.map((feature: any) => {
           // Extraire les composants de l'adresse
@@ -47,7 +50,7 @@ export default function AddressAutocomplete({ onSelect, placeholder = "Entrez un
           let postalCode = '';
           let city = '';
           
-          // Essayer d'extraire le code postal des context
+          // Essayer d'extraire le code postal et la ville des context
           if (feature.context) {
             for (const context of feature.context) {
               if (context.id.startsWith('postcode')) {
@@ -59,11 +62,23 @@ export default function AddressAutocomplete({ onSelect, placeholder = "Entrez un
             }
           }
           
+          // Si la ville n'est pas trouvée dans les contextes, essayer de l'extraire du place_name
+          if (!city && addressParts.length > 1) {
+            // La ville est souvent le deuxième élément dans l'adresse
+            city = addressParts[1].trim();
+          }
+          
+          // Pour les lieux (places) sans contexte, utiliser le text comme ville
+          if (feature.place_type && feature.place_type.includes('place') && !city) {
+            city = feature.text;
+          }
+          
           return {
             title: feature.place_name,
             id: feature.id,
             city: city,
             postalCode: postalCode,
+            place_type: feature.place_type,
             position: {
               lat: feature.center[1],
               lng: feature.center[0]
@@ -95,10 +110,15 @@ export default function AddressAutocomplete({ onSelect, placeholder = "Entrez un
     
     console.log('Données d\'adresse extraites:', address);
     
-    // On ne modifie plus le champ de saisie, on garde la valeur entrée par l'utilisateur
-    // setQuery(item.title || '');
+    // CORRECTION: Mettre à jour le champ de recherche avec l'adresse sélectionnée
+    setQuery(item.title);
+    setSelectedItem(item);
+    
+    // Cacher les suggestions après la sélection
     setSuggestions([]);
     setShowSuggestions(false);
+    
+    // Transmettre les informations au composant parent
     onSelect(address);
   };
 
@@ -109,6 +129,10 @@ export default function AddressAutocomplete({ onSelect, placeholder = "Entrez un
         onChangeText={(text) => {
           setQuery(text);
           setShowSuggestions(true);
+          // Réinitialiser l'adresse sélectionnée si l'utilisateur modifie le texte
+          if (selectedItem && text !== selectedItem.title) {
+            setSelectedItem(null);
+          }
           debouncedSearch(text);
         }}
         placeholder={placeholder}
@@ -135,7 +159,7 @@ export default function AddressAutocomplete({ onSelect, placeholder = "Entrez un
 
 const styles = StyleSheet.create({
   container: {
-    zIndex: 1,
+    zIndex: 1000, // Augmenter le z-index pour s'assurer que les suggestions s'affichent au-dessus de tout
   },
   input: {
     backgroundColor: '#fff',
@@ -153,7 +177,8 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.25,
     shadowRadius: 3.84,
     maxHeight: 200,
-    zIndex: 2,
+    zIndex: 1001, // Supérieur au container
+    overflow: 'visible',
   },
   suggestionItem: {
     borderBottomWidth: 1,

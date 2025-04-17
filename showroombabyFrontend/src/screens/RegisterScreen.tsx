@@ -10,7 +10,7 @@ import axios from 'axios';
 // URL de l'API
 // Pour les appareils externes, utiliser votre adresse IP locale au lieu de 127.0.0.1
 const API_URL = process.env.NODE_ENV === 'development' || __DEV__ 
-  ? 'http://172.20.10.2:8000'  // Adresse IP locale de l'utilisateur
+  ? 'http://192.168.0.34:8000/api'  // Adresse IP locale de l'utilisateur
   : 'https://api.showroombaby.com';
 
 type Props = NativeStackScreenProps<any, 'Register'>;
@@ -69,7 +69,7 @@ export default function RegisterScreen({ navigation }: Props) {
         user_type: userType
       };
 
-      const response = await axios.post(`${API_URL}/api/auth/register`, userData);
+      const response = await axios.post(`${API_URL}/auth/register`, userData);
 
       if (response.data.access_token) {
         // Connexion automatique après inscription

@@ -7,14 +7,15 @@ import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { widthPercentageToDP as wp, heightPercentageToDP as hp } from 'react-native-responsive-screen';
 import { useFocusEffect } from '@react-navigation/native';
+import { SERVER_IP } from '../config/ip';
 
 type Props = NativeStackScreenProps<any, 'Home'>;
 
 // URL de l'API
 // Pour les appareils externes, utiliser votre adresse IP locale au lieu de 127.0.0.1
 const API_URL = process.env.NODE_ENV === 'development' || __DEV__ 
-  ? 'http://172.20.10.2:8000'  // Adresse IP locale de l'utilisateur
-  : 'https://api.showroombaby.com';
+  ? `http://${SERVER_IP}:8000/api`  // Adresse IP locale chargée depuis la configuration avec préfixe /api
+  : 'https://api.showroombaby.com/api';  // URL de production
 
 // URL des images par défaut
 const DEFAULT_IMAGE_URL = 'https://placehold.co/400x300/f8bbd0/ffffff?text=Showroom+Baby';
@@ -157,7 +158,7 @@ const ProductItem = React.memo(({ item, navigation }: { item: Product; navigatio
           if (!token) return;
           
           // Utiliser la nouvelle route de vérification des favoris
-          const response = await axios.get(`${API_URL}/api/favorites/check/${item.id}`, {
+          const response = await axios.get(`${API_URL}/favorites/check/${item.id}`, {
             headers: { Authorization: `Bearer ${token}` },
             timeout: 5000
           });
@@ -197,7 +198,7 @@ const ProductItem = React.memo(({ item, navigation }: { item: Product; navigatio
       }
 
       if (isFavorite) {
-        await axios.delete(`${API_URL}/api/favorites/${item.id}`, {
+        await axios.delete(`${API_URL}/favorites/${item.id}`, {
           headers: { Authorization: `Bearer ${token}` }
         });
         setIsFavorite(false);
@@ -206,7 +207,7 @@ const ProductItem = React.memo(({ item, navigation }: { item: Product; navigatio
         await AsyncStorage.setItem('favoritesChanged', 'true');
         await AsyncStorage.setItem(`favorite_${item.id}`, 'false');
       } else {
-        await axios.post(`${API_URL}/api/favorites/${item.id}`, {}, {
+        await axios.post(`${API_URL}/favorites/${item.id}`, {}, {
           headers: { Authorization: `Bearer ${token}` }
         });
         setIsFavorite(true);
@@ -346,7 +347,7 @@ export default function HomeScreen({ navigation }: Props) {
     setIsLoading(true);
     setError(null);
     try {
-      const response = await axios.get(`${API_URL}/api/products`);
+      const response = await axios.get(`${API_URL}/products`);
       let productsData = Array.isArray(response.data) ? response.data : response.data.items || [];
       setProducts(productsData);
       setTrendingProducts(productsData);

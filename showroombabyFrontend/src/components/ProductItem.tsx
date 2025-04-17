@@ -3,6 +3,7 @@ import { StyleSheet, View, TouchableOpacity, Image, Dimensions } from 'react-nat
 import { Text, Card, Surface } from 'react-native-paper';
 import { widthPercentageToDP as wp } from 'react-native-responsive-screen';
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
+import { SERVER_IP } from '../config/ip';
 
 // Image placeholder
 const placeholderImage = require('../../assets/placeholder.png');
@@ -10,8 +11,8 @@ const placeholderImage = require('../../assets/placeholder.png');
 // API URL
 // Pour les appareils externes, utiliser votre adresse IP locale au lieu de 127.0.0.1
 const API_URL = process.env.NODE_ENV === 'development' || __DEV__ 
-  ? 'http://172.20.10.2:8000'  // Adresse IP locale de l'utilisateur
-  : 'https://api.showroombaby.com';
+  ? `http://${SERVER_IP}:8000/api`  // Adresse IP locale chargée depuis la configuration avec préfixe /api
+  : 'https://api.showroombaby.com/api';  // URL de production
 
 // Largeur de l'écran
 const { width } = Dimensions.get('window');

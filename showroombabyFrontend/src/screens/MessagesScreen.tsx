@@ -7,6 +7,8 @@ import { Ionicons } from '@expo/vector-icons';
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect } from '@react-navigation/native';
+import AuthService from '../services/auth';
+import { SERVER_IP } from '../config/ip';
 
 // Ignorer les avertissements non critiques
 LogBox.ignoreLogs([
@@ -18,8 +20,8 @@ LogBox.ignoreLogs([
 // Adapter l'URL de l'API en fonction de la plateforme
 // Pour les appareils externes, utiliser votre adresse IP locale au lieu de 127.0.0.1
 const API_URL = process.env.NODE_ENV === 'development' || __DEV__ 
-  ? 'http://172.20.10.2:8000'  // Adresse IP locale de l'utilisateur
-  : 'https://api.showroombaby.com';
+  ? `http://${SERVER_IP}:8000/api`  // Adresse IP locale de l'utilisateur
+  : 'https://api.showroombaby.com/api';
 
 const placeholderImage = require('../../assets/placeholder.png');
 const DEFAULT_AVATAR_URL = 'https://via.placeholder.com/100';
@@ -154,9 +156,21 @@ export default function MessagesScreen({ navigation }: any) {
     isMounted.current = true;
     
     const checkAuthentication = async () => {
-      const token = await AsyncStorage.getItem('token');
-      setIsAuthenticated(!!token);
-      if (!token) {
+      try {
+        // Vérifier si l'utilisateur est authentifié via le service d'authentification
+        const isAuth = await AuthService.checkAuth();
+        setIsAuthenticated(isAuth);
+        
+        if (isAuth) {
+          // Récupérer l'ID de l'utilisateur à partir du stockage
+          const id = await AsyncStorage.getItem('userId');
+          setUserId(id ? parseInt(id) : null);
+        } else {
+          setLoading(false);
+        }
+      } catch (error) {
+        console.error('Erreur vérification authentification:', error);
+        setIsAuthenticated(false);
         setLoading(false);
       }
     };
@@ -173,42 +187,52 @@ export default function MessagesScreen({ navigation }: any) {
     useCallback(() => {
       let intervalId: NodeJS.Timeout | null = null;
       const loadData = async () => {
-        const token = await AsyncStorage.getItem('token');
-        if (token) {
-          getUserId();
-          // Charger les conversations une seule fois au début
-          await loadConversations();
+        try {
+          // Vérifier si l'utilisateur est authentifié via le service
+          const isAuth = await AuthService.checkAuth();
           
-          // Rafraîchir les conversations toutes les 30 secondes au lieu de 15
-          // et stocker l'ID de l'intervalle pour pouvoir l'annuler
-          intervalId = setInterval(loadConversations, 30000);
-          
-          // Force refresh des images uniquement au premier chargement ou quand pas d'images
-          // pas à chaque focus pour éviter le clignotement
-          if (conversations.length > 0) {
-            conversations.slice(0, 5).forEach(conversation => {
-              if (conversation.product_id && 
-                  (!conversation.product?.images || 
-                   !Array.isArray(conversation.product.images) || 
-                   conversation.product.images.length === 0)) {
-                loadProductDetails(conversation.product_id, conversation.id);
-              }
-            });
+          if (isAuth) {
+            setIsAuthenticated(true);
+            await getUserId();
+            // Charger les conversations une seule fois au début
+            await loadConversations();
+            
+            // Rafraîchir les conversations toutes les 30 secondes au lieu de 15
+            // et stocker l'ID de l'intervalle pour pouvoir l'annuler
+            intervalId = setInterval(loadConversations, 30000);
+            
+            // Force refresh des images uniquement au premier chargement ou quand pas d'images
+            // pas à chaque focus pour éviter le clignotement
+            if (conversations.length > 0) {
+              conversations.slice(0, 5).forEach(conversation => {
+                if (conversation.product_id && 
+                    (!conversation.product?.images || 
+                     !Array.isArray(conversation.product.images) || 
+                     conversation.product.images.length === 0)) {
+                  loadProductDetails(conversation.product_id, conversation.id);
+                }
+              });
+            }
+          } else {
+            setIsAuthenticated(false);
+            setLoading(false);
           }
-        } else {
+        } catch (error) {
+          console.error('Erreur chargement données:', error);
+          setIsAuthenticated(false);
           setLoading(false);
         }
       };
       
       loadData();
       
-      // Fonction de nettoyage pour annuler l'intervalle quand l'écran n'est plus en focus
+      // Nettoyer l'intervalle lors du démontage
       return () => {
         if (intervalId) {
           clearInterval(intervalId);
         }
       };
-    }, []) // Supprimer la dépendance à conversations pour éviter les boucles
+    }, [])
   );
 
   const getUserId = async () => {
@@ -230,8 +254,17 @@ export default function MessagesScreen({ navigation }: any) {
       
       const signal = abortController.signal;
       
-      // Obtenir le token et l'userId synchronement
-      const token = await AsyncStorage.getItem('token');
+      // Vérifier l'authentification via le service Auth
+      const isAuth = await AuthService.checkAuth();
+      if (!isAuth) {
+        setConversations([]);
+        setLoading(false);
+        setRefreshing(false);
+        setIsAuthenticated(false);
+        return;
+      }
+      
+      // Obtenir l'userId
       const userIdString = await AsyncStorage.getItem('userId');
       const currentUserId = userIdString ? parseInt(userIdString) : null;
       
@@ -249,21 +282,16 @@ export default function MessagesScreen({ navigation }: any) {
         setUserId(currentUserId);
       }
       
-      if (!token) {
-        setConversations([]);
-        setLoading(false);
-        setRefreshing(false);
-        setIsAuthenticated(false);
-        return;
-      }
-      
+      // Obtenir les headers d'authentification
+      const headers = await AuthService.getAuthHeaders();
+            
       // Mettre à jour l'état d'authentification
       setIsAuthenticated(true);
       
       const response = await axios.get(
-        `${API_URL}/api/messages/conversations`,
+        `${API_URL}/messages/conversations`,
         { 
-          headers: { Authorization: `Bearer ${token}` },
+          headers,
           timeout: 10000, // Ajouter un timeout pour éviter les attentes infinies
           signal: signal
         }
@@ -476,28 +504,23 @@ export default function MessagesScreen({ navigation }: any) {
   // Version simplifiée de loadProductDetails pour un chargement efficace
   const loadProductDetails = async (productId: number, conversationId: number, signal?: AbortSignal) => {
     try {
-      if (!isMounted.current) return;
-      
-      // Vérifier si ce produit est déjà en cours de chargement pour éviter les doublons
-      const productLoadingKey = `loading_product_${productId}_${conversationId}`;
-      if (loadingProducts.current[productLoadingKey]) {
+      // Éviter de recharger les produits déjà en cours de chargement
+      const productKey = `${productId}-${conversationId}`;
+      if (loadingProducts.current[productKey]) {
         return;
       }
       
-      // Marquer comme en cours de chargement
-      loadingProducts.current[productLoadingKey] = true;
+      // Marquer ce produit comme en cours de chargement
+      loadingProducts.current[productKey] = true;
       
-      // Récupérer le token
-      const token = await AsyncStorage.getItem('token');
-      if (!token) {
-        loadingProducts.current[productLoadingKey] = false;
-        return;
-      }
+      // Récupérer les headers d'authentification via le service
+      const headers = await AuthService.getAuthHeaders();
       
-      // Appel API pour obtenir les détails du produit
-      const response = await axios.get(`${API_URL}/api/products/${productId}`, {
-        headers: { Authorization: `Bearer ${token}` },
-        signal
+      // Faire la requête pour obtenir les détails du produit
+      const response = await axios.get(`${API_URL}/products/${productId}`, {
+        headers,
+        timeout: 8000,
+        signal: signal
       });
       
       if (!isMounted.current) return;
@@ -553,8 +576,8 @@ export default function MessagesScreen({ navigation }: any) {
     } finally {
       if (isMounted.current) {
         // Fin du chargement
-        const productLoadingKey = `loading_product_${productId}_${conversationId}`;
-        loadingProducts.current[productLoadingKey] = false;
+        const productKey = `${productId}-${conversationId}`;
+        loadingProducts.current[productKey] = false;
       }
     }
   };

@@ -12,7 +12,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 // URL de l'API
 // Pour les appareils externes, utiliser votre adresse IP locale au lieu de 127.0.0.1
 const API_URL = process.env.NODE_ENV === 'development' || __DEV__ 
-  ? 'http://172.20.10.2:8000'  // Adresse IP locale de l'utilisateur
+  ? 'http://192.168.0.34:8000/api'  // Adresse IP locale de l'utilisateur
   : 'https://api.showroombaby.com';
 
 interface Product {
@@ -73,7 +73,7 @@ export default function ProfileScreen({ navigation }: Props) {
       const token = await AsyncStorage.getItem('token');
       if (!token) return;
       
-      const response = await axios.get(`${API_URL}/api/users/profile`, {
+      const response = await axios.get(`${API_URL}/users/profile`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       
@@ -105,7 +105,7 @@ export default function ProfileScreen({ navigation }: Props) {
         return;
       }
 
-      const response = await axios.get(`${API_URL}/api/users/me/products`, {
+      const response = await axios.get(`${API_URL}/users/me/products`, {
         headers: { 
           'Authorization': `Bearer ${token}`,
           'Accept': 'application/json'
@@ -281,7 +281,7 @@ export default function ProfileScreen({ navigation }: Props) {
           onPress: async () => {
             try {
               const token = await AsyncStorage.getItem('token');
-              await axios.delete(`${API_URL}/api/products/${productId}`, {
+              await axios.delete(`${API_URL}/products/${productId}`, {
                 headers: { Authorization: `Bearer ${token}` }
               });
               
@@ -385,7 +385,7 @@ export default function ProfileScreen({ navigation }: Props) {
         return;
       }
       
-      const response = await axios.put(`${API_URL}/api/users/profile`, 
+      const response = await axios.put(`${API_URL}/users/profile`, 
         {
           name,
           email,
@@ -436,7 +436,7 @@ export default function ProfileScreen({ navigation }: Props) {
       }
       
       // Inclure l'adresse dans la mise à jour du profil
-      const response = await axios.put(`${API_URL}/api/users/profile`,
+      const response = await axios.put(`${API_URL}/users/profile`,
         {
           address: {
             street,
@@ -499,7 +499,7 @@ export default function ProfileScreen({ navigation }: Props) {
         return;
       }
       
-      const response = await axios.post(`${API_URL}/api/users/change-password`, 
+      const response = await axios.post(`${API_URL}/users/change-password`, 
         { 
           current_password: currentPassword,
           password: newPassword,
