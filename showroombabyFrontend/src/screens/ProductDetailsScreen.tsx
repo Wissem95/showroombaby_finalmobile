@@ -12,6 +12,7 @@ import Geolocation from '@react-native-community/geolocation';
 import Carousel from 'react-native-reanimated-carousel';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { PanGestureHandler, State } from 'react-native-gesture-handler';
+import imageService from '../services/api/imageService';
 
 // URL de l'API
 // Pour les appareils externes, utiliser votre adresse IP locale au lieu de 127.0.0.1
@@ -266,12 +267,31 @@ const carouselStyles = StyleSheet.create({
     marginLeft: 8,
     fontWeight: '500',
   },
+  imageLoadingContainer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.3)',
+    zIndex: 2,
+  },
 });
 
-const ImageCarousel = ({ images, navigation, product }: { images: string[], navigation: any, product: Product }) => {
+const ImageCarousel = ({ images, navigation, product, formatPrice, getProductImageSource, getFullImageUrl }: { 
+  images: string[], 
+  navigation: any, 
+  product: Product,
+  formatPrice: (price: number) => string,
+  getProductImageSource: (product: Product | null) => any,
+  getFullImageUrl: (imagePath: string | null) => string
+}) => {
   const [activeIndex, setActiveIndex] = useState(0);
   const [imageLoadError, setImageLoadError] = useState<Record<string, boolean>>({});
   const [isFavorite, setIsFavorite] = useState(false);
+  const [imageLoading, setImageLoading] = useState<Record<string, boolean>>({});
   
   // Animation pour l'indicateur de swipe
   const swipeAnim = useRef(new Animated.Value(0)).current;
@@ -330,14 +350,6 @@ const ImageCarousel = ({ images, navigation, product }: { images: string[], navi
     }
   };
 
-  // Fonction pour formater le prix spécifique au composant
-  const formatProductPrice = (price: number) => {
-    if (price === undefined || price === null) {
-      return '0 €';
-    }
-    return `${price}€`;
-  };
-
   const handleShare = async () => {
     if (!product) return;
     
@@ -351,167 +363,46 @@ const ImageCarousel = ({ images, navigation, product }: { images: string[], navi
     }
   };
 
-  if (!images || images.length === 0) {
-    console.log('ImageCarousel - Aucune image, affichage du placeholder');
-    return (
-      <View style={carouselStyles.container}>
-        <View style={carouselStyles.item}>
-          <Image
-            source={placeholderImage}
-            style={carouselStyles.image}
-            resizeMode="cover"
-          />
-          <View style={carouselStyles.overlay} />
-        </View>
-        
-        <View style={carouselStyles.headerBar}>
-          <TouchableOpacity 
-            style={carouselStyles.backButton} 
-            onPress={() => navigation.goBack()}
-          >
-            <Ionicons name="chevron-back" size={32} color="#fff" />
-          </TouchableOpacity>
-        </View>
-        
-        <View style={carouselStyles.productInfoOverlay}>
-          <Text style={carouselStyles.productTitle}>{product.title}</Text>
-          <Text style={carouselStyles.productPrice}>{formatProductPrice(product.price)}</Text>
-          <Text style={carouselStyles.publishDate}>
-            Publié le {new Date(product.created_at).toLocaleDateString('fr-FR')}
-          </Text>
-        </View>
-        
-        <View style={carouselStyles.actionsBar}>
-          <TouchableOpacity 
-            style={carouselStyles.actionButton}
-            onPress={async () => {
-              if (product && product.phone) {
-                Linking.openURL(`tel:${product.phone}`);
-              } else if (product && product.user_id) {
-                try {
-                  // Vérifier si l'utilisateur essaie de s'envoyer un message à lui-même
-                  const userId = await AsyncStorage.getItem('userId');
-                  const currentUserId = userId ? parseInt(userId) : null;
-                  
-                  if (currentUserId && currentUserId === product.user_id) {
-                    Alert.alert("Information", "Vous ne pouvez pas vous envoyer un message à vous-même");
-                    return;
-                  }
-                  
-                  navigation.navigate('Chat', {
-                    receiverId: product.user_id,
-                    productId: product.id,
-                    productTitle: product.title
-                  });
-                } catch (error) {
-                  console.error("Erreur lors de la vérification de l'ID utilisateur:", error);
-                  Alert.alert("Erreur", "Impossible de contacter le vendeur pour le moment");
-                }
-              } else {
-                Alert.alert("Information", "Aucun numéro de téléphone disponible pour ce produit");
-              }
-            }}
-          >
-            <Ionicons name="call-outline" size={26} color="#777" />
-          </TouchableOpacity>
-          <TouchableOpacity 
-            style={carouselStyles.actionButton}
-            onPress={async () => {
-              if (product && product.user_id) {
-                try {
-                  // Vérifier si l'utilisateur essaie de s'envoyer un message à lui-même
-                  const userId = await AsyncStorage.getItem('userId');
-                  const currentUserId = userId ? parseInt(userId) : null;
-                  
-                  if (currentUserId && currentUserId === product.user_id) {
-                    Alert.alert("Information", "Vous ne pouvez pas vous envoyer un message à vous-même");
-                    return;
-                  }
-                  
-                  navigation.navigate('Chat', {
-                    receiverId: product.user_id,
-                    productId: product.id,
-                    productTitle: product.title
-                  });
-                } catch (error) {
-                  console.error("Erreur lors de la vérification de l'ID utilisateur:", error);
-                  Alert.alert("Erreur", "Impossible de contacter le vendeur pour le moment");
-                }
-              } else {
-                Alert.alert("Erreur", "Impossible de contacter le vendeur");
-              }
-            }}
-          >
-            <Ionicons name="chatbubble-outline" size={26} color="#777" />
-          </TouchableOpacity>
-          <TouchableOpacity 
-            style={[
-              carouselStyles.actionButton, 
-              isFavorite && carouselStyles.actionButtonActive
-            ]}
-            onPress={() => setIsFavorite(!isFavorite)}
-          >
-            <Ionicons 
-              name={isFavorite ? "heart" : "heart-outline"} 
-              size={26} 
-              color={isFavorite ? "#e74c3c" : "#777"} 
-            />
-          </TouchableOpacity>
-          <TouchableOpacity 
-            style={carouselStyles.actionButton}
-            onPress={handleShare}
-          >
-            <Ionicons name="share-social-outline" size={26} color="#777" />
-          </TouchableOpacity>
-        </View>
-      </View>
-    );
-  }
-
   const renderItem = ({ item }: { item: string }) => {
-    // Construire l'URL de l'image correctement
-    let imageUrl = '';
-    try {
-      if (typeof item === 'string') {
-        if (item.startsWith('http')) {
-          imageUrl = item;
-        } else {
-          imageUrl = `${API_URL.replace('/api', '')}/storage/${item}`;
-        }
-      } else {
-        imageUrl = placeholderImage;
-      }
-      
-      console.log('Image URL corrigée:', imageUrl);
-    } catch (error) {
-      console.error('Erreur lors de la construction de l\'URL de l\'image:', error);
-      imageUrl = placeholderImage;
-    }
-
+    // Construire l'URL de l'image correctement avec le service
+    const imageUrl = getFullImageUrl(item);
+    
     return (
       <View style={carouselStyles.item}>
-        {imageLoadError[imageUrl] ? (
-          <View style={carouselStyles.errorContainer}>
+        {!imageUrl || imageLoadError[imageUrl] ? (
+          // Afficher le placeholder avec un fond blanc
+          <View style={[carouselStyles.item, { backgroundColor: 'white' }]}>
             <Image
               source={placeholderImage}
-              style={[carouselStyles.image, { opacity: 0.7 }]}
-              resizeMode="cover"
+              style={[carouselStyles.image, { opacity: 1, resizeMode: 'contain' }]}
             />
-            <Text style={carouselStyles.errorText}>Image non disponible</Text>
           </View>
         ) : (
           <>
+            {imageLoading[imageUrl] && (
+              <View style={carouselStyles.imageLoadingContainer}>
+                <ActivityIndicator size="large" color="#fff" />
+              </View>
+            )}
             <Image
               source={{ uri: imageUrl }}
               style={carouselStyles.image}
               resizeMode="cover"
               defaultSource={placeholderImage}
+              onLoadStart={() => {
+                setImageLoading(prev => ({ ...prev, [imageUrl]: true }));
+              }}
+              onLoad={() => {
+                console.log(`Image chargée avec succès: ${imageUrl}`);
+                setImageLoading(prev => ({ ...prev, [imageUrl]: false }));
+              }}
               onError={(error) => {
                 console.log('ImageCarousel - Erreur de chargement image:', {
                   url: imageUrl,
                   error: error.nativeEvent.error
                 });
                 setImageLoadError(prev => ({ ...prev, [imageUrl]: true }));
+                setImageLoading(prev => ({ ...prev, [imageUrl]: false }));
               }}
             />
             <View style={carouselStyles.overlay} />
@@ -591,7 +482,7 @@ const ImageCarousel = ({ images, navigation, product }: { images: string[], navi
           
           <View style={carouselStyles.productInfoOverlay}>
             <Text style={carouselStyles.productTitle}>{product.title}</Text>
-            <Text style={carouselStyles.productPrice}>{formatProductPrice(product.price)}</Text>
+            <Text style={carouselStyles.productPrice}>{formatPrice(product.price)}</Text>
             <Text style={carouselStyles.publishDate}>
               Publié le {new Date(product.created_at).toLocaleDateString('fr-FR')}
             </Text>
@@ -953,6 +844,53 @@ export default function ProductDetailsScreen({ route, navigation }: any) {
     checkAuth();
   }, []);
 
+  // Fonction unique pour formater le prix
+  const formatPrice = (price: number) => {
+    if (price === undefined || price === null) {
+      return '0.00 €';
+    }
+    return price.toFixed(2).replace(/\d(?=(\d{3})+\.)/g, '$& ') + ' €';
+  };
+
+  // Fonction unique pour obtenir les images d'un produit
+  const getProductImage = (product: Product | null): string[] => {
+    if (!product) return [];
+    return imageService.getProductImages(product);
+  };
+
+  // Fonction unique pour obtenir la source d'image d'un produit
+  const getProductImageSource = (product: Product | null) => {
+    if (!product) return placeholderImage;
+    return imageService.getProductImageSource(product, placeholderImage);
+  };
+  
+  // Fonction pour obtenir l'URL complète d'une image
+  const getFullImageUrl = (imagePath: string | null): string => {
+    return imageService.getFullImageUrl(imagePath);
+  };
+  
+  // Autres fonctions utilitaires
+  const getWarrantyLabel = (warranty: string) => {
+    const warranties: Record<string, string> = {
+      'no': 'Pas de garantie',
+      '3_months': '3 mois',
+      '6_months': '6 mois',
+      '12_months': '12 mois',
+      '24_months': '24 mois'
+    };
+    return warranties[warranty] || warranty;
+  };
+
+  const getConditionLabel = (condition: string) => {
+    const conditions: Record<string, string> = {
+      'NEW': 'Neuf',
+      'LIKE_NEW': 'Comme neuf',
+      'GOOD': 'Bon état',
+      'FAIR': 'État correct'
+    };
+    return conditions[condition] || condition;
+  };
+
   // Fonction pour partager le produit
   const handleShare = async () => {
     if (!product) return;
@@ -1086,130 +1024,6 @@ export default function ProductDetailsScreen({ route, navigation }: any) {
     }
   };
 
-  // Obtenir l'image principale d'un produit - version améliorée pour gérer tous les formats
-  const getProductImage = (product: Product | null): string[] => {
-    if (!product || !product.images) {
-      console.log('Produit sans images');
-      return [];
-    }
-
-    try {
-      // Si les images sont stockées sous forme de chaîne JSON
-      if (typeof product.images === 'string') {
-        try {
-          // Tentative de parse JSON
-          const parsedImages = JSON.parse(product.images);
-          if (Array.isArray(parsedImages)) {
-            return parsedImages.map((img: ImageType | string) => {
-              if (typeof img === 'string') {
-                return img;
-              }
-              if (img && typeof img === 'object') {
-                if (img.path) {
-                  return img.path;
-                }
-                if (img.url) {
-                  return img.url;
-                }
-              }
-              return '';
-            }).filter(Boolean);
-          }
-          // Si c'est une chaîne JSON mais pas un tableau (peut-être un objet unique)
-          if (typeof parsedImages === 'object' && parsedImages !== null) {
-            if (parsedImages.path) {
-              return [parsedImages.path];
-            }
-            if (parsedImages.url) {
-              return [parsedImages.url];
-            }
-          }
-          // Si c'est une autre forme de JSON, essayer de l'utiliser comme URL
-          return [product.images];
-        } catch (e) {
-          // Si ce n'est pas un JSON valide, essayer d'utiliser directement comme une URL
-          if (product.images.includes('.jpg') || 
-              product.images.includes('.jpeg') || 
-              product.images.includes('.png')) {
-            return [product.images];
-          }
-          console.log('Format d\'image non reconnu (chaîne):', product.images);
-          return [];
-        }
-      }
-
-      // Si c'est déjà un tableau
-      if (Array.isArray(product.images)) {
-        if (product.images.length === 0) {
-          return [];
-        }
-        
-        return product.images.map((img: ImageType | string) => {
-          if (typeof img === 'string') {
-            return img;
-          }
-          if (img && typeof img === 'object') {
-            if (img.path) {
-              return img.path;
-            }
-            if (img.url) {
-              return img.url;
-            }
-          }
-          return '';
-        }).filter(Boolean);
-      }
-
-      // Si c'est un objet avec une propriété path ou url
-      if (typeof product.images === 'object' && product.images !== null) {
-        const img = product.images as ImageType;
-        if (img.path) {
-          return [img.path];
-        }
-        if (img.url) {
-          return [img.url];
-        }
-      }
-
-      console.log('Format d\'images non reconnu:', product.images);
-      return [];
-    } catch (error) {
-      console.error('Erreur lors du traitement des images:', error);
-      return [];
-    }
-  };
-  
-  // Traduire la garantie
-  const getWarrantyLabel = (warranty: string) => {
-    const warranties: Record<string, string> = {
-      'no': 'Pas de garantie',
-      '3_months': '3 mois',
-      '6_months': '6 mois',
-      '12_months': '12 mois',
-      '24_months': '24 mois'
-    };
-    return warranties[warranty] || warranty;
-  };
-
-  // Traduire la condition du produit
-  const getConditionLabel = (condition: string) => {
-    const conditions: Record<string, string> = {
-      'NEW': 'Neuf',
-      'LIKE_NEW': 'Comme neuf',
-      'GOOD': 'Bon état',
-      'FAIR': 'État correct'
-    };
-    return conditions[condition] || condition;
-  };
-
-  // Formater le prix
-  const formatPrice = (price: number) => {
-    if (price === undefined || price === null) {
-      return '0.00 €';
-    }
-    return price.toFixed(2).replace(/\d(?=(\d{3})+\.)/g, '$& ') + ' €';
-  };
-
   // Fonction pour obtenir les coordonnées à partir de l'adresse
   const getCoordinates = async (address: string) => {
     try {
@@ -1311,6 +1125,9 @@ export default function ProductDetailsScreen({ route, navigation }: any) {
           images={getProductImage(product)} 
           navigation={navigation} 
           product={product}
+          formatPrice={formatPrice}
+          getProductImageSource={getProductImageSource}
+          getFullImageUrl={getFullImageUrl}
         />
       </View>
     );
@@ -1360,36 +1177,18 @@ export default function ProductDetailsScreen({ route, navigation }: any) {
               fullscreenMode: true
             })}
           >
-            {getProductImage(product).length > 0 ? (
-              <>
-                <Image
-                  source={{ 
-                    uri: getProductImage(product).length > 0 
-                      ? (
-                        typeof getProductImage(product)[0] === 'string' && getProductImage(product)[0].startsWith('http')
-                          ? getProductImage(product)[0]
-                          : `${API_URL.replace('/api', '')}/storage/${getProductImage(product)[0]}`
-                      )
-                      : placeholderImage
-                  }}
-                  style={styles.mainImage}
-                  resizeMode="cover"
-                  onError={(e) => {
-                    console.log('Erreur de chargement image principale:', e.nativeEvent.error);
-                  }}
-                />
-                <View style={styles.imageOverlay} />
-              </>
-            ) : (
-              <>
-                <Image
-                  source={placeholderImage}
-                  style={styles.mainImage}
-                  resizeMode="cover"
-                />
-                <View style={styles.imageOverlay} />
-              </>
-            )}
+            <View style={styles.productImageContainer}>
+              <Image
+                source={getProductImageSource(product)}
+                style={styles.mainImage}
+                resizeMode="cover"
+                defaultSource={placeholderImage}
+                onError={(e) => {
+                  console.log('Erreur de chargement image principale:', e.nativeEvent.error);
+                }}
+              />
+              <View style={styles.imageOverlay} />
+            </View>
             
             <View style={styles.imageHeader}>
               <TouchableOpacity 
@@ -1407,7 +1206,7 @@ export default function ProductDetailsScreen({ route, navigation }: any) {
             
             {getProductImage(product).length > 1 && (
               <View style={styles.imagePagination}>
-                {getProductImage(product).map((_, index) => (
+                {getProductImage(product).map((_: any, index: number) => (
                   <View
                     key={index}
                     style={[
@@ -1881,6 +1680,11 @@ const styles = StyleSheet.create({
     position: 'relative',
     height: '100%',
   },
+  productImageContainer: {
+    width: '100%',
+    height: '100%',
+    position: 'relative',
+  },
   mainImage: {
     width: '100%',
     height: '100%',
@@ -1893,14 +1697,6 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
     backgroundColor: 'rgba(0,0,0,0.2)',
-  },
-  imageGradient: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    height: 150,
-    backgroundColor: 'rgba(0,0,0,0.4)',
   },
   imageHeader: {
     position: 'absolute',

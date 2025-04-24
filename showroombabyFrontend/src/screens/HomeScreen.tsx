@@ -8,17 +8,22 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { widthPercentageToDP as wp, heightPercentageToDP as hp } from 'react-native-responsive-screen';
 import { useFocusEffect } from '@react-navigation/native';
 import { SERVER_IP } from '../config/ip';
+import imageService from '../services/api/imageService';
 
 type Props = NativeStackScreenProps<any, 'Home'>;
 
-// URL de l'API
-// Pour les appareils externes, utiliser votre adresse IP locale au lieu de 127.0.0.1
+// URL de l'API avec l'adresse IP de configuration
 const API_URL = process.env.NODE_ENV === 'development' || __DEV__ 
   ? `http://${SERVER_IP}:8000/api`  // Adresse IP locale chargée depuis la configuration avec préfixe /api
   : 'https://api.showroombaby.com/api';  // URL de production
 
-// URL des images par défaut
-const DEFAULT_IMAGE_URL = 'https://placehold.co/400x300/f8bbd0/ffffff?text=Showroom+Baby';
+console.log('HomeScreen - API_URL:', API_URL);
+
+// Image placeholder
+const placeholderImage = require('../../assets/placeholder.png');
+
+// URL des images par défaut (remplacement par le placeholder local)
+const DEFAULT_IMAGE_URL = placeholderImage;
 const BANNER_IMAGE_URL = require('../../assets/images/IMG_3139-Photoroom.png');
 
 // Catégories à afficher avec leurs images correspondantes
@@ -69,74 +74,9 @@ const ProductItem = React.memo(({ item, navigation }: { item: Product; navigatio
     });
   };
 
+  // Utiliser le service d'image pour obtenir la source de l'image
   const getProductImage = (product: Product) => {
-    // Image par défaut
-    if (!product.images) {
-      return { uri: DEFAULT_IMAGE_URL };
-    }
-
-    try {
-      // Si images est une chaîne JSON, on essaie de l'analyser
-      if (typeof product.images === 'string') {
-        try {
-          const parsedImages = JSON.parse(product.images);
-          
-          if (Array.isArray(parsedImages) && parsedImages.length > 0) {
-            // Vérifier si l'image contient un chemin complet ou juste un nom de fichier
-            const imageUrl = parsedImages[0].includes('http') 
-              ? parsedImages[0] 
-              : `${API_URL}/storage/${parsedImages[0]}`;
-            
-            return { uri: imageUrl };
-          }
-        } catch (e) {
-          // Si ce n'est pas un JSON valide, on utilise directement la chaîne
-          const imageUrl = product.images.includes('http') 
-            ? product.images 
-            : `${API_URL}/storage/${product.images}`;
-          
-          return { uri: imageUrl };
-        }
-      } 
-      // Si c'est déjà un tableau d'objets avec propriété "path"
-      else if (Array.isArray(product.images) && product.images.length > 0) {
-        // Vérifier si c'est un tableau d'objets avec une propriété path
-        if (typeof product.images[0] === 'object' && product.images[0] !== null) {
-          // Si l'objet contient un champ path ou url
-          if (product.images[0].path) {
-            const imageUrl = product.images[0].path.includes('http') 
-              ? product.images[0].path 
-              : `${API_URL}/storage/${product.images[0].path}`;
-            
-            return { uri: imageUrl };
-          } else if (product.images[0].url) {
-            return { uri: product.images[0].url };
-          } else {
-            // Essayer de récupérer directement la première valeur
-            const firstImage = product.images[0];
-            
-            if (typeof firstImage === 'string') {
-              const imageUrl = firstImage.includes('http') 
-                ? firstImage 
-                : `${API_URL}/storage/${firstImage}`;
-              
-              return { uri: imageUrl };
-            }
-          }
-        } else if (typeof product.images[0] === 'string') {
-          // Si c'est un tableau de chaînes
-          const imageUrl = product.images[0].includes('http') 
-            ? product.images[0] 
-            : `${API_URL}/storage/${product.images[0]}`;
-          
-          return { uri: imageUrl };
-        }
-      }
-    } catch (e) {
-      // En cas d'erreur, on utilise l'image par défaut
-    }
-
-    return { uri: DEFAULT_IMAGE_URL };
+    return imageService.getProductImageSource(product, DEFAULT_IMAGE_URL);
   };
   
   useFocusEffect(
@@ -276,11 +216,18 @@ const ProductItem = React.memo(({ item, navigation }: { item: Product; navigatio
           style={styles.productImage}
           resizeMode="cover"
           onLoadStart={() => setImageLoading(true)}
-          onLoad={() => setImageLoading(false)}
-          onError={() => {
+          onLoad={() => {
+            console.log(`Image chargée avec succès pour produit ${item.id}`);
+            setImageLoading(false);
+            setImageError(false);
+          }}
+          onError={(e) => {
+            console.log(`Erreur de chargement d'image pour produit ${item.id}:`, e.nativeEvent.error);
             setImageLoading(false);
             setImageError(true);
           }}
+          key={`home-image-${item.id}-${new Date().getTime()}`}
+          defaultSource={DEFAULT_IMAGE_URL}
         />
         {imageError && (
           <View style={styles.imageErrorContainer}>
@@ -497,6 +444,47 @@ export default function HomeScreen({ navigation }: Props) {
       </ScrollView>
     );
   };
+
+  // Fonction pour tester l'accès aux images
+  useEffect(() => {
+    // Cette fonction est volontairement commentée pour éviter des requêtes constantes
+    /* 
+    const testImageAccess = async () => {
+      if (products.length > 0) {
+        const firstProduct = products[0];
+        try {
+          // Tester l'accès à l'image du premier produit
+          const imageSource = getProductImage(firstProduct);
+          if (imageSource && imageSource.uri) {
+            console.log('Test d\'accès à l\'image:', imageSource.uri);
+            
+            try {
+              const response = await fetch(imageSource.uri, { method: 'HEAD' });
+              console.log('Réponse du test d\'image:', {
+                status: response.status,
+                ok: response.ok,
+                headers: Object.fromEntries(response.headers.entries())
+              });
+            } catch (error) {
+              console.error('Erreur lors du test d\'accès à l\'image:', error);
+            }
+          }
+        } catch (error) {
+          console.error('Erreur lors du test des images:', error);
+        }
+      }
+    };
+    
+    if (products.length > 0) {
+      testImageAccess();
+    }
+    */
+    
+    // Au lieu de tester les images, on log simplement les URLs des produits chargés
+    if (products.length > 0) {
+      console.log(`HomeScreen - ${products.length} produits chargés. Vérifiez les logs d'images.`);
+    }
+  }, [products]);
 
   return (
     <View style={styles.container}>
