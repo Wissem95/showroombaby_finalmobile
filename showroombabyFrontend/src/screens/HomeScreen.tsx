@@ -157,7 +157,14 @@ const ProductItem = React.memo(({ item, navigation }: { item: Product; navigatio
         await AsyncStorage.setItem(`favorite_${item.id}`, 'true');
       }
     } catch (error: any) {
+      // Vérifie si c'est l'erreur 422 pour ne pas l'afficher en rouge
+      if (error.response && error.response.status === 422 && error.response.data?.message.includes('propre produit')) {
+        // Ne pas afficher l'erreur en console pour cette erreur spécifique
+        console.log('Info: tentative d\'ajouter son propre produit en favoris');
+      } else {
+        // Pour toutes les autres erreurs, on conserve le console.error
       console.error('Erreur favoris:', error);
+      }
       
       if (error.response) {
         if (error.response.status === 422) {

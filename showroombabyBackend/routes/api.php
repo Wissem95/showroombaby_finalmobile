@@ -40,6 +40,7 @@ Route::prefix('products')->group(function () {
     Route::get('/trending', [ProductController::class, 'trending']);
     Route::get('/{id}', [ProductController::class, 'show']);
     Route::get('/{id}/similar', [ProductController::class, 'similar']);
+    Route::get('/{id}/images', [ProductController::class, 'getImages']);
 
     // Routes protégées
     Route::middleware('auth:sanctum')->group(function () {

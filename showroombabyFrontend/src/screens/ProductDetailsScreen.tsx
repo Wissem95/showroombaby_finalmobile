@@ -96,23 +96,41 @@ const carouselStyles = StyleSheet.create({
     backgroundColor: 'black',
     position: 'relative',
     overflow: 'hidden',
+    zIndex: 1,
   },
   item: {
     width: '100%',
     height: '100%',
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: 'transparent',
+    backgroundColor: 'rgba(0,0,0,0.2)',
     overflow: 'hidden',
+    zIndex: 1,
   },
   image: {
     width: '100%',
     height: '100%',
-    resizeMode: 'cover',
+    resizeMode: 'contain',
+    zIndex: 2,
+  },
+  debugInfo: {
+    position: 'absolute',
+    top: 100, 
+    left: 20,
+    right: 20,
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    padding: 10,
+    borderRadius: 5,
+    zIndex: 100,
+  },
+  debugText: {
+    color: 'white',
+    fontSize: 12,
   },
   overlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0,0,0,0.2)',
+    backgroundColor: 'rgba(0,0,0,0.05)',
+    zIndex: 3,
   },
   headerBar: {
     position: 'absolute',
@@ -134,7 +152,7 @@ const carouselStyles = StyleSheet.create({
     position: 'absolute',
     bottom: 100,
     width: '100%',
-    zIndex: 5,
+    zIndex: 10,
   },
   paginationDot: {
     width: 8,
@@ -163,6 +181,7 @@ const carouselStyles = StyleSheet.create({
     elevation: 10,
     margin: 5,
     top: 20,
+    zIndex: 1000,
   },
   productInfoOverlay: {
     position: 'absolute',
@@ -172,7 +191,7 @@ const carouselStyles = StyleSheet.create({
     padding: 20,
     paddingBottom: 80,
     backgroundColor: 'rgba(0,0,0,0.5)',
-    zIndex: 3,
+    zIndex: 10,
   },
   productTitle: {
     fontSize: 22,
@@ -206,7 +225,7 @@ const carouselStyles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-around',
     alignItems: 'center',
-    zIndex: 4,
+    zIndex: 20,
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     shadowColor: '#000',
@@ -260,6 +279,7 @@ const carouselStyles = StyleSheet.create({
     padding: 8,
     borderRadius: 20,
     alignSelf: 'center',
+    zIndex: 15,
   },
   swipeText: {
     color: '#fff',
@@ -276,7 +296,7 @@ const carouselStyles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: 'rgba(0, 0, 0, 0.3)',
-    zIndex: 2,
+    zIndex: 15,
   },
 });
 
@@ -292,12 +312,35 @@ const ImageCarousel = ({ images, navigation, product, formatPrice, getProductIma
   const [imageLoadError, setImageLoadError] = useState<Record<string, boolean>>({});
   const [isFavorite, setIsFavorite] = useState(false);
   const [imageLoading, setImageLoading] = useState<Record<string, boolean>>({});
+  const [showDebugInfo, setShowDebugInfo] = useState(__DEV__);
+  const [imageKey, setImageKey] = useState(0); // Clé pour forcer le rechargement
   
   // Animation pour l'indicateur de swipe
   const swipeAnim = useRef(new Animated.Value(0)).current;
   
   // Nouvelle animation pour la transition
   const transitionAnim = useRef(new Animated.Value(0)).current;
+  
+  // Fonction pour forcer le rechargement des images
+  const reloadImages = () => {
+    console.log('[DEBUG-IMAGES] Forçage du rechargement des images');
+    // Réinitialiser les erreurs et l'état de chargement
+    setImageLoadError({});
+    setImageLoading({});
+    // Incrémenter la clé pour forcer le rechargement du composant Image
+    setImageKey(prev => prev + 1);
+  };
+  
+  useEffect(() => {
+    if (images.length > 0) {
+      console.log('[DEBUG-IMAGES] Images disponibles dans le carrousel:', images.length);
+      images.forEach((img, index) => {
+        console.log(`[DEBUG-IMAGES] Image ${index}:`, img);
+      });
+    } else {
+      console.log('[DEBUG-IMAGES] Aucune image disponible dans le carrousel');
+    }
+  }, [images]);
   
   useEffect(() => {
     // Animation de l'indicateur de swipe
@@ -366,38 +409,50 @@ const ImageCarousel = ({ images, navigation, product, formatPrice, getProductIma
   const renderItem = ({ item }: { item: string }) => {
     // Construire l'URL de l'image correctement avec le service
     const imageUrl = getFullImageUrl(item);
+    console.log('[DEBUG-IMAGES] URL générée pour le carrousel:', imageUrl);
+    console.log('[DEBUG-IMAGES] Item original:', item);
+    
+    // Test avec une URL directe connue pour fonctionner
+    const testUrl = 'https://via.placeholder.com/400';
     
     return (
-      <View style={carouselStyles.item}>
+      <View style={[carouselStyles.item, { zIndex: 1 }]}>
         {!imageUrl || imageLoadError[imageUrl] ? (
           // Afficher le placeholder avec un fond blanc
-          <View style={[carouselStyles.item, { backgroundColor: 'white' }]}>
+          <View style={[carouselStyles.item, { backgroundColor: 'white', zIndex: 5 }]}>
             <Image
               source={placeholderImage}
-              style={[carouselStyles.image, { opacity: 1, resizeMode: 'contain' }]}
+              style={[carouselStyles.image, { opacity: 1, resizeMode: 'contain', zIndex: 5 }]}
             />
+            <Text style={{color: 'black', textAlign: 'center', position: 'absolute'}}>
+              Image non disponible
+            </Text>
+            {showDebugInfo && (
+              <Text style={{color: 'red', textAlign: 'center', position: 'absolute', top: 20, fontSize: 12}}>
+                URL: {imageUrl || 'Vide'}
+              </Text>
+            )}
           </View>
         ) : (
           <>
-            {imageLoading[imageUrl] && (
-              <View style={carouselStyles.imageLoadingContainer}>
-                <ActivityIndicator size="large" color="#fff" />
-              </View>
-            )}
+            {/* Image normale avec l'URL calculée */}
             <Image
+              key={`image-${imageKey}`} // Forcer le rechargement
               source={{ uri: imageUrl }}
-              style={carouselStyles.image}
-              resizeMode="cover"
+              style={[carouselStyles.image, { zIndex: 1 }]}
+              resizeMode="contain"
               defaultSource={placeholderImage}
               onLoadStart={() => {
+                console.log(`[DEBUG-IMAGES] Début chargement image: ${imageUrl}`);
                 setImageLoading(prev => ({ ...prev, [imageUrl]: true }));
               }}
               onLoad={() => {
-                console.log(`Image chargée avec succès: ${imageUrl}`);
+                console.log(`[DEBUG-IMAGES] Image chargée avec succès: ${imageUrl}`);
                 setImageLoading(prev => ({ ...prev, [imageUrl]: false }));
+                setImageLoadError(prev => ({ ...prev, [imageUrl]: false }));
               }}
               onError={(error) => {
-                console.log('ImageCarousel - Erreur de chargement image:', {
+                console.log('[DEBUG-IMAGES] Erreur de chargement image:', {
                   url: imageUrl,
                   error: error.nativeEvent.error
                 });
@@ -405,7 +460,32 @@ const ImageCarousel = ({ images, navigation, product, formatPrice, getProductIma
                 setImageLoading(prev => ({ ...prev, [imageUrl]: false }));
               }}
             />
-            <View style={carouselStyles.overlay} />
+            
+            {/* Image de test statique pour comparer */}
+            {__DEV__ && showDebugInfo && (
+              <Image
+                source={{ uri: testUrl }}
+                style={[carouselStyles.image, { 
+                  position: 'absolute',
+                  top: '50%', 
+                  left: 0, 
+                  width: '30%', 
+                  height: '30%', 
+                  zIndex: 20,
+                  backgroundColor: 'white',
+                  borderWidth: 2,
+                  borderColor: 'red'
+                }]}
+                resizeMode="contain"
+              />
+            )}
+            
+            <View style={[carouselStyles.overlay, { zIndex: 2 }]} />
+            {imageLoading[imageUrl] && (
+              <View style={[carouselStyles.imageLoadingContainer, { zIndex: 10 }]}>
+                <ActivityIndicator size="large" color="#fff" />
+              </View>
+            )}
           </>
         )}
       </View>
@@ -418,7 +498,7 @@ const ImageCarousel = ({ images, navigation, product, formatPrice, getProductIma
         activeOpacity={1}
         style={{ flex: 1 }}
         onPress={() => console.log('Tap sur le carrousel')}
-        onLongPress={() => console.log('Long press sur le carrousel')}
+        onLongPress={() => setShowDebugInfo(!showDebugInfo)}
         delayLongPress={250}
       >
         <Animated.View style={[
@@ -451,7 +531,41 @@ const ImageCarousel = ({ images, navigation, product, formatPrice, getProductIma
             >
               <Ionicons name="chevron-back" size={32} color="#fff" />
             </TouchableOpacity>
+            
+            {/* Boutons de débogage */}
+            {__DEV__ && (
+              <>
+                <TouchableOpacity 
+                  style={[carouselStyles.backButton, { backgroundColor: 'rgba(255,0,0,0.5)' }]} 
+                  onPress={() => setShowDebugInfo(!showDebugInfo)}
+                >
+                  <Ionicons name="bug-outline" size={24} color="#fff" />
+                </TouchableOpacity>
+                
+                {/* Bouton pour recharger les images */}
+                <TouchableOpacity 
+                  style={[carouselStyles.backButton, { backgroundColor: 'rgba(0,255,0,0.5)' }]} 
+                  onPress={reloadImages}
+                >
+                  <Ionicons name="refresh-outline" size={24} color="#fff" />
+                </TouchableOpacity>
+              </>
+            )}
           </View>
+          
+          {showDebugInfo && (
+            <View style={carouselStyles.debugInfo}>
+              <Text style={carouselStyles.debugText}>
+                Images: {images.length} | Index actif: {activeIndex}
+              </Text>
+              <Text style={carouselStyles.debugText}>
+                Image actuelle: {images[activeIndex] ? images[activeIndex].substring(0, 30) + '...' : 'N/A'}
+              </Text>
+              <Text style={carouselStyles.debugText}>
+                Erreurs: {Object.keys(imageLoadError).filter(key => imageLoadError[key]).length}
+              </Text>
+            </View>
+          )}
           
           <Carousel
             loop
@@ -688,11 +802,18 @@ export default function ProductDetailsScreen({ route, navigation }: any) {
     const loadProductDetails = async () => {
       if (!productId && route.params?.product) {
         // Si le produit est déjà disponible dans les paramètres
-        setProduct(route.params.product);
+        const paramProduct = route.params.product;
+        setProduct(paramProduct);
+        
+        console.log('[DEBUG-IMAGES] Produit provenant des params:', {
+          id: paramProduct.id,
+          images: paramProduct.images,
+          image_type: typeof paramProduct.images
+        });
         
         // Utiliser les données du vendeur du produit si disponibles
-        if (route.params.product.seller) {
-          setSeller(route.params.product.seller);
+        if (paramProduct.seller) {
+          setSeller(paramProduct.seller);
         }
         
         setLoading(false);
@@ -711,6 +832,24 @@ export default function ProductDetailsScreen({ route, navigation }: any) {
         
         if (response.data) {
           const productData = response.data.data || response.data;
+          console.log('[DEBUG-IMAGES] Données du produit reçues:', {
+            id: productData.id,
+            images: productData.images,
+            image_type: typeof productData.images
+          });
+          
+          // Si les images sont un string (JSON), essayer de l'analyser
+          if (typeof productData.images === 'string') {
+            try {
+              console.log('[DEBUG-IMAGES] Tentative de parse JSON pour les images:', productData.images);
+              const parsed = JSON.parse(productData.images);
+              productData.images = parsed;
+              console.log('[DEBUG-IMAGES] Images parsées avec succès:', parsed);
+            } catch (e) {
+              console.log('[DEBUG-IMAGES] Échec du parse JSON pour les images');
+            }
+          }
+          
           setProduct(productData);
           
           // Utiliser d'abord les données du vendeur incluses dans la réponse du produit
@@ -855,13 +994,23 @@ export default function ProductDetailsScreen({ route, navigation }: any) {
   // Fonction unique pour obtenir les images d'un produit
   const getProductImage = (product: Product | null): string[] => {
     if (!product) return [];
-    return imageService.getProductImages(product);
+    
+    const images = imageService.getProductImages(product);
+    console.log('[DEBUG-IMAGES] Images extraites du produit:', images);
+    if (images.length === 0) {
+      console.log('[DEBUG-IMAGES] Aucune image trouvée dans le produit', product.id);
+    }
+    return images;
   };
 
   // Fonction unique pour obtenir la source d'image d'un produit
   const getProductImageSource = (product: Product | null) => {
     if (!product) return placeholderImage;
-    return imageService.getProductImageSource(product, placeholderImage);
+    
+    const source = imageService.getProductImageSource(product, placeholderImage);
+    console.log('[DEBUG-IMAGES] Source image générée:', 
+      typeof source === 'object' && source.uri ? source.uri : 'Utilisation du placeholder');
+    return source;
   };
   
   // Fonction pour obtenir l'URL complète d'une image
@@ -943,7 +1092,14 @@ export default function ProductDetailsScreen({ route, navigation }: any) {
         Alert.alert('Succès', 'Produit ajouté aux favoris');
       }
     } catch (error: any) {
-      console.error('Erreur lors de la gestion des favoris:', error);
+      // Vérifie si c'est l'erreur 422 pour ne pas l'afficher en rouge
+      if (error.response && error.response.status === 422 && error.response.data?.message?.includes('propre produit')) {
+        // Ne pas afficher l'erreur en console pour cette erreur spécifique
+        console.log('Info: tentative d\'ajouter son propre produit en favoris');
+      } else {
+        // Pour toutes les autres erreurs, on conserve le console.error
+        console.error('Erreur lors de la gestion des favoris:', error);
+      }
       
       if (error.response) {
         if (error.response.status === 401) {

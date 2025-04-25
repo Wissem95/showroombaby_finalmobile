@@ -23,7 +23,7 @@ class ProductController extends Controller
     public function index(Request $request)
     {
         // Initialisation de la requête
-        $query = Product::with(['seller', 'category', 'images'])
+        $query = Product::with(['seller', 'category'])
             ->where('status', 'PUBLISHED');
 
         // Filtre par catégorie
@@ -99,8 +99,29 @@ class ProductController extends Controller
 
         $products = $query->paginate($limit, ['*'], 'page', $page);
 
+        // Charger et formater les images pour chaque produit
+        $formattedProducts = [];
+        foreach ($products->items() as $product) {
+            $productImages = ProductImage::where('product_id', $product->id)->get();
+
+            $formattedImages = [];
+            foreach ($productImages as $image) {
+                $formattedImages[] = [
+                    'id' => $image->id,
+                    'path' => $image->path,
+                    'url' => asset('storage/' . $image->path),
+                    'is_primary' => $image->is_primary,
+                    'order' => $image->order
+                ];
+            }
+
+            // Ajouter les images formatées au produit
+            $product->images = $formattedImages;
+            $formattedProducts[] = $product;
+        }
+
         return response()->json([
-            'items' => $products->items(),
+            'items' => $formattedProducts,
             'total' => $products->total(),
             'page' => $products->currentPage(),
             'limit' => $products->perPage(),
@@ -189,6 +210,21 @@ class ProductController extends Controller
         // Incrémenter le compteur de vues
         $product->increment('view_count');
 
+        // Charger les images du produit
+        $productImages = ProductImage::where('product_id', $product->id)->get();
+
+        // Formatter les images pour l'API
+        $formattedImages = [];
+        foreach ($productImages as $image) {
+            $formattedImages[] = [
+                'id' => $image->id,
+                'path' => $image->path,
+                'url' => asset('storage/' . $image->path),
+                'is_primary' => $image->is_primary,
+                'order' => $image->order
+            ];
+        }
+
         // Formater la réponse
         $response = [
             'id' => $product->id,
@@ -212,7 +248,7 @@ class ProductController extends Controller
             'view_count' => $product->view_count,
             'created_at' => $product->created_at,
             'updated_at' => $product->updated_at,
-            'images' => $product->images,
+            'images' => $formattedImages,
             'is_trending' => $product->is_trending,
             'is_featured' => $product->is_featured,
             'user_id' => $product->user_id,
@@ -416,5 +452,44 @@ class ProductController extends Controller
                 'message' => 'Erreur lors de la récupération des produits'
             ], 500);
         }
+    }
+
+    /**
+     * Récupère les images d'un produit spécifique
+     *
+     * @param string $id
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function getImages($id)
+    {
+        $product = Product::findOrFail($id);
+
+        $productImages = ProductImage::where('product_id', $id)->get();
+
+        // Vérifier s'il y a des images avec des chemins d'accès complets NULL
+        foreach ($productImages as $image) {
+            // Si l'URL complète est NULL, la mettre à jour
+            if ($image->full_path === null && $image->path !== null) {
+                $image->full_path = '/storage/' . $image->path;
+                $image->save();
+            }
+        }
+
+        $formattedImages = [];
+        foreach ($productImages as $image) {
+            $formattedImages[] = [
+                'id' => $image->id,
+                'path' => $image->path,
+                'url' => asset('storage/' . $image->path),
+                'full_path' => $image->full_path,
+                'is_primary' => $image->is_primary,
+                'order' => $image->order
+            ];
+        }
+
+        return response()->json([
+            'status' => 'success',
+            'data' => $formattedImages
+        ]);
     }
 }

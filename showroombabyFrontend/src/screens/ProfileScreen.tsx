@@ -200,66 +200,31 @@ export default function ProfileScreen({ navigation }: Props) {
 
   const getProductImage = (product: Product) => {
     // Image par défaut si pas d'images
-    if (!product.images) {
+    if (!product.images || !Array.isArray(product.images) || product.images.length === 0) {
       return require('../../assets/placeholder.png');
     }
     
     try {
-      // Si images est une chaîne JSON, on essaie de l'analyser
-      if (typeof product.images === 'string') {
-        try {
-          const parsedImages = JSON.parse(product.images);
-          
-          if (Array.isArray(parsedImages) && parsedImages.length > 0) {
-            // Vérifier si l'image contient un chemin complet ou juste un nom de fichier
-            const imageUrl = parsedImages[0].includes('http') 
-              ? parsedImages[0] 
-              : `${API_URL}/storage/${parsedImages[0]}`;
-            
-            return { uri: imageUrl };
-          }
-        } catch (e) {
-          // Si ce n'est pas un JSON valide, on utilise directement la chaîne
-          const imageUrl = product.images.includes('http') 
-            ? product.images 
-            : `${API_URL}/storage/${product.images}`;
-          
-          return { uri: imageUrl };
-        }
-      } 
-      // Si c'est déjà un tableau d'objets avec propriété "path"
-      else if (Array.isArray(product.images) && product.images.length > 0) {
-        // Vérifier si c'est un tableau d'objets avec une propriété path
-        if (typeof product.images[0] === 'object' && product.images[0] !== null) {
-          // Si l'objet contient un champ path ou url
-          if (product.images[0].path) {
-            const imageUrl = product.images[0].path.includes('http') 
-              ? product.images[0].path 
-              : `${API_URL}/storage/${product.images[0].path}`;
-            
-            return { uri: imageUrl };
-          } else if (product.images[0].url) {
-            return { uri: product.images[0].url };
-          } else {
-            // Essayer de récupérer directement la première valeur
-            const firstImage = product.images[0];
-            
-            if (typeof firstImage === 'string') {
-              const imageUrl = firstImage.includes('http') 
-                ? firstImage 
-                : `${API_URL}/storage/${firstImage}`;
-              
-              return { uri: imageUrl };
-            }
-          }
-        } else if (typeof product.images[0] === 'string') {
-          // Si c'est un tableau de chaînes
-          const imageUrl = product.images[0].includes('http') 
-            ? product.images[0] 
-            : `${API_URL}/storage/${product.images[0]}`;
-          
-          return { uri: imageUrl };
-        }
+      const image = product.images[0];
+      
+      // Si c'est une chaîne qui commence par http, c'est déjà une URL complète
+      if (typeof image === 'string' && image.startsWith('http')) {
+        return { uri: image };
+      }
+      
+      // Si c'est une chaîne sans http, ajouter le préfixe de stockage
+      if (typeof image === 'string') {
+        return { uri: `${API_URL}/storage/${image}` };
+      }
+      
+      // Si c'est un objet avec une propriété url
+      if (typeof image === 'object' && image && 'url' in image && image.url) {
+        return { uri: image.url };
+      }
+      
+      // Si c'est un objet avec une propriété path
+      if (typeof image === 'object' && image && 'path' in image && image.path) {
+        return { uri: `${API_URL}/storage/${image.path}` };
       }
     } catch (e) {
       console.error('Erreur traitement image:', e);

@@ -126,13 +126,36 @@ const EmptyConversationsList = ({ navigation, isAuthenticated }: { navigation: a
 
 // Fonction utilitaire simplifiée pour résoudre les URL d'images
 const getImageUrl = (image: any): string => {
-  if (!image) return DEFAULT_AVATAR_URL;
+  // Si c'est une chaîne qui commence par http, c'est déjà une URL complète
+  if (typeof image === 'string' && image.startsWith('http')) {
+    return image;
+  }
   
+  // Si c'est une chaîne sans http, ajouter le préfixe de stockage
   if (typeof image === 'string') {
-    return image.startsWith('http') ? image : `${API_URL}/storage/${image}`;
+    return `${API_URL}/storage/${image}`;
+  }
+  
+  // Si c'est un objet avec une propriété url
+  if (typeof image === 'object' && image && 'url' in image && image.url) {
+    return image.url;
+  }
+  
+  // Si c'est un objet avec une propriété path
+  if (typeof image === 'object' && image && 'path' in image && image.path) {
+    return `${API_URL}/storage/${image.path}`;
   }
   
   return DEFAULT_AVATAR_URL;
+};
+
+// Fonction pour obtenir l'URL d'image d'un produit
+const getProductImageUrl = (product: any): string => {
+  if (!product || !product.images || !product.images.length) {
+    return DEFAULT_AVATAR_URL;
+  }
+  
+  return getImageUrl(product.images[0]);
 };
 
 export default function MessagesScreen({ navigation }: any) {
@@ -642,98 +665,65 @@ export default function MessagesScreen({ navigation }: any) {
     }
 
     return (
-      <Animated.View
-        entering={FadeIn.duration(400)}
-        exiting={FadeOut.duration(300)}
-        layout={Layout.springify()}
+      <TouchableOpacity 
+        style={styles.conversationItem}
+        onPress={() => navigation.navigate('Chat', {
+          receiverId: otherUserId,
+          productId: item.product?.id,
+          productTitle: item.product?.title
+        })}
       >
-        <TouchableOpacity
-          onPress={() => {
-            navigation.navigate('Chat', {
-              receiverId: otherUserId,
-              productTitle: productTitle,
-              productId: item.product_id || (item.product ? item.product.id : undefined)
-            });
-          }}
-          style={styles.conversationTouchable}
-          activeOpacity={0.7}
-        >
-          {/* Wrapper externe pour gérer les ombres correctement */}
-          <View style={styles.cardOuterWrapper}>
-            <Surface style={styles.conversationSurface}>
-              {/* Wrapper interne avec overflow:hidden pour gérer les coins arrondis */}
-              <View style={[styles.conversationCard, !item.read && styles.unreadCard]}>
-                <View style={styles.conversationMain}>
-                  <View style={styles.conversationContent}>
-                    {renderAvatar(item)}
-                    
-                    <View style={styles.textContainer}>
-                      <View style={styles.headerRow}>
-                        <Text 
-                          style={[
-                            styles.userName, 
-                            !item.read && styles.unreadText
-                          ]} 
-                          numberOfLines={1}
-                        >
-                          {otherUserName}
-                        </Text>
-                        <Text style={styles.timeText}>
-                          {formatDate(item.created_at)}
-                        </Text>
-                      </View>
-                      
-                      <View style={styles.productInfoRow}>
-                        {item.product_id ? (
-                          <View style={styles.productImageContainer}>
-                            <Image 
-                              source={hasImages && imageUrl ? { uri: imageUrl } : placeholderImage}
-                              style={styles.productImage}
-                            />
-                          </View>
-                        ) : null}
-                        
-                        <Text 
-                          style={[
-                            styles.productTitle, 
-                            !item.read && { fontWeight: '700' },
-                            !hasValidProduct && { color: '#888', fontStyle: 'italic' }
-                          ]} 
-                          numberOfLines={1}
-                        >
-                          {productTitle}
-                        </Text>
-                        
-                        {formattedPrice && (
-                          <View style={styles.priceBadgeContainer}>
-                            <Text style={styles.messagePriceTag}>
-                              {formattedPrice}
-                            </Text>
-                          </View>
-                        )}
-                      </View>
-                      
-                      <Text 
-                        style={[
-                          styles.lastMessage, 
-                          !item.read && styles.unreadText
-                        ]} 
-                        numberOfLines={1}
-                      >
-                        {item.content}
-                      </Text>
-                    </View>
-                    
-                    {!item.read && (
-                      <Badge size={wp('2.5%')} style={styles.unreadBadge} />
-                    )}
-                  </View>
-                </View>
-              </View>
-            </Surface>
+        {/* Avatar de l'utilisateur */}
+        {renderAvatar(item)}
+        
+        <View style={styles.messageContent}>
+          {/* Nom de l'utilisateur et heure */}
+          <View style={styles.messageHeader}>
+            <Text style={styles.userName} numberOfLines={1}>
+              {otherUser?.username || `Utilisateur #${otherUserId}`}
+            </Text>
+            <Text style={styles.messageTime}>
+              {formatDate(item.created_at)}
+            </Text>
           </View>
-        </TouchableOpacity>
-      </Animated.View>
+          
+          {/* Détails du produit s'il existe */}
+          {item.product && (
+            <View style={styles.productPreview}>
+              <View style={styles.productImageContainer}>
+                {item.product.images && item.product.images.length > 0 ? (
+                  <Image 
+                    source={{ uri: getProductImageUrl(item.product) }}
+                    style={styles.productImage}
+                    defaultSource={placeholderImage}
+                  />
+                ) : (
+                  <View style={styles.placeholderImageContainer}>
+                    <Ionicons name="image-outline" size={16} color="#ddd" />
+                  </View>
+                )}
+              </View>
+              <Text style={styles.productTitle} numberOfLines={1}>
+                {item.product.title}
+              </Text>
+            </View>
+          )}
+          
+          {/* Message */}
+          <Text style={[
+            styles.messageText,
+            !item.read && item.sender_id !== userId && styles.unreadMessageText
+          ]} numberOfLines={1}>
+            {item.content}
+          </Text>
+        </View>
+        
+        {!item.read && item.sender_id !== userId && (
+          <View style={styles.unreadBadge}>
+            <Text style={styles.unreadBadgeText}>•</Text>
+          </View>
+        )}
+      </TouchableOpacity>
     );
   };
 
@@ -1127,5 +1117,57 @@ const styles = StyleSheet.create({
   // Style pour le bouton "Charger plus"
   loadMorePlaceholder: {
     height: hp('8%'),
+  },
+  // Style pour la conversation
+  conversationItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: wp('3%'),
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+  },
+  // Style pour le contenu de la conversation
+  messageContent: {
+    flex: 1,
+  },
+  // Style pour le header de la conversation
+  messageHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: hp('0.3%'),
+  },
+  // Style pour le texte de l'heure
+  messageTime: {
+    fontSize: wp('3%'),
+    color: '#999',
+  },
+  // Style pour le texte du message
+  messageText: {
+    fontSize: wp('3.4%'),
+    color: '#666',
+  },
+  // Style pour le texte des messages non lus
+  unreadMessageText: {
+    fontWeight: '600',
+    color: '#333',
+  },
+  // Style pour le texte du titre du produit
+  productPreview: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: hp('0.3%'),
+  },
+  // Style pour le texte du titre du produit
+  productTitle: {
+    fontSize: wp('3.5%'),
+    color: '#6B3CE9',
+    fontWeight: '500',
+    flex: 1,
+  },
+  // Style pour le texte du titre du produit
+  unreadBadgeText: {
+    fontSize: wp('3%'),
+    color: '#fff',
+    fontWeight: '600',
   },
 }); 

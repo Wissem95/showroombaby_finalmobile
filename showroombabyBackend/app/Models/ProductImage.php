@@ -17,6 +17,7 @@ class ProductImage extends Model
      */
     protected $fillable = [
         'path',
+        'full_path',
         'is_primary',
         'order',
         'product_id',
@@ -33,6 +34,13 @@ class ProductImage extends Model
     ];
 
     /**
+     * Les attributs qui doivent être ajoutés au tableau.
+     *
+     * @var array<int, string>
+     */
+    protected $appends = ['url'];
+
+    /**
      * Obtenir le produit associé à cette image
      */
     public function product(): BelongsTo
@@ -45,6 +53,10 @@ class ProductImage extends Model
      */
     public function getUrlAttribute(): string
     {
+        if ($this->full_path) {
+            return asset($this->full_path);
+        }
+
         return asset('storage/' . $this->path);
     }
 }

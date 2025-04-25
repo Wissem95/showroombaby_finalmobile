@@ -603,6 +603,37 @@ export default function ChatScreen({ route, navigation }: Props) {
     );
   };
 
+  // Fonction pour obtenir l'URL d'image d'un produit
+  const getProductImageUrl = (product?: Product | null): string => {
+    if (!product || !product.images || !product.images.length) {
+      return DEFAULT_AVATAR_URL;
+    }
+    
+    const image = product.images[0];
+    
+    // Si c'est une chaîne qui commence par http, c'est déjà une URL complète
+    if (typeof image === 'string' && image.startsWith('http')) {
+      return image;
+    }
+    
+    // Si c'est une chaîne sans http, ajouter le préfixe de stockage
+    if (typeof image === 'string') {
+      return `${API_URL}/storage/${image}`;
+    }
+    
+    // Si c'est un objet avec une propriété url
+    if (typeof image === 'object' && image && 'url' in image && (image as any).url) {
+      return (image as any).url;
+    }
+    
+    // Si c'est un objet avec une propriété path
+    if (typeof image === 'object' && image && 'path' in image && (image as any).path) {
+      return `${API_URL}/storage/${(image as any).path}`;
+    }
+    
+    return DEFAULT_AVATAR_URL;
+  };
+
   if (loading) {
     return (
       <View style={[styles.loadingContainer, { paddingTop: insets.top }]}>
@@ -706,17 +737,9 @@ export default function ChatScreen({ route, navigation }: Props) {
               activeOpacity={0.8}
             >
               <View style={styles.productImageContainer}>
-                {product.images && product.images.length > 0 && product.images[0] ? (
+                {product.images && product.images.length > 0 ? (
                   <Image 
-                    source={{ 
-                      uri: typeof product.images[0] === 'string' && product.images[0].startsWith('http') 
-                        ? product.images[0] 
-                        : typeof product.images[0] === 'string' 
-                          ? `${API_URL}/storage/${product.images[0]}`
-                          : typeof product.images[0] === 'object' && (product.images[0] as ImageType)?.path
-                            ? `${API_URL}/storage/${(product.images[0] as ImageType).path}`
-                            : DEFAULT_AVATAR_URL
-                    }}
+                    source={{ uri: getProductImageUrl(product) }}
                     style={styles.productImage}
                     defaultSource={placeholderImage}
                     onError={(e) => {
