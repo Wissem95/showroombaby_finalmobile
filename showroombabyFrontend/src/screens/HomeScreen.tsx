@@ -53,12 +53,14 @@ interface Product {
   user_id: number;
   city?: string;
   location?: string;
+  address?: string;
   view_count: number;
   created_at: string;
   updated_at: string;
   images?: string | string[] | { path: string; url?: string }[] | any[] | null;
   is_trending?: boolean | number;
   is_featured?: boolean | number;
+  zip_code?: string;
 }
 
 // Composant d'élément de produit indépendant
@@ -72,6 +74,28 @@ const ProductItem = React.memo(({ item, navigation }: { item: Product; navigatio
       style: 'currency',
       currency: 'EUR',
     });
+  };
+
+  // Afficher la localisation complète avec département
+  const getFullLocation = (product: Product) => {
+    let locationParts = [];
+    
+    // Ajouter l'adresse si disponible
+    if (product.address) {
+      locationParts.push(product.address);
+    } else if (product.city) {
+      locationParts.push(product.city);
+    } else if (product.location) {
+      locationParts.push(product.location);
+    }
+    
+    // Ajouter le code postal s'il existe
+    if (product.zip_code) {
+      locationParts.push(product.zip_code);
+    }
+    
+    // Joindre tous les éléments avec un espace et un tiret
+    return locationParts.join(' - ') || "";
   };
 
   // Utiliser le service d'image pour obtenir la source de l'image
@@ -282,9 +306,9 @@ const ProductItem = React.memo(({ item, navigation }: { item: Product; navigatio
         <Text style={styles.productPrice}>
           {formatPrice(item.price)}
         </Text>
-        {item.city ? (
+        {item.city || item.location || item.address ? (
           <Text style={styles.productLocation} numberOfLines={1}>
-            {item.city || item.location || ""}
+            {getFullLocation(item)}
           </Text>
         ) : null}
         {(item.is_trending || item.is_featured) ? (

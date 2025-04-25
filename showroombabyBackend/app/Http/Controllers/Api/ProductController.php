@@ -245,6 +245,7 @@ class ProductController extends Controller
             ] : null,
             'city' => $product->city,
             'location' => $product->location,
+            'address' => $product->address,
             'view_count' => $product->view_count,
             'created_at' => $product->created_at,
             'updated_at' => $product->updated_at,
@@ -257,7 +258,7 @@ class ProductController extends Controller
             'warranty' => $product->warranty,
             'phone' => $product->phone,
             'hide_phone' => $product->hide_phone,
-            'zip_code' => $product->zip_code,
+            'zip_code' => $product->zipCode,
             'brand' => $product->brand,
             'model' => $product->model,
             'material' => $product->material,
@@ -446,7 +447,7 @@ class ProductController extends Controller
                 'data' => $products
             ]);
         } catch (\Exception $e) {
-            \Log::error('Erreur lors de la récupération des produits: ' . $e->getMessage());
+            Log::error('Erreur lors de la récupération des produits: ' . $e->getMessage());
             return response()->json([
                 'status' => 'error',
                 'message' => 'Erreur lors de la récupération des produits'

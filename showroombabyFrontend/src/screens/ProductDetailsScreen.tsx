@@ -66,6 +66,7 @@ interface Product {
   material?: string;
   dimensions?: string;
   weight?: string;
+  address?: string;
 }
 
 // Interface pour l'utilisateur vendeur
@@ -346,8 +347,13 @@ const ImageCarousel = ({ images, navigation, product, formatPrice, getProductIma
           timeout: 5000
         });
         
-        setIsFavorite(response.data?.isFavorite || false);
-        await AsyncStorage.setItem(`favorite_${product.id}`, response.data?.isFavorite ? 'true' : 'false');
+        // Récupérer directement la valeur isFavorite de la réponse
+        const isFavorite = response.data?.isFavorite || false;
+        
+        setIsFavorite(isFavorite);
+        
+        // Sauvegarder le statut dans le stockage local pour les prochaines fois
+        await AsyncStorage.setItem(`favorite_${product.id}`, isFavorite ? 'true' : 'false');
       } catch (error: any) {
         console.error('Erreur lors de la vérification des favoris:', error);
         setIsFavorite(false);
@@ -1075,6 +1081,38 @@ export default function ProductDetailsScreen({ route, navigation }: any) {
     return conditions[condition] || condition;
   };
 
+  // Fonction pour afficher l'adresse complète avec département et code postal
+  const getFullAddress = () => {
+    // Log tous les champs potentiels d'adresse pour le debug
+    console.log("Champs d'adresse disponibles:", {
+      address: product?.address,
+      city: product?.city,
+      location: product?.location,
+      zipCode: product?.zip_code
+    });
+    
+    let addressParts = [];
+    
+    // Ajouter l'adresse si disponible
+    if (product?.address) {
+      addressParts.push(product.address);
+    } else if (product?.city) {
+      addressParts.push(product.city);
+    } else if (product?.location) {
+      addressParts.push(product.location);
+    }
+    
+    // Ajouter le code postal s'il existe
+    if (product?.zip_code) {
+      addressParts.push(product.zip_code);
+    }
+    
+    // Joindre tous les éléments avec un espace et un tiret
+    const fullAddress = addressParts.join(' - ');
+    
+    return fullAddress || "Localisation non spécifiée";
+  };
+
   // Fonction pour partager le produit
   const handleShare = async () => {
     if (!product) return;
@@ -1223,71 +1261,28 @@ export default function ProductDetailsScreen({ route, navigation }: any) {
     }
   };
 
-  // Fonction pour obtenir les coordonnées à partir de l'adresse
-  const getCoordinates = async (address: string) => {
-    try {
-      // Token Mapbox en dur
-      const MAPBOX_TOKEN = 'pk.eyJ1Ijoid2lzc2VtOTUiLCJhIjoiY204bG52Z3cyMWQ5dTJrcXI2d210ZnY2ZSJ9.-xQ5BHlcU51dTyLmbHoXog';
-      
-      console.log("🔍 Appel géocodage Mapbox avec adresse:", address);
-      const encodedAddress = encodeURIComponent(address);
-      const geocodingUrl = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodedAddress}.json?access_token=${MAPBOX_TOKEN}&country=fr&types=address,place,postcode&limit=1`;
-      
-      console.log("🌐 URL géocodage:", geocodingUrl);
-      
-      const response = await axios.get(geocodingUrl);
-      
-      console.log("✅ Réponse géocodage status:", response.status);
-      
-      if (response.data?.features?.length > 0 && response.data.features[0]?.center) {
-        const center = response.data.features[0].center;
-        // Mapbox renvoie les coordonnées dans l'ordre [longitude, latitude]
-        console.log("📍 Coordonnées trouvées:", center);
-        setLocation({ latitude: center[1], longitude: center[0] });
-      } else {
-        console.warn("⚠️ Aucune coordonnée trouvée pour cette adresse:", address);
-        console.log("📄 Réponse complète:", JSON.stringify(response.data));
-      }
-    } catch (error: any) {
-      console.error('❌ Erreur de géocodage:', error.message);
-      if (error.response) {
-        console.error('🔴 Statut:', error.response.status);
-        console.error('🔴 Données:', JSON.stringify(error.response.data));
-      } else if (error.request) {
-        console.error('🔴 Aucune réponse reçue:', error.request);
-      } else {
-        console.error('🔴 Erreur de configuration:', error.message);
-      }
-    }
-  };
-
-  // Utiliser l'effet pour obtenir les coordonnées
+  // Modifier l'effet pour traiter correctement les données
   useEffect(() => {
     if (product) {
-      // Privilégier la ville si elle existe
-      if (product.city && !product.city.includes("Val-d'Oise")) {
-        const address = product.city + (product.zip_code ? `, ${product.zip_code}` : "");
-        console.log("🏙️ Utilisation de la ville pour la géolocalisation:", address);
-        getCoordinates(address);
-      }
-      // Sinon utiliser l'adresse complète
-      else {
-        // Construire une adresse complète avec tous les éléments disponibles
-        const addressParts = [];
-        
-        if (product.location) addressParts.push(product.location);
-        if (product.city && !product.city.includes("Val-d'Oise")) addressParts.push(product.city);
-        if (product.zip_code) addressParts.push(product.zip_code);
-        
-        // Ajouter le pays par défaut si aucun élément n'indique le pays
-        const address = addressParts.join(' ');
-        
-        if (address) {
-          console.log("🏙️ Construction de l'adresse pour la géolocalisation:", address);
-          getCoordinates(address);
-        } else {
-          console.warn("⚠️ Impossible de construire une adresse à partir des données du produit");
-        }
+      console.log('Product details with address:', {
+        id: product.id,
+        title: product.title,
+        address: product.address,
+        city: product.city,
+        location: product.location
+      });
+      
+      // Utiliser directement les coordonnées de la DB si disponibles
+      if (product.latitude && product.longitude && 
+          !isNaN(product.latitude) && !isNaN(product.longitude)) {
+        console.log("📍 Coordonnées valides trouvées dans le produit:", product.latitude, product.longitude);
+        setLocation({
+          latitude: product.latitude,
+          longitude: product.longitude
+        });
+      } else {
+        console.log("❌ Coordonnées invalides ou manquantes dans le produit");
+        setLocation(null);
       }
     }
   }, [product]);
@@ -1481,30 +1476,27 @@ export default function ProductDetailsScreen({ route, navigation }: any) {
             <View style={styles.detailItem}>
               <Text style={styles.detailLabel}>Catégorie</Text>
               <Text style={styles.detailValue}>
-                {product.category ? product.category.name : getCategoryName(product.categoryId)}
-                {product.subcategory ? 
-                  ` > ${product.subcategory.name}` : 
-                  product.subcategoryId ? 
-                    ` > ${getSubcategoryName(product.categoryId, product.subcategoryId)}` : 
-                    ''}
+                {product.category 
+                  ? (product.subcategory 
+                      ? `${product.category.name} > ${product.subcategory.name}` 
+                      : product.category.name)
+                  : (product.categoryId 
+                      ? (product.subcategoryId 
+                          ? `${getCategoryName(product.categoryId)} > ${getSubcategoryName(product.categoryId, product.subcategoryId)}` 
+                          : getCategoryName(product.categoryId))
+                      : 'Catégorie inconnue')
+                }
               </Text>
             </View>
             
-            {(product.city || product.location) && (
-              <View style={styles.detailItem}>
-                <Text style={styles.detailLabel}>Localisation</Text>
-                <Text style={styles.detailValue}>
-                  <Ionicons name="location-outline" size={16} color="#666" />
-                  {' '}
-                  {product.location && !product.location.includes("Val-d'Oise") 
-                    ? product.location 
-                    : product.city && !product.city.includes("Val-d'Oise") 
-                      ? product.city
-                      : "Garges-lès-Gonesse"}
-                  {product.zip_code && `, ${product.zip_code}`}
-                </Text>
-              </View>
-            )}
+            <View style={styles.detailItem}>
+              <Text style={styles.detailLabel}>Localisation</Text>
+              <Text style={styles.detailValue}>
+                <Ionicons name="location-outline" size={16} color="#666" />
+                {' '}
+                {getFullAddress()}
+              </Text>
+            </View>
             
             <View style={styles.detailItem}>
               <Text style={styles.detailLabel}>Vues</Text>
@@ -1562,9 +1554,10 @@ export default function ProductDetailsScreen({ route, navigation }: any) {
           </View>
         </View>
 
+        {/* Carte avec la localisation */}
         {location && (
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Localisation</Text>
+            <Text style={styles.sectionTitle}>Carte</Text>
             <View style={styles.mapContainerWrapper}>
               <View style={styles.mapContainer}>
                 <MapView
@@ -1572,8 +1565,8 @@ export default function ProductDetailsScreen({ route, navigation }: any) {
                   initialRegion={{
                     latitude: location.latitude,
                     longitude: location.longitude,
-                    latitudeDelta: 0.01,
-                    longitudeDelta: 0.01,
+                    latitudeDelta: 0.02,
+                    longitudeDelta: 0.02,
                   }}
                 >
                   <Marker
@@ -1581,8 +1574,8 @@ export default function ProductDetailsScreen({ route, navigation }: any) {
                       latitude: location.latitude,
                       longitude: location.longitude,
                     }}
-                    title={product.title}
-                    description={`${product.city || product.location || ''}`}
+                    title={product?.title}
+                    description={getFullAddress()}
                   />
                 </MapView>
               </View>
@@ -1726,7 +1719,7 @@ const styles = StyleSheet.create({
   price: {
     fontSize: 28,
     fontWeight: '700',
-    color: '#6B3CE9',
+    color: '#ff6b9b',
   },
   actions: {
     flexDirection: 'row',
@@ -1816,7 +1809,7 @@ const styles = StyleSheet.create({
     borderRadius: 25,
   },
   sellerAvatarPlaceholder: {
-    backgroundColor: '#6B3CE9',
+    backgroundColor: '#ff6b9b',
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -1856,7 +1849,7 @@ const styles = StyleSheet.create({
     borderTopColor: '#f0f0f0',
   },
   contactButton: {
-    backgroundColor: '#6B3CE9',
+    backgroundColor: '#ff6b9b',
   },
   disabledButton: {
     backgroundColor: '#f0f0f0',
@@ -1864,26 +1857,18 @@ const styles = StyleSheet.create({
     opacity: 0.7,
   },
   mapContainerWrapper: {
-    height: 200,
-    marginTop: 10,
-    borderRadius: 12,
+    height: 250,
+    marginVertical: 12,
+    borderRadius: 0,
     overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 3.84,
-    elevation: 3,
+    borderWidth: 1,
+    borderColor: '#f0f0f0',
   },
   mapContainer: {
-    height: '100%',
-    width: '100%',
+    flex: 1,
   },
   map: {
-    width: '100%',
-    height: '100%',
+    ...StyleSheet.absoluteFillObject,
   },
   fullImageButton: {
     flex: 1,
