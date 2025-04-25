@@ -6,13 +6,14 @@ import Animated, { FadeIn, FadeOut, Layout, ZoomIn, SlideInUp, BounceIn } from '
 import { Ionicons } from '@expo/vector-icons';
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useFocusEffect, useNavigation } from '@react-navigation/native';
+import { useFocusEffect, useNavigation, useIsFocused } from '@react-navigation/native';
 import type { NativeStackScreenProps, NativeStackNavigationProp } from '@react-navigation/native-stack';
 import AuthService from '../services/auth';
 import { SERVER_IP } from '../config/ip';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import ConversationService from '../services/conversation';
 import Toast from 'react-native-toast-message';
+import { EventRegister } from 'react-native-event-listeners';
 
 // Ignorer les avertissements non critiques
 LogBox.ignoreLogs([
@@ -650,6 +651,9 @@ const MessagesScreen = () => {
 
   // Nettoyage des composants démontés pour éviter les fuites mémoire
   const isMounted = useRef(true);
+
+  // État de focus de l'écran pour la recharge automatique
+  const isFocused = useIsFocused();
   
   // Animation de rotation pour l'icône de chargement
   useEffect(() => {
@@ -666,6 +670,7 @@ const MessagesScreen = () => {
     }
   }, [loading]);
   
+  // Vérification de l'authentification et récupération de l'ID utilisateur
   useEffect(() => {
     isMounted.current = true;
     
@@ -1031,6 +1036,97 @@ const MessagesScreen = () => {
       setUnreadCount(0);
     }
   }, [userId]);
+  
+  // Effets pour recharger les données lorsqu'on revient sur l'écran des messages
+  useFocusEffect(
+    useCallback(() => {
+      // Recharger les données lorsque l'écran est de nouveau en focus
+      if (isAuthenticated && !refreshing && !loading) {
+        // Petit délai pour éviter de charger trop tôt
+        const timer = setTimeout(() => {
+          refreshMessages(false);
+        }, 300);
+        
+        return () => clearTimeout(timer);
+      }
+    }, [isAuthenticated, isFocused, refreshing, loading])
+  );
+
+  // Recharger les données lorsque l'utilisateur revient de la page de chat
+  const refreshAfterChat = async () => {
+    try {
+      // Seulement si l'utilisateur est authentifié et l'écran est en focus
+      if (isAuthenticated && isFocused) {
+        await loadData(false);
+      }
+    } catch (error) {
+      console.error('Erreur lors du rechargement après chat:', error);
+    }
+  };
+
+  // Actualiser automatiquement pour marquer les messages comme lus
+  const markMessagesAsRead = async (conversationId: number) => {
+    try {
+      // Vérifier l'authentification
+      const isAuth = await AuthService.checkAuth();
+      if (!isAuth) return;
+      
+      const headers = await AuthService.getAuthHeaders();
+      
+      // Appel à l'API pour marquer les messages comme lus
+      // Utilisation de la route correcte du backend (POST /{id}/read)
+      await axios.post(
+        `${API_URL}/messages/${conversationId}/read`,
+        {},
+        { headers }
+      );
+      
+      // Mise à jour immédiate du compteur de messages non lus local
+      // Réduire le compteur de 1 si le message était non lu
+      const conversationToUpdate = conversations.find(conv => conv.id === conversationId);
+      if (conversationToUpdate && !conversationToUpdate.read && conversationToUpdate.sender_id !== userId) {
+        setUnreadCount(prevCount => Math.max(0, prevCount - 1));
+      }
+      
+      // Recharger les conversations pour mettre à jour l'UI
+      refreshAfterChat();
+    } catch (error) {
+      console.error('Erreur lors du marquage comme lu:', error);
+      
+      // Tenter de mettre à jour l'UI localement même si l'API échoue
+      // Cela permet d'avoir une meilleure expérience utilisateur
+      setConversations(prevConversations => {
+        return prevConversations.map(conv => {
+          if (conv.id === conversationId && !conv.read) {
+            // Réduire le compteur non lu localement si on marque comme lu
+            if (conv.sender_id !== userId) {
+              setUnreadCount(prevCount => Math.max(0, prevCount - 1));
+            }
+            return { ...conv, read: true };
+          }
+          return conv;
+        });
+      });
+    }
+  };
+
+  // Mise à jour du statut de lecture des messages dans la navbar
+  useEffect(() => {
+    // Mettre à jour l'icône de la barre de navigation avec le nombre de messages non lus
+    const updateNavBarBadge = async () => {
+      try {
+        // On peut stocker le nombre de messages non lus dans AsyncStorage pour que d'autres écrans y accèdent
+        await AsyncStorage.setItem('unreadMessagesCount', unreadCount.toString());
+        
+        // Émettre un événement pour mettre à jour le badge dans la navbar
+        EventRegister.emit('UPDATE_UNREAD_COUNT', unreadCount);
+      } catch (error) {
+        console.error('Erreur lors de la mise à jour du badge:', error);
+      }
+    };
+    
+    updateNavBarBadge();
+  }, [unreadCount]);
 
   const renderConversation = ({ item, index }: { item: Conversation, index: number }) => {
     // Tentative de chargement du produit si nécessaire
@@ -1051,6 +1147,21 @@ const MessagesScreen = () => {
     // Simplification de l'affichage du produit
     const hasProduct = !!item.product && !!item.product.title;
     
+    // Fonction pour gérer le tap sur une conversation
+    const handleConversationPress = async () => {
+      // Si le message est non lu, le marquer comme lu immédiatement
+      if (isUnread) {
+        markMessagesAsRead(item.id);
+      }
+      
+      // Naviguer vers l'écran de chat
+      navigation.navigate('Chat', {
+        receiverId: otherUserId,
+        productId: item.product?.id,
+        productTitle: item.product?.title
+      });
+    };
+    
     return (
       <Animated.View
         entering={FadeIn.duration(300).delay(Math.min(index * 50, 300))}
@@ -1061,11 +1172,7 @@ const MessagesScreen = () => {
             styles.conversationItem,
             isUnread && styles.unreadConversationItem
           ]}
-          onPress={() => navigation.navigate('Chat', {
-            receiverId: otherUserId,
-            productId: item.product?.id,
-            productTitle: item.product?.title
-          })}
+          onPress={handleConversationPress}
           activeOpacity={0.7}
         >
           {/* Avatar de l'utilisateur */}

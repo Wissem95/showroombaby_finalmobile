@@ -157,10 +157,9 @@ const carouselStyles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.4)',
   },
   paginationDotActive: {
-    backgroundColor: '#fff',
+    backgroundColor: '#ffffff',
     width: 10,
     height: 10,
-    borderRadius: 5,
   },
   favoriteButton: {
     position: 'absolute',
@@ -198,7 +197,7 @@ const carouselStyles = StyleSheet.create({
   },
   productInfoOverlay: {
     position: 'absolute',
-    bottom: 0,
+    bottom: 100,
     left: 0,
     right: 0,
     padding: 20,
@@ -240,16 +239,18 @@ const carouselStyles = StyleSheet.create({
   swipeIndicator: {
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 10,
+    paddingVertical: 15,
+    marginTop: 10,
   },
   swipeText: {
     color: '#fff',
-    fontSize: 14,
+    fontSize: 16,
     marginTop: 5,
+    fontWeight: '500',
   },
   actionsBar: {
     position: 'absolute',
-    bottom: 20,
+    bottom: 40,
     left: 20,
     right: 20,
     flexDirection: 'row',
@@ -258,17 +259,19 @@ const carouselStyles = StyleSheet.create({
   },
   actionButton: {
     backgroundColor: 'rgba(255,255,255,0.9)',
-    paddingVertical: 10,
-    paddingHorizontal: 20,
+    paddingVertical: 14,
+    paddingHorizontal: 24,
     borderRadius: 25,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    elevation: 3,
+    elevation: 4,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 3,
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    minWidth: 60,
+    minHeight: 55,
   },
   actionButtonActive: {
     backgroundColor: '#ff6b9b',
@@ -288,12 +291,73 @@ const ImageCarousel = ({ images, navigation, product, formatPrice, getProductIma
   const [imageLoadError, setImageLoadError] = useState<Record<string, boolean>>({});
   const [isFavorite, setIsFavorite] = useState(false);
   const [imageLoading, setImageLoading] = useState<Record<string, boolean>>({});
+  const [isProductOwner, setIsProductOwner] = useState(false);
   
   // Animation pour l'indicateur de swipe
   const swipeAnim = useRef(new Animated.Value(0)).current;
   
   // Nouvelle animation pour la transition
   const transitionAnim = useRef(new Animated.Value(0)).current;
+  
+  // Vérifier si l'utilisateur est le propriétaire du produit
+  useEffect(() => {
+    const checkIfProductOwner = async () => {
+      try {
+        const userId = await AsyncStorage.getItem('userId');
+        if (userId && product && product.user_id === parseInt(userId)) {
+          setIsProductOwner(true);
+        } else {
+          setIsProductOwner(false);
+        }
+      } catch (error) {
+        console.error("Erreur lors de la vérification du propriétaire:", error);
+        setIsProductOwner(false);
+      }
+    };
+    
+    checkIfProductOwner();
+  }, [product]);
+  
+  // Vérifier si le produit est en favori
+  useEffect(() => {
+    const checkIfFavorite = async () => {
+      if (!product || !product.id) return;
+      
+      try {
+        const localStatus = await AsyncStorage.getItem(`favorite_${product.id}`);
+        if (localStatus === 'true') {
+          setIsFavorite(true);
+          return;
+        } else if (localStatus === 'false') {
+          setIsFavorite(false);
+          return;
+        }
+        
+        const token = await AsyncStorage.getItem('token');
+        
+        if (!token) {
+          console.log('Utilisateur non connecté, impossible de vérifier les favoris');
+          return;
+        }
+        
+        // Utiliser la route dédiée pour vérifier si un produit est en favoris
+        const response = await axios.get(`${API_URL}/favorites/check/${product.id}`, {
+          headers: { Authorization: `Bearer ${token}` },
+          timeout: 5000
+        });
+        
+        setIsFavorite(response.data?.isFavorite || false);
+        await AsyncStorage.setItem(`favorite_${product.id}`, response.data?.isFavorite ? 'true' : 'false');
+      } catch (error: any) {
+        console.error('Erreur lors de la vérification des favoris:', error);
+        setIsFavorite(false);
+        // En cas d'erreur, définir comme non-favori par défaut
+        await AsyncStorage.setItem(`favorite_${product.id}`, 'false');
+      }
+    };
+
+    checkIfFavorite();
+  }, [product]);
   
   // Fonction pour animer la transition
   const animateTransition = () => {
@@ -306,6 +370,52 @@ const ImageCarousel = ({ images, navigation, product, formatPrice, getProductIma
       // Une fois l'animation terminée, naviguer vers la vue détaillée
       navigation.setParams({ fullscreenMode: false });
     });
+  };
+
+  // Gérer le favori
+  const handleFavoriteToggle = async () => {
+    if (isProductOwner) {
+      Alert.alert("Information", "Vous ne pouvez pas ajouter votre propre produit en favoris");
+      return;
+    }
+    
+    const token = await AsyncStorage.getItem('token');
+    
+    if (!token) {
+      Alert.alert('Connexion requise', 'Vous devez être connecté pour ajouter des favoris');
+      return;
+    }
+    
+    try {
+      if (isFavorite) {
+        await axios.delete(`${API_URL}/favorites/${product.id}`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        setIsFavorite(false);
+        await AsyncStorage.setItem(`favorite_${product.id}`, 'false');
+      } else {
+        await axios.post(`${API_URL}/favorites/${product.id}`, {}, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        setIsFavorite(true);
+        await AsyncStorage.setItem(`favorite_${product.id}`, 'true');
+      }
+      
+      await AsyncStorage.setItem('favoritesChanged', 'true');
+    } catch (error: any) {
+      if (error.response) {
+        if (error.response.status === 422 && error.response.data?.message?.includes('propre produit')) {
+          Alert.alert("Information", "Vous ne pouvez pas ajouter votre propre produit en favoris");
+          setIsProductOwner(true);
+        } else if (error.response.status === 401) {
+          Alert.alert('Connexion requise', 'Vous devez être connecté pour gérer vos favoris');
+        } else {
+          Alert.alert('Erreur', 'Une erreur est survenue lors de la gestion des favoris');
+        }
+      } else {
+        Alert.alert('Erreur de connexion', 'Impossible de se connecter au serveur');
+      }
+    }
   };
 
   // Gérer le geste de swipe vertical
@@ -390,6 +500,22 @@ const ImageCarousel = ({ images, navigation, product, formatPrice, getProductIma
     );
   };
 
+  const renderPaginationDots = () => {
+    return (
+      <View style={styles.paginationContainer}>
+        {images.map((_, index) => (
+          <View
+            key={index}
+            style={[
+              styles.paginationDot,
+              activeIndex === index && styles.paginationDotActive
+            ]}
+          />
+        ))}
+      </View>
+    );
+  };
+
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <TouchableOpacity 
@@ -460,12 +586,19 @@ const ImageCarousel = ({ images, navigation, product, formatPrice, getProductIma
           </View>
           
           <TouchableOpacity 
-            style={[carouselStyles.favoriteButton, { top: 60 + insets.top }]}
-            onPress={() => {
-              setIsFavorite(!isFavorite);
-            }}
+            style={[
+              carouselStyles.favoriteButton, 
+              { top: 60 + insets.top },
+              isProductOwner && { backgroundColor: 'rgba(200,200,200,0.7)' }
+            ]}
+            onPress={handleFavoriteToggle}
+            disabled={isProductOwner}
           >
-            <Ionicons name={isFavorite ? 'heart' : 'heart-outline'} size={24} color={isFavorite ? '#ff6b9b' : '#333'} />
+            <Ionicons 
+              name={isFavorite ? 'heart' : 'heart-outline'} 
+              size={24} 
+              color={isProductOwner ? '#999' : (isFavorite ? '#ff6b9b' : '#333')} 
+            />
           </TouchableOpacity>
           
           <TouchableOpacity 
@@ -541,14 +674,16 @@ const ImageCarousel = ({ images, navigation, product, formatPrice, getProductIma
             <TouchableOpacity 
               style={[
                 carouselStyles.actionButton, 
-                isFavorite && carouselStyles.actionButtonActive
+                isFavorite && carouselStyles.actionButtonActive,
+                isProductOwner && { backgroundColor: 'rgba(200,200,200,0.7)' }
               ]}
-              onPress={() => setIsFavorite(!isFavorite)}
+              onPress={handleFavoriteToggle}
+              disabled={isProductOwner}
             >
               <Ionicons 
                 name={isFavorite ? "heart" : "heart-outline"} 
                 size={26} 
-                color={isFavorite ? "#e74c3c" : "#777"} 
+                color={isProductOwner ? '#999' : (isFavorite ? "#e74c3c" : "#777")} 
               />
             </TouchableOpacity>
             <TouchableOpacity 
@@ -596,6 +731,7 @@ export default function ProductDetailsScreen({ route, navigation }: any) {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [location, setLocation] = useState<{latitude: number, longitude: number} | null>(null);
   const [categoryName, setCategoryName] = useState<string>('Catégorie');
+  const [isProductOwner, setIsProductOwner] = useState(false);
   
   // Animation de transition
   const slideAnimation = useRef(new Animated.Value(
@@ -860,6 +996,28 @@ export default function ProductDetailsScreen({ route, navigation }: any) {
     checkAuth();
   }, []);
 
+  // Vérifier si l'utilisateur est le propriétaire du produit
+  useEffect(() => {
+    const checkIfProductOwner = async () => {
+      try {
+        if (!product) return;
+        
+        const userId = await AsyncStorage.getItem('userId');
+        if (userId && product.user_id === parseInt(userId)) {
+          setIsProductOwner(true);
+          console.log('Utilisateur propriétaire du produit détecté');
+        } else {
+          setIsProductOwner(false);
+        }
+      } catch (error) {
+        console.error("Erreur lors de la vérification du propriétaire:", error);
+        setIsProductOwner(false);
+      }
+    };
+    
+    checkIfProductOwner();
+  }, [product]);
+
   // Fonction unique pour formater le prix
   const formatPrice = (price: number) => {
     if (price === undefined || price === null) {
@@ -935,6 +1093,12 @@ export default function ProductDetailsScreen({ route, navigation }: any) {
   const handleFavorite = async () => {
     if (!product) return;
     
+    // Vérifier si l'utilisateur est le propriétaire du produit
+    if (isProductOwner) {
+      Alert.alert("Information", "Vous ne pouvez pas ajouter votre propre produit en favoris");
+      return;
+    }
+    
     const token = await AsyncStorage.getItem('token');
     
     if (!token) {
@@ -973,6 +1137,8 @@ export default function ProductDetailsScreen({ route, navigation }: any) {
       if (error.response && error.response.status === 422 && error.response.data?.message?.includes('propre produit')) {
         // Ne pas afficher l'erreur en console pour cette erreur spécifique
         console.log('Info: tentative d\'ajouter son propre produit en favoris');
+        setIsProductOwner(true);
+        Alert.alert("Information", "Vous ne pouvez pas ajouter votre propre produit en favoris");
       } else {
         // Pour toutes les autres erreurs, on conserve le console.error
         console.error('Erreur lors de la gestion des favoris:', error);
@@ -1239,12 +1405,12 @@ export default function ProductDetailsScreen({ route, navigation }: any) {
             
             {getProductImage(product).length > 1 && (
               <View style={styles.imagePagination}>
-                {getProductImage(product).map((_: any, index: number) => (
+                {getProductImage(product).map((_, index) => (
                   <View
                     key={index}
                     style={[
                       styles.paginationDot,
-                      index === 0 && styles.paginationDotActive,
+                      index === 0 && styles.paginationDotActive
                     ]}
                   />
                 ))}
@@ -1260,9 +1426,10 @@ export default function ProductDetailsScreen({ route, navigation }: any) {
             <View style={styles.actions}>
               <IconButton
                 icon={isFavorite ? "heart" : "heart-outline"}
-                iconColor={isFavorite ? "#e74c3c" : "#000"}
+                iconColor={isProductOwner ? "#aaa" : (isFavorite ? "#e74c3c" : "#000")}
                 size={24}
                 onPress={handleFavorite}
+                disabled={isProductOwner}
               />
               <IconButton
                 icon="share-variant"
@@ -1449,15 +1616,20 @@ export default function ProductDetailsScreen({ route, navigation }: any) {
             mode="contained" 
             style={[styles.actionButton, styles.contactButton]}
             onPress={handleContactSeller}
+            disabled={isProductOwner}
           >
-            Contacter le vendeur
+            {isProductOwner ? 'Votre produit' : 'Contacter le vendeur'}
           </Button>
           <Button 
             mode="outlined" 
-            style={styles.actionButton}
+            style={[
+              styles.actionButton,
+              isProductOwner && styles.disabledButton
+            ]}
             onPress={handleFavorite}
+            disabled={isProductOwner}
           >
-            {isFavorite ? 'Retirer des favoris' : 'Ajouter aux favoris'}
+            {isProductOwner ? 'Vous ne pouvez pas mettre votre produit en favoris' : (isFavorite ? 'Retirer des favoris' : 'Ajouter aux favoris')}
           </Button>
         </View>
 
@@ -1686,6 +1858,11 @@ const styles = StyleSheet.create({
   contactButton: {
     backgroundColor: '#6B3CE9',
   },
+  disabledButton: {
+    backgroundColor: '#f0f0f0',
+    borderColor: '#ddd',
+    opacity: 0.7,
+  },
   mapContainerWrapper: {
     height: 200,
     marginTop: 10,
@@ -1792,22 +1969,136 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
+  paginationContainer: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   paginationDot: {
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: 'rgba(255, 255, 255, 0.5)',
     marginHorizontal: 4,
+    backgroundColor: 'rgba(255,255,255,0.4)',
   },
   paginationDotActive: {
-    width: 20,
-    height: 8,
-    backgroundColor: '#fff',
-    borderRadius: 4,
+    backgroundColor: '#ffffff',
+    width: 10,
+    height: 10,
+  },
+  favoriteButton: {
+    position: 'absolute',
+    top: 60,
+    right: 15,
+    width: 45,
+    height: 45,
+    borderRadius: 22.5,
+    backgroundColor: 'rgba(255,255,255,0.9)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 20,
+    elevation: 3,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 3,
+  },
+  shareButton: {
+    position: 'absolute',
+    top: 115,
+    right: 15,
+    width: 45,
+    height: 45,
+    borderRadius: 22.5,
+    backgroundColor: 'rgba(255,255,255,0.9)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 20,
+    elevation: 3,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 3,
+  },
+  productInfoOverlay: {
+    position: 'absolute',
+    bottom: 100,
+    left: 0,
+    right: 0,
+    padding: 20,
+    zIndex: 20,
+    backgroundColor: 'rgba(0,0,0,0.3)',
+  },
+  productInfoContainer: {
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    borderRadius: 15,
+    padding: 15,
+  },
+  productTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#fff',
+    marginBottom: 5,
+    textShadowColor: 'rgba(0,0,0,0.3)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
+  },
+  productPrice: {
+    fontSize: 22,
+    fontWeight: 'bold',
+    color: '#fff',
+    marginBottom: 10,
+  },
+  imageLoadingContainer: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    zIndex: 4,
+  },
+  publishDate: {
+    fontSize: 14,
+    color: '#fff',
+    marginBottom: 10,
+  },
+  swipeIndicator: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 15,
+    marginTop: 10,
+  },
+  swipeText: {
+    color: '#fff',
+    fontSize: 16,
+    marginTop: 5,
+    fontWeight: '500',
+  },
+  actionsBar: {
+    position: 'absolute',
+    bottom: 40,
+    left: 20,
+    right: 20,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    zIndex: 25,
   },
   actionButton: {
+    backgroundColor: 'rgba(255,255,255,0.9)',
+    paddingVertical: 14,
+    paddingHorizontal: 24,
     borderRadius: 25,
-    height: 50,
+    flexDirection: 'row',
+    alignItems: 'center',
     justifyContent: 'center',
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    minWidth: 60,
+    minHeight: 55,
   },
+  actionButtonActive: {
+    backgroundColor: '#ff6b9b',
+  }
 }); 

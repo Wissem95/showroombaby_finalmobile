@@ -21,6 +21,7 @@ import { StatusBar } from 'expo-status-bar';
 import { widthPercentageToDP as wp, heightPercentageToDP as hp } from 'react-native-responsive-screen';
 import { LinearGradient } from 'expo-linear-gradient';
 import { PanGestureHandler, State, PanGestureHandlerStateChangeEvent, GestureHandlerRootView } from 'react-native-gesture-handler';
+import imageService from '../services/api/imageService';
 
 // URL de l'API
 // Pour les appareils externes, utiliser votre adresse IP locale au lieu de 127.0.0.1
@@ -221,76 +222,6 @@ export default function FavoritesScreen({ navigation }: any) {
     );
   };
 
-  const getProductImage = (product: Product) => {
-    // Image par défaut si pas d'images
-    if (!product.images) {
-      return placeholderImage;
-    }
-    
-    try {
-      // Si images est une chaîne JSON, on essaie de l'analyser
-      if (typeof product.images === 'string') {
-        try {
-          const parsedImages = JSON.parse(product.images);
-          
-          if (Array.isArray(parsedImages) && parsedImages.length > 0) {
-            // Vérifier si l'image contient un chemin complet ou juste un nom de fichier
-            const imageUrl = parsedImages[0].includes('http') 
-              ? parsedImages[0] 
-              : `${API_URL}/storage/${parsedImages[0]}`;
-            
-            return { uri: imageUrl };
-          }
-        } catch (e) {
-          // Si ce n'est pas un JSON valide, on utilise directement la chaîne
-          const imageUrl = product.images.includes('http') 
-            ? product.images 
-            : `${API_URL}/storage/${product.images}`;
-          
-          return { uri: imageUrl };
-        }
-      } 
-      // Si c'est déjà un tableau d'objets avec propriété "path"
-      else if (Array.isArray(product.images) && product.images.length > 0) {
-        // Vérifier si c'est un tableau d'objets avec une propriété path
-        if (typeof product.images[0] === 'object' && product.images[0] !== null) {
-          // Si l'objet contient un champ path ou url
-          if (product.images[0].path) {
-            const imageUrl = product.images[0].path.includes('http') 
-              ? product.images[0].path 
-              : `${API_URL}/storage/${product.images[0].path}`;
-            
-            return { uri: imageUrl };
-          } else if (product.images[0].url) {
-            return { uri: product.images[0].url };
-          } else {
-            // Essayer de récupérer directement la première valeur
-            const firstImage = product.images[0];
-            
-            if (typeof firstImage === 'string') {
-              const imageUrl = firstImage.includes('http') 
-                ? firstImage 
-                : `${API_URL}/storage/${firstImage}`;
-              
-              return { uri: imageUrl };
-            }
-          }
-        } else if (typeof product.images[0] === 'string') {
-          // Si c'est un tableau de chaînes
-          const imageUrl = product.images[0].includes('http') 
-            ? product.images[0] 
-            : `${API_URL}/storage/${product.images[0]}`;
-          
-          return { uri: imageUrl };
-        }
-      }
-    } catch (e) {
-      console.error('Erreur traitement image:', e);
-    }
-    
-    return placeholderImage;
-  };
-
   const formatPrice = (price: number) => {
     return price.toLocaleString('fr-FR', {
       style: 'currency',
@@ -314,6 +245,7 @@ export default function FavoritesScreen({ navigation }: any) {
     onRemove: (id: number, title: string) => void;
   }) => {
     const [imageError, setImageError] = useState(false);
+    const [imageLoading, setImageLoading] = useState(true);
     
     return (
       <View style={styles.productCard}>
@@ -333,10 +265,24 @@ export default function FavoritesScreen({ navigation }: any) {
               </View>
             ) : (
               <Image 
-                source={getProductImage(item)} 
+                source={imageService.getProductImageSource(item, placeholderImage)} 
                 style={styles.productImage}
-                onError={() => setImageError(true)}
+                onLoadStart={() => setImageLoading(true)}
+                onLoad={() => {
+                  setImageLoading(false);
+                  setImageError(false);
+                }}
+                onError={() => {
+                  setImageLoading(false);
+                  setImageError(true);
+                }}
+                defaultSource={placeholderImage}
               />
+            )}
+            {imageLoading && (
+              <View style={styles.imageLoadingContainer}>
+                <ActivityIndicator size="small" color="#e75480" />
+              </View>
             )}
             <TouchableOpacity 
               style={styles.removeButton}
@@ -818,5 +764,15 @@ const styles = StyleSheet.create({
     color: '#e75480',
     marginTop: hp('1%'),
     letterSpacing: 0.1,
+  },
+  imageLoadingContainer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.3)',
   },
 });

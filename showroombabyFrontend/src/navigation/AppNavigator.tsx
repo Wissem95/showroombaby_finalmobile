@@ -21,6 +21,7 @@ import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import Icons3DStatic from '../components/Icons3DStatic';
+import { EventRegister } from 'react-native-event-listeners';
 
 // URL de l'API
 // Pour les appareils externes, utiliser votre adresse IP locale au lieu de 127.0.0.1
@@ -79,6 +80,7 @@ function CustomBottomBar({ navigation, activeRoute }: CustomBottomBarProps) {
   const [unreadCount, setUnreadCount] = useState(0);
   const [user, setUser] = useState<any>(null);
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
+  const eventListener = useRef<any>(null);
   
   // Vérifier l'authentification
   useEffect(() => {
@@ -125,6 +127,35 @@ function CustomBottomBar({ navigation, activeRoute }: CustomBottomBarProps) {
       }
     };
   }, [isAuthenticated]);
+
+  // Écouter les événements de mise à jour des messages non lus
+  useEffect(() => {
+    // Écouter l'événement UPDATE_UNREAD_COUNT émis par l'écran des messages
+    eventListener.current = EventRegister.addEventListener('UPDATE_UNREAD_COUNT', (count) => {
+      setUnreadCount(parseInt(count as string, 10) || 0);
+    });
+
+    // Charger initialement le compteur depuis AsyncStorage
+    const loadInitialCount = async () => {
+      try {
+        const storedCount = await AsyncStorage.getItem('unreadMessagesCount');
+        if (storedCount !== null) {
+          setUnreadCount(parseInt(storedCount, 10) || 0);
+        }
+      } catch (error) {
+        console.error('Erreur lors du chargement initial du compteur:', error);
+      }
+    };
+
+    loadInitialCount();
+
+    // Nettoyage à la désinstallation
+    return () => {
+      if (eventListener.current) {
+        EventRegister.removeEventListener(eventListener.current);
+      }
+    };
+  }, []);
 
   const loadUnreadMessages = async () => {
     try {
