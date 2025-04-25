@@ -76,7 +76,39 @@ const ProductItem = React.memo(({ item, navigation }: { item: Product; navigatio
 
   // Utiliser le service d'image pour obtenir la source de l'image
   const getProductImage = (product: Product) => {
-    return imageService.getProductImageSource(product, DEFAULT_IMAGE_URL);
+    // Si pas d'images, retourner le placeholder
+    if (!product.images || !Array.isArray(product.images) || product.images.length === 0) {
+      return DEFAULT_IMAGE_URL;
+    }
+    
+    try {
+      const image = product.images[0];
+      
+      // Si c'est une chaîne qui commence par http, c'est déjà une URL complète
+      if (typeof image === 'string' && image.startsWith('http')) {
+        return { uri: image };
+      }
+      
+      // Si c'est une chaîne sans http, ajouter le préfixe de stockage
+      if (typeof image === 'string') {
+        return { uri: `${API_URL}/storage/${image}` };
+      }
+      
+      // Si c'est un objet avec une propriété url
+      if (typeof image === 'object' && image && 'url' in image && (image as any).url) {
+        return { uri: (image as any).url };
+      }
+      
+      // Si c'est un objet avec une propriété path
+      if (typeof image === 'object' && image && 'path' in image && (image as any).path) {
+        return { uri: `${API_URL}/storage/${(image as any).path}` };
+      }
+    } catch (e) {
+      console.error('Erreur traitement image:', e);
+    }
+    
+    // Image par défaut en cas d'échec
+    return DEFAULT_IMAGE_URL;
   };
   
   useFocusEffect(
@@ -452,44 +484,11 @@ export default function HomeScreen({ navigation }: Props) {
     );
   };
 
-  // Fonction pour tester l'accès aux images
+  // Supprimer tout le code de test des images
   useEffect(() => {
-    // Cette fonction est volontairement commentée pour éviter des requêtes constantes
-    /* 
-    const testImageAccess = async () => {
-      if (products.length > 0) {
-        const firstProduct = products[0];
-        try {
-          // Tester l'accès à l'image du premier produit
-          const imageSource = getProductImage(firstProduct);
-          if (imageSource && imageSource.uri) {
-            console.log('Test d\'accès à l\'image:', imageSource.uri);
-            
-            try {
-              const response = await fetch(imageSource.uri, { method: 'HEAD' });
-              console.log('Réponse du test d\'image:', {
-                status: response.status,
-                ok: response.ok,
-                headers: Object.fromEntries(response.headers.entries())
-              });
-            } catch (error) {
-              console.error('Erreur lors du test d\'accès à l\'image:', error);
-            }
-          }
-        } catch (error) {
-          console.error('Erreur lors du test des images:', error);
-        }
-      }
-    };
-    
+    // Si des produits sont chargés, simplement le noter sans faire d'autres tests
     if (products.length > 0) {
-      testImageAccess();
-    }
-    */
-    
-    // Au lieu de tester les images, on log simplement les URLs des produits chargés
-    if (products.length > 0) {
-      console.log(`HomeScreen - ${products.length} produits chargés. Vérifiez les logs d'images.`);
+      console.log(`HomeScreen - ${products.length} produits chargés`);
     }
   }, [products]);
 

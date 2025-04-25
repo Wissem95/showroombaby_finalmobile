@@ -237,12 +237,18 @@ class AuthService {
       // Vérifier si le token est valide
       const response = await axios.get(`${API_URL}/auth/check`, {
         headers: { Authorization: `Bearer ${this.token}` },
-        timeout: 5000 // Ajouter un timeout pour éviter les attentes infinies
+        timeout: 8000 // Augmenter le timeout pour éviter les problèmes sur les réseaux lents
       });
       
       if (response.status === 200 && response.data.user) {
         // Mettre à jour les informations de l'utilisateur
         this.user = response.data.user;
+        
+        // S'assurer que l'ID utilisateur est également stocké
+        if (this.user && this.user.id) {
+          await AsyncStorage.setItem('userId', this.user.id.toString());
+        }
+        
         console.log('checkAuth: Token valide, utilisateur mis à jour');
         return true;
       }
@@ -251,17 +257,26 @@ class AuthService {
       return false;
     } catch (error) {
       console.error('Erreur vérification token:', error);
-      // Si erreur 401, le token n'est plus valide
-      if (axios.isAxiosError(error) && error.response?.status === 401) {
-        console.log('checkAuth: Token invalide (401), déconnexion');
-        await this.logout();
+      
+      // En cas d'erreur de connexion, considérer le token comme valide pour éviter 
+      // les déconnexions en boucle sur les réseaux instables
+      if (axios.isAxiosError(error)) {
+        // Si erreur 401, le token n'est plus valide
+        if (error.response?.status === 401) {
+          console.log('checkAuth: Token invalide (401), déconnexion');
+          await this.logout();
+          return false;
+        }
+        // Erreur réseau (pas de réponse) - considérer comme connecté si token existe
+        else if (!error.response) {
+          console.log('checkAuth: Erreur réseau, considérer le token comme valide');
+          // On ne déconnecte pas l'utilisateur sur une erreur réseau
+          return true;
+        }
       }
-      // Éviter de se déconnecter pour les erreurs réseau
-      else if (axios.isAxiosError(error) && !error.response) {
-        console.log('checkAuth: Erreur réseau, considérer le token comme valide');
-        return !!this.token; // Considérer le token valide en cas d'erreur réseau
-      }
-      return false;
+      
+      // Par défaut, considérer le token comme valide si présent (pour éviter les déconnexions fréquentes)
+      return !!this.token;
     }
   }
 

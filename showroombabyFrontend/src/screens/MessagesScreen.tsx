@@ -1,14 +1,18 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { StyleSheet, View, FlatList, TouchableOpacity, Image, RefreshControl, Platform, LogBox } from 'react-native';
+import { StyleSheet, View, FlatList, TouchableOpacity, Image, RefreshControl, Platform, LogBox, Animated as RNAnimated, AppState, AppStateStatus } from 'react-native';
 import { Text, Surface, ActivityIndicator, Appbar, FAB, Badge, Avatar, Divider, Button } from 'react-native-paper';
 import { widthPercentageToDP as wp, heightPercentageToDP as hp } from 'react-native-responsive-screen';
-import Animated, { FadeIn, FadeOut, Layout } from 'react-native-reanimated';
+import Animated, { FadeIn, FadeOut, Layout, ZoomIn, SlideInUp, BounceIn } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useFocusEffect } from '@react-navigation/native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
+import type { NativeStackScreenProps, NativeStackNavigationProp } from '@react-navigation/native-stack';
 import AuthService from '../services/auth';
 import { SERVER_IP } from '../config/ip';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import ConversationService from '../services/conversation';
+import Toast from 'react-native-toast-message';
 
 // Ignorer les avertissements non critiques
 LogBox.ignoreLogs([
@@ -63,30 +67,473 @@ interface ImageType {
   url?: string;
 }
 
+// Styles pour la page des messages
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#ffffff',
+  },
+  headerContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: wp('5%'),
+    paddingVertical: hp('2%'),
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+    backgroundColor: '#ffffff',
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+  },
+  mainHeaderTitle: {
+    fontSize: wp('7%'),
+    fontWeight: '700',
+    color: '#333',
+    textShadowColor: 'rgba(0, 0, 0, 0.05)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
+  },
+  header: {
+    backgroundColor: '#fff',
+    paddingHorizontal: wp('5%'),
+    paddingBottom: hp('2%'),
+    paddingTop: hp('2%'),
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 4,
+    zIndex: 10,
+  },
+  headerTitle: {
+    fontSize: wp('5.5%'),
+    fontWeight: '700',
+    color: '#333',
+    marginBottom: hp('1%'),
+  },
+  headerSubtitle: {
+    fontSize: wp('3.5%'),
+    color: '#777',
+  },
+  searchContainer: {
+    marginHorizontal: wp('4%'),
+    marginTop: hp('2%'),
+    marginBottom: hp('1%'),
+  },
+  searchBar: {
+    borderRadius: 10,
+    height: hp('5.5%'),
+    backgroundColor: '#fff',
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    borderWidth: 1,
+    borderColor: '#f0f0f0',
+  },
+  searchInput: {
+    fontSize: wp('3.8%'),
+  },
+  conversationItem: {
+    flexDirection: 'row',
+    backgroundColor: '#fff',
+    marginHorizontal: wp('3%'),
+    marginVertical: hp('0.7%'),
+    padding: wp('4%'),
+    borderRadius: 12,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+    position: 'relative',
+    borderWidth: 0,
+  },
+  unreadConversationItem: {
+    backgroundColor: '#f9f9f9',
+    borderLeftWidth: 3,
+    borderLeftColor: '#ff6b9b',
+  },
+  userAvatar: {
+    width: wp('14%'),
+    height: wp('14%'),
+    borderRadius: wp('7%'),
+    marginRight: wp('3%'),
+    backgroundColor: '#f8f8f8',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#f0f0f0',
+    elevation: 3,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.15,
+    shadowRadius: 3,
+  },
+  unreadUserAvatar: {
+    borderColor: '#ff6b9b',
+    borderWidth: 2,
+  },
+  avatarImage: {
+    width: '100%',
+    height: '100%',
+    borderRadius: wp('7%'),
+  },
+  avatarPlaceholder: {
+    width: '100%',
+    height: '100%',
+    borderRadius: wp('7%'),
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#ff6b9b',
+  },
+  avatarText: {
+    fontSize: wp('6%'),
+    fontWeight: 'bold',
+    color: '#fff',
+  },
+  messageContent: {
+    flex: 1,
+    justifyContent: 'center',
+  },
+  messageHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: hp('0.5%'),
+  },
+  userName: {
+    fontSize: wp('4.2%'),
+    fontWeight: '500',
+    color: '#333',
+    flex: 1,
+  },
+  unreadUserName: {
+    fontWeight: '700',
+    color: '#222',
+  },
+  messageTime: {
+    fontSize: wp('3%'),
+    color: '#888',
+    marginLeft: wp('2%'),
+    fontWeight: '400',
+  },
+  unreadMessageTime: {
+    color: '#666',
+    fontWeight: '500',
+  },
+  messageText: {
+    fontSize: wp('3.5%'),
+    color: '#777',
+    marginTop: hp('0.5%'),
+    lineHeight: wp('5%'),
+  },
+  unreadMessageText: {
+    fontWeight: '500',
+    color: '#555',
+  },
+  unreadBadge: {
+    position: 'absolute',
+    right: wp('3%'),
+    top: wp('3%'),
+    minWidth: wp('5%'),
+    height: wp('5%'),
+    borderRadius: wp('2.5%'),
+    backgroundColor: '#ff6b9b',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 4,
+    elevation: 4,
+    shadowColor: '#ff3b7b',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+  },
+  unreadBadgeText: {
+    fontSize: wp('2.8%'),
+    color: '#fff',
+    fontWeight: '700',
+  },
+  productPreview: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginVertical: hp('0.8%'),
+    backgroundColor: 'rgba(244, 245, 255, 0.5)',
+    padding: wp('2%'),
+    borderRadius: 8,
+    borderWidth: 0,
+  },
+  productImageContainer: {
+    width: wp('12%'),
+    height: wp('12%'),
+    borderRadius: 10,
+    marginRight: wp('2%'),
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: '#f0f0f0',
+    backgroundColor: '#fff',
+    elevation: 1,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 1,
+  },
+  productImage: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 8,
+  },
+  placeholderImageContainer: {
+    width: '100%',
+    height: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#f5f5f5',
+  },
+  productTitle: {
+    fontSize: wp('3.6%'),
+    color: '#6B3CE9',
+    fontWeight: '500',
+    marginBottom: hp('0.3%'),
+    textShadowColor: 'rgba(107, 60, 233, 0.1)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 1,
+  },
+  emptyStateContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: wp('10%'),
+    backgroundColor: '#ffffff',
+  },
+  emptyStateImage: {
+    width: wp('40%'),
+    height: wp('40%'),
+    marginBottom: hp('3%'),
+    opacity: 0.7,
+  },
+  emptyStateTitle: {
+    fontSize: wp('5.5%'),
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: hp('1.5%'),
+    textAlign: 'center',
+  },
+  emptyStateText: {
+    fontSize: wp('4.2%'),
+    color: '#666',
+    textAlign: 'center',
+    marginBottom: hp('3.5%'),
+    lineHeight: wp('6.5%'),
+  },
+  emptyStateButton: {
+    backgroundColor: '#ff6b9b',
+    paddingHorizontal: wp('8%'),
+    paddingVertical: hp('1.5%'),
+    borderRadius: 30,
+    elevation: 4,
+    shadowColor: '#ff6b9b',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.3,
+    shadowRadius: 5,
+  },
+  emptyStateButtonText: {
+    color: '#fff',
+    fontSize: wp('4%'),
+    fontWeight: 'bold',
+  },
+  loadMoreContainer: {
+    padding: wp('5%'),
+    alignItems: 'center',
+    marginBottom: hp('2%'),
+  },
+  loadMoreButton: {
+    backgroundColor: 'rgba(107, 60, 233, 0.12)',
+    paddingVertical: hp('1.2%'),
+    paddingHorizontal: wp('6%'),
+    borderRadius: 25,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    elevation: 2,
+    shadowColor: '#6B3CE9',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 3,
+  },
+  loadMoreText: {
+    color: '#6B3CE9',
+    fontWeight: '600',
+    fontSize: wp('3.5%'),
+    marginLeft: wp('2%'),
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingTop: hp('10%'),
+    backgroundColor: '#ffffff',
+  },
+  loadingText: {
+    fontSize: wp('4%'),
+    color: '#777',
+    marginTop: hp('2%'),
+    fontWeight: '500',
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: wp('10%'),
+    backgroundColor: '#ffffff',
+  },
+  errorText: {
+    fontSize: wp('4%'),
+    color: '#777',
+    textAlign: 'center',
+    marginTop: hp('2%'),
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: wp('10%'),
+    backgroundColor: '#ffffff',
+  },
+  emptyText: {
+    fontSize: wp('5.5%'),
+    fontWeight: 'bold',
+    color: '#333',
+    marginTop: hp('3%'),
+    marginBottom: hp('1.5%'),
+    textAlign: 'center',
+  },
+  emptySubText: {
+    fontSize: wp('4.2%'),
+    color: '#666',
+    textAlign: 'center',
+    lineHeight: wp('6.5%'),
+  },
+  buttonContainer: {
+    marginTop: hp('3.5%'),
+    width: '100%',
+  },
+  loadMorePlaceholder: {
+    height: hp('10%'),
+  },
+  unreadCountContainer: {
+    backgroundColor: '#ff6b9b',
+    borderRadius: 18,
+    paddingHorizontal: wp('2.5%'),
+    paddingVertical: hp('0.6%'),
+    minWidth: wp('6%'),
+    alignItems: 'center',
+    justifyContent: 'center',
+    elevation: 3,
+    shadowColor: '#ff3b7b',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 3,
+    marginLeft: 10,
+  },
+  unreadCountText: {
+    color: '#fff',
+    fontSize: wp('3.2%'),
+    fontWeight: '700',
+  },
+  listContainer: {
+    paddingTop: hp('1%'),
+    paddingBottom: hp('2%'),
+  },
+  emptyList: {
+    flex: 1,
+  },
+  divider: {
+    height: 1,
+    backgroundColor: '#f0f0f0',
+    marginVertical: hp('0.5%'),
+    marginHorizontal: wp('4%'),
+    opacity: 0.5,
+  },
+  loadingIcon: {
+    width: 50,
+    height: 50,
+    marginBottom: 16,
+  },
+  exploreButton: {
+    marginTop: 20,
+    borderColor: '#ff6b9b',
+    borderRadius: 25,
+    paddingHorizontal: 20,
+    borderWidth: 1.5,
+    elevation: 2,
+    shadowColor: '#ff6b9b',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 3,
+  },
+  loginButton: {
+    marginTop: 20,
+    backgroundColor: '#ff6b9b',
+    borderRadius: 25,
+    paddingHorizontal: 20,
+    elevation: 4,
+    shadowColor: '#ff3b7b',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.3,
+    shadowRadius: 5,
+  },
+  backButton: {
+    marginTop: 12,
+    borderColor: '#ff6b9b',
+    borderRadius: 25,
+    paddingHorizontal: 20,
+    borderWidth: 1.5,
+  },
+});
+
 const EmptyConversationsList = ({ navigation, isAuthenticated }: { navigation: any, isAuthenticated: boolean }) => {
   return (
-    <View style={styles.emptyContainer}>
-      <Ionicons name="chatbubble-ellipses-outline" size={wp('20%')} color="#ddd" />
-      <Text style={styles.emptyText}>
+    <Animated.View 
+      entering={FadeIn.duration(600).delay(300)}
+      style={styles.emptyContainer}
+    >
+      <Animated.View entering={ZoomIn.duration(800).delay(400)}>
+        <Ionicons name="chatbubble-ellipses-outline" size={wp('25%')} color="#ddd" />
+      </Animated.View>
+      
+      <Animated.Text 
+        entering={SlideInUp.duration(800).delay(600)}
+        style={styles.emptyText}
+      >
         {isAuthenticated ? 'Aucune conversation pour le moment.' : 'Vous n\'êtes pas connecté'}
-      </Text>
-      <Text style={styles.emptySubText}>
+      </Animated.Text>
+      
+      <Animated.Text 
+        entering={SlideInUp.duration(800).delay(800)}
+        style={styles.emptySubText}
+      >
         {isAuthenticated 
           ? 'Commencez à chatter avec des vendeurs pour voir vos conversations ici.'
           : 'Vous devez être connecté pour accéder à vos messages.'}
-      </Text>
+      </Animated.Text>
       
       {!isAuthenticated ? (
-        <View style={styles.buttonContainer}>
+        <Animated.View 
+          entering={SlideInUp.duration(800).delay(1000)}
+          style={styles.buttonContainer}
+        >
           <Button 
             mode="contained" 
             onPress={() => navigation.navigate('Auth')}
-            style={{
-              marginTop: 20,
-              backgroundColor: '#ff6b9b',
-              borderRadius: 25,
-              paddingHorizontal: 20
-            }}
+            style={styles.loginButton}
+            icon="login"
           >
             Se connecter
           </Button>
@@ -94,33 +541,27 @@ const EmptyConversationsList = ({ navigation, isAuthenticated }: { navigation: a
           <Button 
             mode="outlined" 
             onPress={() => navigation.navigate('Home')}
-            style={{
-              marginTop: 12,
-              borderColor: '#ff6b9b',
-              borderRadius: 25,
-              paddingHorizontal: 20
-            }}
+            style={styles.backButton}
             textColor="#ff6b9b"
+            icon="home"
           >
             Retour à l'accueil
           </Button>
-        </View>
+        </Animated.View>
       ) : (
-        <Button 
-          mode="outlined" 
-          onPress={() => navigation.navigate('Home')}
-          style={{
-            marginTop: 20,
-            borderColor: '#ff6b9b',
-            borderRadius: 25,
-            paddingHorizontal: 20
-          }}
-          textColor="#ff6b9b"
-        >
-          Explorer des produits
-        </Button>
+        <Animated.View entering={SlideInUp.duration(800).delay(1000)}>
+          <Button 
+            mode="outlined" 
+            onPress={() => navigation.navigate('Home')}
+            style={styles.exploreButton}
+            textColor="#ff6b9b"
+            icon="shopping"
+          >
+            Explorer des produits
+          </Button>
+        </Animated.View>
       )}
-    </View>
+    </Animated.View>
   );
 };
 
@@ -158,22 +599,72 @@ const getProductImageUrl = (product: any): string => {
   return getImageUrl(product.images[0]);
 };
 
-export default function MessagesScreen({ navigation }: any) {
+const CONVERSATIONS_PER_PAGE = 20;
+
+// Type pour les paramètres de navigation
+type RootStackParamList = {
+  Chat: {
+    receiverId: number;
+    productId?: number;
+    productTitle?: string;
+  };
+  Explore: undefined;
+  Home: undefined;
+  Auth: undefined;
+  Search: undefined;
+  ProductDetails: {
+    productId: number;
+    fullscreenMode?: boolean;
+  };
+};
+
+type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
+
+const MessagesScreen = () => {
+  const navigation = useNavigation<NavigationProp>();
+  const insets = useSafeAreaInsets();
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
+  const [page, setPage] = useState(1);
   const [userId, setUserId] = useState<number | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [activeTab, setActiveTab] = useState('all');
   const [unreadCount, setUnreadCount] = useState(0);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [loadingMore, setLoadingMore] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const conversationsPerPage = 10; // Nombre de conversations à charger par page
+  const refreshInterval = useRef<NodeJS.Timeout | null>(null);
+  const [lastRefreshTime, setLastRefreshTime] = useState(0);
+  const [isInitialLoadDone, setIsInitialLoadDone] = useState(false);
+  const MIN_REFRESH_INTERVAL = 10000; // 10 secondes minimum entre les rafraîchissements
+  
+  // Animation pour l'icône de chargement
+  const spinAnim = useRef(new RNAnimated.Value(0)).current;
   
   // Référence pour stocker les produits en cours de chargement
   const loadingProducts = useRef<Record<string, boolean>>({});
 
   // Nettoyage des composants démontés pour éviter les fuites mémoire
-  const isMounted = React.useRef(true);
+  const isMounted = useRef(true);
+  
+  // Animation de rotation pour l'icône de chargement
+  useEffect(() => {
+    if (loading) {
+      RNAnimated.loop(
+        RNAnimated.timing(spinAnim, {
+          toValue: 1,
+          duration: 2000,
+          useNativeDriver: true
+        })
+      ).start();
+    } else {
+      spinAnim.setValue(0);
+    }
+  }, [loading]);
   
   useEffect(() => {
     isMounted.current = true;
@@ -203,272 +694,218 @@ export default function MessagesScreen({ navigation }: any) {
     // Cleanup lors du démontage
     return () => {
       isMounted.current = false;
+      if (refreshInterval.current) {
+        clearInterval(refreshInterval.current);
+        refreshInterval.current = null;
+      }
     };
   }, []);
 
-  useFocusEffect(
-    useCallback(() => {
-      let intervalId: NodeJS.Timeout | null = null;
-      const loadData = async () => {
+  const processConversations = async (conversationsData: any[]) => {
+    // Transformer les données pour s'assurer que les informations utilisateur sont complètes
+    const processedConversations = conversationsData.map((conv: any) => {
+      // Créer des objets utilisateur complets à partir des données plates
+      const sender = {
+        id: conv.sender_id,
+        username: conv.sender_username || `Utilisateur #${conv.sender_id}`,
+        email: conv.sender_email,
+        avatar: conv.sender_avatar
+      };
+      
+      const recipient = {
+        id: conv.recipient_id,
+        username: conv.recipient_username || `Utilisateur #${conv.recipient_id}`,
+        email: conv.recipient_email,
+        avatar: conv.recipient_avatar
+      };
+      
+      // Créer un objet produit si les données sont disponibles
+      let product = undefined;
+      if (conv.product_id) {
+        let productImages: Array<any> = [];
+        
+        // Traitement des images du produit
         try {
-          // Vérifier si l'utilisateur est authentifié via le service
-          const isAuth = await AuthService.checkAuth();
-          
-          if (isAuth) {
-            setIsAuthenticated(true);
-            await getUserId();
-            // Charger les conversations une seule fois au début
-            await loadConversations();
-            
-            // Rafraîchir les conversations toutes les 30 secondes au lieu de 15
-            // et stocker l'ID de l'intervalle pour pouvoir l'annuler
-            intervalId = setInterval(loadConversations, 30000);
-            
-            // Force refresh des images uniquement au premier chargement ou quand pas d'images
-            // pas à chaque focus pour éviter le clignotement
-            if (conversations.length > 0) {
-              conversations.slice(0, 5).forEach(conversation => {
-                if (conversation.product_id && 
-                    (!conversation.product?.images || 
-                     !Array.isArray(conversation.product.images) || 
-                     conversation.product.images.length === 0)) {
-                  loadProductDetails(conversation.product_id, conversation.id);
-                }
-              });
-            }
-          } else {
-            setIsAuthenticated(false);
-            setLoading(false);
+          if (conv.product_images) {
+            // Ajouter le traitement des images ici
+            // ... existing code ...
           }
         } catch (error) {
-          console.error('Erreur chargement données:', error);
-          setIsAuthenticated(false);
-          setLoading(false);
+          productImages = [];
         }
-      };
+        
+        product = {
+          id: conv.product_id,
+          title: conv.product_title || `Produit #${conv.product_id}`,
+          price: conv.product_price,
+          images: productImages
+        };
+      }
       
-      loadData();
-      
-      // Nettoyer l'intervalle lors du démontage
-      return () => {
-        if (intervalId) {
-          clearInterval(intervalId);
-        }
+      // Retourner une conversation avec tous les champs nécessaires
+      return {
+        ...conv,
+        sender,
+        recipient,
+        product
       };
-    }, [])
-  );
-
-  const getUserId = async () => {
+    });
+    
+    // Regrouper les conversations par paires d'utilisateurs et par produit
+    const currentUserIdStr = await AsyncStorage.getItem('userId');
+    const currentUserId = currentUserIdStr ? parseInt(currentUserIdStr) : null;
+    
+    // Création d'une Map pour stocker les conversations uniques
+    const conversationsMap = new Map();
+    
+    // Regrouper les conversations par paire d'utilisateurs et par produit
+    processedConversations.forEach(conv => {
+      // Créer une clé unique pour chaque conversation
+      // La clé est composée des ID des deux utilisateurs et de l'ID du produit
+      const userIds = [conv.sender_id, conv.recipient_id].sort((a, b) => a - b);
+      const key = `${userIds[0]}-${userIds[1]}-${conv.product_id || 'general'}`;
+      
+      // Si cette conversation existe déjà, mettre à jour uniquement si le message est plus récent
+      if (!conversationsMap.has(key) || 
+          new Date(conv.created_at) > new Date(conversationsMap.get(key).created_at)) {
+        conversationsMap.set(key, conv);
+      }
+    });
+    
+    // Convertir la Map en tableau
+    const uniqueConversations = Array.from(conversationsMap.values());
+    
+    // Trier par date de création (plus récent en premier)
+    uniqueConversations.sort((a, b) => 
+      new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+    );
+    
+    return uniqueConversations;
+  };
+  
+  const refreshMessages = async (withLoadingState = true) => {
+    // Vérification du debounce
+    const now = Date.now();
+    if (now - lastRefreshTime < MIN_REFRESH_INTERVAL) {
+      return; // Évite les rafraîchissements trop fréquents
+    }
+    
     try {
-      const id = await AsyncStorage.getItem('userId');
-      setUserId(id ? parseInt(id) : null);
+      setLastRefreshTime(now);
+      await loadData(withLoadingState);
     } catch (error) {
-      console.error('Erreur récupération ID utilisateur');
+      // Réduire les logs d'erreurs
+      if (__DEV__) {
+        console.error('Erreur lors du rafraîchissement des messages:', error);
+      }
     }
   };
-
-  const loadConversations = async () => {
-    // Utiliser les abortController pour annuler les requêtes en cas de démontage
-    const abortController = new AbortController();
-    
+  
+  const loadData = async (withRefresh = false) => {
     try {
-      // Ne pas continuer si le composant est démonté
-      if (!isMounted.current) return;
+      if (withRefresh) setRefreshing(true);
+      else if (!isInitialLoadDone) setLoading(true);
       
-      const signal = abortController.signal;
-      
-      // Vérifier l'authentification via le service Auth
+      // Vérifier l'authentification
       const isAuth = await AuthService.checkAuth();
+      setIsAuthenticated(isAuth);
+      
+      // Si utilisateur non authentifié, arrêter le chargement
       if (!isAuth) {
-        setConversations([]);
-        setLoading(false);
         setRefreshing(false);
-        setIsAuthenticated(false);
+        setLoading(false);
         return;
       }
       
-      // Obtenir l'userId
-      const userIdString = await AsyncStorage.getItem('userId');
-      const currentUserId = userIdString ? parseInt(userIdString) : null;
-      
-      // Vérifier si l'utilisateur a changé pendant le chargement
-      if (currentUserId === null) {
-        setConversations([]);
-        setLoading(false);
-        setRefreshing(false);
-        setIsAuthenticated(false);
-        return;
-      }
-      
-      // Mettre à jour userId si nécessaire
-      if (currentUserId !== userId) {
-        setUserId(currentUserId);
-      }
-      
-      // Obtenir les headers d'authentification
-      const headers = await AuthService.getAuthHeaders();
-            
-      // Mettre à jour l'état d'authentification
-      setIsAuthenticated(true);
-      
-      const response = await axios.get(
-        `${API_URL}/messages/conversations`,
-        { 
-          headers,
-          timeout: 10000, // Ajouter un timeout pour éviter les attentes infinies
-          signal: signal
-        }
-      );
-
-      // Vérifier si les données sont présentes et valides
-      if (response.data?.data?.data && Array.isArray(response.data.data.data)) {
-        const conversationsData = response.data.data.data;
+      // Récupérer l'ID utilisateur
+      const userId = await AsyncStorage.getItem('userId');
+      if (userId) {
+        setUserId(parseInt(userId));
         
-        // Transformer les données pour s'assurer que les informations utilisateur sont complètes
-        const processedConversations = conversationsData.map((conv: any) => {
-          // Créer des objets utilisateur complets à partir des données plates
-          const sender = {
-            id: conv.sender_id,
-            username: conv.sender_username || `Utilisateur #${conv.sender_id}`,
-            email: conv.sender_email,
-            avatar: conv.sender_avatar
-          };
-          
-          const recipient = {
-            id: conv.recipient_id,
-            username: conv.recipient_username || `Utilisateur #${conv.recipient_id}`,
-            email: conv.recipient_email,
-            avatar: conv.recipient_avatar
-          };
-          
-          // Créer un objet produit si les données sont disponibles
-          let product = undefined;
-          if (conv.product_id) {
-            let productImages = [];
-            
-            // Traitement des images du produit
-            try {
-              if (conv.product_images) {
-                // Si les images sont déjà sous forme de tableau
-                if (Array.isArray(conv.product_images)) {
-                  productImages = conv.product_images;
-                } 
-                // Si les images sont une chaîne JSON
-                else if (typeof conv.product_images === 'string') {
-                  try {
-                    // Essayer de parser le JSON
-                    productImages = JSON.parse(conv.product_images);
-                  } catch (error) {
-                    // Si le parsing échoue, mais que la chaîne ressemble à un chemin d'image, on l'utilise directement
-                    if (conv.product_images.includes('.jpg') || 
-                        conv.product_images.includes('.jpeg') || 
-                        conv.product_images.includes('.png') ||
-                        conv.product_images.includes('/') ||
-                        conv.product_images.includes('http')) {
-                      productImages = [conv.product_images];
-                    } else {
-                      // Même si la chaîne ne ressemble pas à un chemin, essayons de l'utiliser directement
-                      productImages = [conv.product_images];
-                    }
-                  }
-                } else if (typeof conv.product_images === 'object' && conv.product_images !== null) {
-                  // Si c'est un objet mais pas un tableau, essayer de l'utiliser directement
-                  productImages = [conv.product_images];
-                }
-                
-                // Vérification supplémentaire pour s'assurer que c'est un tableau
-                if (!Array.isArray(productImages)) {
-                  productImages = [];
-                }
-              }
-            } catch (error) {
-              productImages = [];
+        try {
+          // Charger les conversations
+          const headers = await AuthService.getAuthHeaders();
+          const response = await axios.get(
+            `${API_URL}/messages/conversations`,
+            { 
+              headers,
+              timeout: 10000
             }
-            
-            product = {
-              id: conv.product_id,
-              title: conv.product_title || `Produit #${conv.product_id}`,
-              price: conv.product_price,
-              images: productImages
-            };
+          );
+          
+          if (!response.data?.data?.data || !Array.isArray(response.data.data.data)) {
+            setConversations([]);
+            setHasMore(false);
+            setRefreshing(false);
+            setLoading(false);
+            setIsInitialLoadDone(true);
+            return;
           }
           
-          // Retourner une conversation avec tous les champs nécessaires
-          return {
-            ...conv,
-            sender,
-            recipient,
-            product
-          };
-        });
-        
-        // Regrouper les conversations par utilisateur mais préserver l'information du produit
-        const userConversations = new Map<number, Conversation>();
-        
-        // Vérifier pour chaque conversation si on a bien les infos utilisateur
-        processedConversations.forEach((conv: Conversation) => {
-          // Utiliser currentUserId au lieu de userId pour s'assurer que la valeur est disponible
-          const otherUserId = conv.sender_id === currentUserId ? conv.recipient_id : conv.sender_id;
+          const conversations = response.data.data.data;
           
-          // Si cette conversation a un produit et que nous n'avons pas encore de conversation avec cet utilisateur
-          // ou si nous avons déjà une conversation mais sans produit, privilégier celle avec un produit
-          if (!userConversations.has(otherUserId) || 
-              (conv.product_id && !userConversations.get(otherUserId)!.product_id) ||
-              (conv.product_id && userConversations.get(otherUserId)!.product_id && 
-               new Date(conv.created_at) > new Date(userConversations.get(otherUserId)!.created_at))) {
-            userConversations.set(otherUserId, conv);
-          } 
-          // Si pas de produit dans cette conversation mais qu'elle est plus récente
-          else if (!conv.product_id && 
-                   new Date(conv.created_at) > new Date(userConversations.get(otherUserId)!.created_at)) {
-            userConversations.set(otherUserId, conv);
+          // Si pas de conversations, arrêter le chargement
+          if (!conversations || !conversations.length) {
+            setConversations([]);
+            setHasMore(false);
+            setRefreshing(false);
+            setLoading(false);
+            setIsInitialLoadDone(true);
+            return;
           }
-        });
-        
-        // Convertir la Map en tableau
-        const uniqueConversations = Array.from(userConversations.values());
-        
-        // Trier par date de création (plus récent en premier)
-        uniqueConversations.sort((a, b) => 
-          new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-        );
-        
-        setConversations(uniqueConversations);
-        
-        // Compter les conversations non lues
-        const unread = uniqueConversations.filter((conv: Conversation) => !conv.read).length;
-        setUnreadCount(unread);
-      } else {
-        console.error('Format de données invalide');
-        setConversations([]);
-      }
-    } catch (error: any) {
-      if (!axios.isCancel(error)) {
-        // Éviter d'afficher trop d'erreurs dans la console
-        
-        // Si erreur d'authentification, ne pas rediriger mais mettre à jour l'état
-        if (error.response?.status === 401) {
-          setIsAuthenticated(false);
+          
+          // Calcul du nombre total de messages non lus
+          const unreadTotal = conversations.filter(
+            (conv: any) => !conv.read && conv.sender_id !== parseInt(userId)
+          ).length;
+          setUnreadCount(unreadTotal);
+          
+          // Traitement des conversations
+          const processedConversations = await processConversations(conversations);
+          
+          setConversations(processedConversations);
+          setHasMore(conversations.length < CONVERSATIONS_PER_PAGE);
+          
+          // Mettre en place l'actualisation automatique uniquement si ce n'est pas déjà fait
+          // et seulement après le premier chargement réussi
+          if (!refreshInterval.current && isInitialLoadDone) {
+            refreshInterval.current = setInterval(async () => {
+              if (AppState.currentState === 'active' && isMounted.current) {
+                await refreshMessages(false);
+              }
+            }, 60000); // Actualiser toutes les 60 secondes au lieu de 30
+          }
+          
+          setIsInitialLoadDone(true);
+        } catch (error) {
+          if (__DEV__) {
+            console.error('Erreur lors du chargement des conversations:', error);
+          }
+          Toast.show({
+            type: 'error',
+            text1: 'Erreur',
+            text2: 'Impossible de charger les conversations. Veuillez réessayer.'
+          });
         }
-        
-        setConversations([]);
       }
+    } catch (error) {
+      if (__DEV__) {
+        console.error('Erreur dans loadData:', error);
+      }
+      Toast.show({
+        type: 'error',
+        text1: 'Erreur',
+        text2: 'Une erreur est survenue. Veuillez réessayer.'
+      });
     } finally {
-      if (isMounted.current) {
-        setLoading(false);
-        setRefreshing(false);
-      }
+      setRefreshing(false);
+      setLoading(false);
     }
-    
-    // Retourner une fonction de nettoyage
-    return () => {
-      abortController.abort();
-    };
   };
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
-    loadConversations();
+    loadData();
   }, []);
 
   const formatDate = (dateString: string) => {
@@ -486,30 +923,6 @@ export default function MessagesScreen({ navigation }: any) {
     } else {
       return date.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' });
     }
-  };
-
-  const renderAvatar = (conversation: Conversation) => {
-    const otherUser = conversation.sender_id === userId ? conversation.recipient : conversation.sender;
-    
-    if (otherUser?.avatar) {
-      return (
-        <Avatar.Image 
-          size={wp('12%')} 
-          source={{ uri: getImageUrl(otherUser.avatar) }} 
-          style={styles.avatar}
-        />
-      );
-    }
-    
-    return (
-      <Avatar.Text 
-        size={wp('12%')} 
-        label={(otherUser?.username?.[0] || 'U').toUpperCase()} 
-        style={styles.avatar}
-        color="#fff"
-        theme={{ colors: { primary: '#ff6b9b' } }}
-      />
-    );
   };
 
   useEffect(() => {
@@ -610,7 +1023,7 @@ export default function MessagesScreen({ navigation }: any) {
     if (userId) {
       // Si les conversations n'ont pas encore été chargées
       if (loading && conversations.length === 0) {
-        loadConversations();
+        loadData();
       }
     } else {
       // Si pas d'userId, probablement déconnecté
@@ -619,7 +1032,7 @@ export default function MessagesScreen({ navigation }: any) {
     }
   }, [userId]);
 
-  const renderConversation = ({ item }: { item: Conversation }) => {
+  const renderConversation = ({ item, index }: { item: Conversation, index: number }) => {
     // Tentative de chargement du produit si nécessaire
     if (item.product_id && (!item.product || !item.product.images || item.product.images.length === 0)) {
       // On déclenche le chargement des détails dans le rendu
@@ -632,98 +1045,127 @@ export default function MessagesScreen({ navigation }: any) {
     // Déterminer le nom à afficher pour l'autre utilisateur
     const otherUserName = otherUser?.username || `Utilisateur #${otherUserId}`;
     
-    // Déterminons si le produit est valide
-    const hasValidProduct = !!item.product && !!item.product.id && !!item.product.title;
+    // Vérifier si le message est non lu et vient de l'autre utilisateur
+    const isUnread = !item.read && item.sender_id !== userId;
     
-    // Titre et prix du produit
-    const productTitle = hasValidProduct ? item.product!.title : (item.product_id ? `Produit #${item.product_id}` : 'Conversation générale');
+    // Simplification de l'affichage du produit
+    const hasProduct = !!item.product && !!item.product.title;
     
-    const formattedPrice = item.product?.price 
-      ? `${parseFloat(item.product.price.toString()).toFixed(2).replace('.', ',')}€` 
-      : (item.product_id ? '??€' : '');
-    
-    // Vérification simple de l'existence des images
-    const hasImages = !!item.product && 
-                    !!item.product.images && 
-                    Array.isArray(item.product.images) && 
-                    item.product.images.length > 0;
-    
-    // Préparer directement l'URL de l'image avec le format correct
-    let imageUrl = '';
-    if (hasImages) {
-      const image = item.product!.images![0];
-      if (typeof image === 'string') {
-        imageUrl = image.startsWith('http') ? image : `${API_URL}/storage/${image}`;
-      } else if (image && typeof image === 'object') {
-        const imgObj = image as any;
-        if (imgObj.path) {
-          imageUrl = imgObj.path.startsWith('http') ? imgObj.path : `${API_URL}/storage/${imgObj.path}`;
-        } else if (imgObj.url) {
-          imageUrl = imgObj.url;
-        }
-      }
-    }
-
     return (
-      <TouchableOpacity 
-        style={styles.conversationItem}
-        onPress={() => navigation.navigate('Chat', {
-          receiverId: otherUserId,
-          productId: item.product?.id,
-          productTitle: item.product?.title
-        })}
+      <Animated.View
+        entering={FadeIn.duration(300).delay(Math.min(index * 50, 300))}
+        layout={Layout.springify()}
       >
-        {/* Avatar de l'utilisateur */}
-        {renderAvatar(item)}
-        
-        <View style={styles.messageContent}>
-          {/* Nom de l'utilisateur et heure */}
-          <View style={styles.messageHeader}>
-            <Text style={styles.userName} numberOfLines={1}>
-              {otherUser?.username || `Utilisateur #${otherUserId}`}
-            </Text>
-            <Text style={styles.messageTime}>
-              {formatDate(item.created_at)}
-            </Text>
+        <TouchableOpacity 
+          style={[
+            styles.conversationItem,
+            isUnread && styles.unreadConversationItem
+          ]}
+          onPress={() => navigation.navigate('Chat', {
+            receiverId: otherUserId,
+            productId: item.product?.id,
+            productTitle: item.product?.title
+          })}
+          activeOpacity={0.7}
+        >
+          {/* Avatar de l'utilisateur */}
+          <View style={[styles.userAvatar, isUnread && styles.unreadUserAvatar]}>
+            {otherUser?.avatar ? (
+              <Image 
+                source={{ uri: getImageUrl(otherUser.avatar) }} 
+                style={styles.avatarImage}
+                defaultSource={placeholderImage}
+              />
+            ) : (
+              <View style={styles.avatarPlaceholder}>
+                <Text style={styles.avatarText}>
+                  {(otherUserName[0] || 'U').toUpperCase()}
+                </Text>
+              </View>
+            )}
           </View>
           
-          {/* Détails du produit s'il existe */}
-          {item.product && (
-            <View style={styles.productPreview}>
-              <View style={styles.productImageContainer}>
-                {item.product.images && item.product.images.length > 0 ? (
-                  <Image 
-                    source={{ uri: getProductImageUrl(item.product) }}
-                    style={styles.productImage}
-                    defaultSource={placeholderImage}
-                  />
-                ) : (
-                  <View style={styles.placeholderImageContainer}>
-                    <Ionicons name="image-outline" size={16} color="#ddd" />
-                  </View>
-                )}
-              </View>
-              <Text style={styles.productTitle} numberOfLines={1}>
-                {item.product.title}
+          <View style={styles.messageContent}>
+            {/* Nom de l'utilisateur et heure */}
+            <View style={styles.messageHeader}>
+              <Text style={[
+                styles.userName,
+                isUnread && styles.unreadUserName
+              ]} numberOfLines={1}>
+                {otherUserName}
+              </Text>
+              <Text style={[
+                styles.messageTime, 
+                isUnread && styles.unreadMessageTime
+              ]}>
+                {formatDate(item.created_at)}
               </Text>
             </View>
-          )}
-          
-          {/* Message */}
-          <Text style={[
-            styles.messageText,
-            !item.read && item.sender_id !== userId && styles.unreadMessageText
-          ]} numberOfLines={1}>
-            {item.content}
-          </Text>
-        </View>
-        
-        {!item.read && item.sender_id !== userId && (
-          <View style={styles.unreadBadge}>
-            <Text style={styles.unreadBadgeText}>•</Text>
+            
+            {/* Affichage du produit et du message sur deux lignes distinctes sans onglets */}
+            {hasProduct && item.product && (
+              <View style={{ 
+                backgroundColor: isUnread ? 'rgba(107, 60, 233, 0.1)' : 'rgba(107, 60, 233, 0.07)', 
+                padding: wp('2%'), 
+                borderRadius: 10, 
+                marginBottom: hp('0.5%'), 
+                flexDirection: 'row', 
+                alignItems: 'center',
+                elevation: 1,
+                shadowColor: '#6B3CE9',
+                shadowOffset: { width: 0, height: 1 },
+                shadowOpacity: 0.1,
+                shadowRadius: 2,
+              }}>
+                {/* Image du produit restaurée */}
+                <View style={{ 
+                  width: wp('10%'), 
+                  height: wp('10%'), 
+                  borderRadius: 8, 
+                  marginRight: wp('2%'), 
+                  overflow: 'hidden',
+                  borderWidth: 1,
+                  borderColor: '#f0f0f0',
+                  elevation: 2,
+                  shadowColor: '#000',
+                  shadowOffset: { width: 0, height: 1 },
+                  shadowOpacity: 0.1,
+                  shadowRadius: 1,
+                }}>
+                  {item.product.images && item.product.images.length > 0 ? (
+                    <Image 
+                      source={{ uri: getProductImageUrl(item.product) }}
+                      style={{ width: '100%', height: '100%' }}
+                      defaultSource={placeholderImage}
+                    />
+                  ) : (
+                    <View style={{ width: '100%', height: '100%', justifyContent: 'center', alignItems: 'center', backgroundColor: '#f0f0f0' }}>
+                      <Ionicons name="image-outline" size={16} color="#ccc" />
+                    </View>
+                  )}
+                </View>
+                <Text style={styles.productTitle} numberOfLines={1}>
+                  {item.product.title}
+                  {item.product.price ? ` - ${parseFloat(String(item.product.price)).toFixed(2).replace('.', ',')}€` : ''}
+                </Text>
+              </View>
+            )}
+            
+            <Text style={[
+              styles.messageText,
+              isUnread && styles.unreadMessageText
+            ]} numberOfLines={1}>
+              {item.content}
+            </Text>
           </View>
-        )}
-      </TouchableOpacity>
+          
+          {isUnread && (
+            <View style={styles.unreadBadge}>
+              <Text style={styles.unreadBadgeText}>1</Text>
+            </View>
+          )}
+        </TouchableOpacity>
+      </Animated.View>
     );
   };
 
@@ -732,9 +1174,7 @@ export default function MessagesScreen({ navigation }: any) {
   );
 
   const handleNewMessage = () => {
-    // Ici on pourrait naviguer vers une liste de produits ou des vendeurs
-    // Pour l'instant, on navigue simplement vers l'écran Explore
-    navigation.navigate('Explore');
+    // Cette fonction est maintenant supprimée car le bouton FAB est enlevé
   };
 
   const loadMore = () => {
@@ -763,14 +1203,14 @@ export default function MessagesScreen({ navigation }: any) {
           onPress={loadMore}
           loading={loadingMore}
           style={styles.loadMoreButton}
-          labelStyle={styles.loadMoreButtonText}
-          color="#ff6b9b"
+          labelStyle={styles.loadMoreText}
+          color="#6B3CE9"
           icon={loadingMore ? undefined : "chevron-down"}
         >
-          {loadingMore ? 'Chargement...' : 'Voir plus d\'anciens messages'}
+          {loadingMore ? 'Chargement...' : 'Voir plus de conversations'}
         </Button>
         
-        {/* Espace supplémentaire pour s'assurer que le bouton est visible au-dessus du FAB */}
+        {/* Espace supplémentaire en bas de la liste */}
         <View style={{ height: hp('8%') }} />
       </View>
     );
@@ -779,395 +1219,100 @@ export default function MessagesScreen({ navigation }: any) {
   // Effet pour forcer un rafraîchissement après le chargement initial
   useEffect(() => {
     // Lorsque loading passe de true à false, c'est que les conversations ont été chargées pour la première fois
-    if (!loading && conversations.length > 0) {
+    if (!loading && conversations.length > 0 && isInitialLoadDone) {
       // Petit délai pour laisser l'interface se stabiliser
       const timer = setTimeout(() => {
-        // Force refresh pour s'assurer que les images s'affichent correctement
-        if (isMounted.current) {
-          loadConversations();
+        // Ne plus faire de rechargement automatique après le chargement initial
+        if (isMounted.current && !refreshInterval.current) {
+          // Configurer l'intervalle de rafraîchissement uniquement maintenant
+          refreshInterval.current = setInterval(async () => {
+            if (AppState.currentState === 'active' && isMounted.current) {
+              await refreshMessages(false);
+            }
+          }, 60000); // Actualiser toutes les 60 secondes au lieu de 30
         }
       }, 300);
       
       return () => clearTimeout(timer);
     }
-  }, [loading, conversations.length]);
+  }, [loading, conversations.length, isInitialLoadDone]);
 
   return (
-    <View style={styles.container}>
-      <Appbar.Header style={styles.header}>
-        <Appbar.Content title="Messages" titleStyle={styles.headerTitle} />
+    <View style={[styles.container, { paddingTop: insets.top }]}>
+      {/* En-tête principal avec titre clair - style amélioré */}
+      <Animated.View 
+        style={[styles.headerContainer, { 
+          borderBottomWidth: 1, 
+          borderBottomColor: '#e0e0e0',
+          backgroundColor: '#fff'
+        }]}
+        entering={FadeIn.duration(500)}
+      >
+        <Text style={styles.mainHeaderTitle}>Messages</Text>
         {unreadCount > 0 && (
-          <View style={styles.unreadCountContainer}>
+          <Animated.View 
+            style={styles.unreadCountContainer}
+            entering={BounceIn.duration(500)}
+          >
             <Text style={styles.unreadCountText}>{unreadCount}</Text>
-          </View>
+          </Animated.View>
         )}
-      </Appbar.Header>
+      </Animated.View>
 
-      {loading ? (
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#ff6b9b" />
-          <Text style={styles.loadingText}>Chargement des conversations...</Text>
-        </View>
-      ) : (
-        <FlatList
-          data={conversations}
-          renderItem={renderConversation}
-          keyExtractor={(item, index) => `${item.sender_id}-${item.recipient_id}-${index}`}
-          contentContainerStyle={[
-            styles.listContainer,
-            conversations.length === 0 && styles.emptyList
-          ]}
-          ListEmptyComponent={renderEmptyComponent}
-          ItemSeparatorComponent={() => <Divider style={styles.divider} />}
-          ListFooterComponent={conversations.length > 0 ? LoadMoreButton : null}
-          refreshControl={
-            <RefreshControl
-              refreshing={refreshing}
-              onRefresh={onRefresh}
-              colors={['#ff6b9b']}
-              tintColor="#ff6b9b"
-            />
-          }
-        />
-      )}
-
-      <FAB
-        icon="plus"
-        style={styles.fab}
-        color="#fff"
-        onPress={handleNewMessage}
-      />
+      {/* Zone des messages - style amélioré */}
+      <View style={{ 
+        flex: 1, 
+        backgroundColor: '#f8f9fa' 
+      }}>
+        {loading ? (
+          <View style={styles.loadingContainer}>
+            <RNAnimated.View
+              style={{
+                transform: [{
+                  rotate: spinAnim.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: ['0deg', '360deg']
+                  })
+                }]
+              }}
+            >
+              <Ionicons name="chatbubble-ellipses-outline" size={50} color="#ff6b9b" />
+            </RNAnimated.View>
+            <Text style={styles.loadingText}>Chargement des conversations...</Text>
+          </View>
+        ) : (
+          <FlatList
+            data={conversations}
+            renderItem={renderConversation}
+            keyExtractor={(item, index) => `${item.sender_id}-${item.recipient_id}-${index}`}
+            contentContainerStyle={[
+              styles.listContainer,
+              conversations.length === 0 && styles.emptyList
+            ]}
+            ListEmptyComponent={renderEmptyComponent}
+            ListFooterComponent={conversations.length > 0 ? LoadMoreButton : null}
+            refreshControl={
+              <RefreshControl
+                refreshing={refreshing}
+                onRefresh={onRefresh}
+                colors={['#ff6b9b']}
+                tintColor="#ff6b9b"
+                progressBackgroundColor="#ffffff"
+              />
+            }
+            showsVerticalScrollIndicator={false}
+            initialNumToRender={8}
+            maxToRenderPerBatch={5}
+            windowSize={10}
+            removeClippedSubviews={false}
+            bounces={true}
+            overScrollMode="never"
+            scrollEventThrottle={16}
+          />
+        )}
+      </View>
     </View>
   );
 }
 
-const styles = StyleSheet.create({
-  // Conteneur principal de l'écran
-  container: {
-    flex: 1,
-    backgroundColor: '#f5f5f5',
-  },
-  // En-tête de l'application avec le titre "Messages"
-  header: {
-    backgroundColor: '#ffffff',
-    elevation: 4,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 3,
-    marginTop: hp('-5%'),
-  },
-  // Style du titre dans l'en-tête
-  headerTitle: {
-    fontSize: wp('5%'),
-    fontWeight: '600',
-  },
-  // Conteneur pour l'indicateur de chargement
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  // Texte affiché pendant le chargement
-  loadingText: {
-    marginTop: hp('2%'),
-    color: '#666',
-    fontSize: wp('4%'),
-  },
-  // Conteneur pour l'état vide (aucune conversation)
-  emptyContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: wp('8%'),
-  },
-  // Texte principal affiché quand la liste est vide
-  emptyText: {
-    fontSize: wp('4.5%'),
-    fontWeight: '600',
-    color: '#555',
-    textAlign: 'center',
-    marginTop: hp('3%'),
-  },
-  // Texte secondaire affiché quand la liste est vide
-  emptySubText: {
-    fontSize: wp('3.5%'),
-    color: '#888',
-    textAlign: 'center',
-    marginTop: hp('1%'),
-    lineHeight: wp('5%'),
-  },
-  // Style pour la liste vide (pour centrer le contenu)
-  emptyList: {
-    flex: 1,
-  },
-  // Conteneur de la liste des conversations
-  listContainer: {
-    paddingVertical: hp('1%'),
-  },
-  // Zone cliquable pour chaque conversation
-  conversationTouchable: {
-    marginHorizontal: wp('3%'),
-    marginVertical: hp('0.8%'),
-    borderRadius: 12,
-  },
-  // Carte représentant une conversation dans la liste
-  conversationCard: {
-    borderRadius: 12,
-    backgroundColor: '#ffffff',
-  },
-  // Style spécifique pour les conversations non lues
-  unreadCard: {
-    backgroundColor: '#fff9fb',
-  },
-  // Surface pour la conversation avec les ombres
-  conversationSurface: {
-    borderRadius: 12,
-    elevation: 3,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 1,
-    },
-    shadowOpacity: 0.15,
-    shadowRadius: 2,
-    overflow: 'visible',
-  },
-  // Wrapper externe pour gérer les ombres
-  cardOuterWrapper: {
-    borderRadius: 12,
-    overflow: 'visible',
-    width: '100%',
-  },
-  // Partie principale de la carte de conversation
-  conversationMain: {
-    flex: 1,
-  },
-  // Disposition du contenu de la conversation
-  conversationContent: {
-    flexDirection: 'row',
-    padding: wp('3%'),
-    alignItems: 'center',
-    position: 'relative',
-  },
-  // Style de l'avatar dans la conversation
-  avatar: {
-    marginRight: wp('2.5%'),
-    width: wp('12%'),
-    height: wp('12%'),
-    borderRadius: wp('6%'),
-    backgroundColor: '#ff6b9b',
-  },
-  // Conteneur des textes (nom, produit, message)
-  textContainer: {
-    flex: 1,
-    marginRight: wp('2%'),
-  },
-  // Ligne d'en-tête avec le nom et l'heure
-  headerRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: hp('0.3%'),
-  },
-  // Style du nom d'utilisateur
-  userName: {
-    fontSize: wp('3.8%'),
-    fontWeight: '700',
-    color: '#333',
-    flex: 1,
-    marginRight: 10,
-  },
-  // Style de l'heure du message
-  timeText: {
-    fontSize: wp('3%'),
-    color: '#999',
-  },
-  // Ligne contenant les infos du produit
-  productInfoRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 3,
-  },
-  // Titre du produit discuté
-  productTitle: {
-    fontSize: wp('3.5%'),
-    color: '#6B3CE9',
-    fontWeight: '500',
-    flex: 1,
-  },
-  // Badge contenant le prix
-  priceBadgeContainer: {
-    marginLeft: 6,
-    paddingVertical: 3,
-    paddingHorizontal: 6,
-    backgroundColor: 'rgba(255,107,155,0.15)',
-    borderRadius: 4,
-    borderWidth: 1,
-    borderColor: 'rgba(255,107,155,0.1)',
-  },
-  // Style du prix dans le badge
-  messagePriceTag: {
-    fontSize: wp('3.2%'),
-    color: '#ff6b9b',
-    fontWeight: '700',
-  },
-  // Style du dernier message
-  lastMessage: {
-    fontSize: wp('3.4%'),
-    color: '#666',
-    lineHeight: wp('4.2%'),
-    marginTop: 2,
-  },
-  // Style pour le texte des messages non lus
-  unreadText: {
-    fontWeight: '600',
-    color: '#333',
-  },
-  // Badge indiquant un message non lu
-  unreadBadge: {
-    backgroundColor: '#ff6b9b',
-    position: 'absolute',
-    right: wp('4%'),
-    top: hp('4%'),
-  },
-  // Conteneur pour les boutons
-  buttonContainer: {
-    width: '100%',
-    marginTop: 12,
-    alignItems: 'center',
-  },
-  // Conteneur du compteur de messages non lus
-  unreadCountContainer: {
-    backgroundColor: '#ff6b9b',
-    borderRadius: 15,
-    paddingHorizontal: wp('2%'),
-    paddingVertical: hp('0.5%'),
-    marginRight: wp('3%'),
-    minWidth: wp('5%'),
-    alignItems: 'center',
-  },
-  // Texte du compteur de messages non lus
-  unreadCountText: {
-    color: '#fff',
-    fontSize: wp('3%'),
-    fontWeight: '600',
-  },
-  // Séparateur entre les conversations
-  divider: {
-    marginHorizontal: wp('4%'),
-    height: 1,
-    backgroundColor: '#f0f0f0',
-  },
-  // Bouton flottant pour créer un nouveau message
-  fab: {
-    position: 'absolute',
-    margin: 16,
-    right: 0,
-    bottom: 0,
-    backgroundColor: '#ff6b9b',
-  },
-  // Style de l'image du produit
-  productImage: {
-    width: '100%',
-    height: '100%',
-    borderRadius: 4,
-  },
-  // Conteneur pour les images du produit
-  productImageContainer: {
-    width: 45,
-    height: 45,
-    borderRadius: 6,
-    overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: '#e0e0e0',
-    marginRight: 10,
-    backgroundColor: '#fff',
-  },
-  // Placeholder pour les images du produit
-  placeholderImageContainer: {
-    width: '100%',
-    height: '100%',
-    backgroundColor: '#f5f5f5',
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderRadius: 4,
-  },
-  // Conteneur pour le bouton "Charger plus"
-  loadMoreContainer: {
-    width: '100%',
-    padding: wp('4%'),
-    alignItems: 'center',
-  },
-  // Style du bouton "Charger plus"
-  loadMoreButton: {
-    backgroundColor: '#fff',
-    borderColor: '#ff6b9b',
-    borderWidth: 2,
-    borderRadius: 25,
-    paddingHorizontal: wp('4%'),
-    paddingVertical: hp('1%'),
-  },
-  // Style du texte du bouton "Charger plus"
-  loadMoreButtonText: {
-    color: '#ff6b9b',
-    fontSize: wp('3.5%'),
-    fontWeight: '600',
-  },
-  // Style pour le bouton "Charger plus"
-  loadMorePlaceholder: {
-    height: hp('8%'),
-  },
-  // Style pour la conversation
-  conversationItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: wp('3%'),
-    borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
-  },
-  // Style pour le contenu de la conversation
-  messageContent: {
-    flex: 1,
-  },
-  // Style pour le header de la conversation
-  messageHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: hp('0.3%'),
-  },
-  // Style pour le texte de l'heure
-  messageTime: {
-    fontSize: wp('3%'),
-    color: '#999',
-  },
-  // Style pour le texte du message
-  messageText: {
-    fontSize: wp('3.4%'),
-    color: '#666',
-  },
-  // Style pour le texte des messages non lus
-  unreadMessageText: {
-    fontWeight: '600',
-    color: '#333',
-  },
-  // Style pour le texte du titre du produit
-  productPreview: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: hp('0.3%'),
-  },
-  // Style pour le texte du titre du produit
-  productTitle: {
-    fontSize: wp('3.5%'),
-    color: '#6B3CE9',
-    fontWeight: '500',
-    flex: 1,
-  },
-  // Style pour le texte du titre du produit
-  unreadBadgeText: {
-    fontSize: wp('3%'),
-    color: '#fff',
-    fontWeight: '600',
-  },
-}); 
+export default MessagesScreen; 

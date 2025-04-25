@@ -11,7 +11,8 @@ import {
   Alert, 
   ActivityIndicator, 
   RefreshControl,
-  LogBox
+  LogBox,
+  Animated as RNAnimated
 } from 'react-native';
 import { Text, Surface, Avatar, Appbar, Divider, Button, IconButton } from 'react-native-paper';
 import { Ionicons } from '@expo/vector-icons';
@@ -24,7 +25,9 @@ import Animated, {
   FadeOut, 
   SlideInRight, 
   SlideInLeft,
-  Layout
+  Layout,
+  BounceIn,
+  ZoomIn
 } from 'react-native-reanimated';
 import { useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -132,6 +135,8 @@ export default function ChatScreen({ route, navigation }: Props) {
   const { receiverId, productId, productTitle } = route.params || {};
   const toastTimeout = useRef<NodeJS.Timeout | null>(null);
   const insets = useSafeAreaInsets();
+  // Animation de pulse pour le bouton d'envoi
+  const pulseAnim = useRef(new RNAnimated.Value(1)).current;
 
   // S'assurer que les paramètres de route sont valides
   useEffect(() => {
@@ -167,6 +172,41 @@ export default function ChatScreen({ route, navigation }: Props) {
       }
     };
   }, []);
+
+  useEffect(() => {
+    if (loading) {
+      // Animation de rotation pour l'icône de chargement
+      RNAnimated.loop(
+        RNAnimated.timing(pulseAnim, {
+          toValue: 1.08,
+          duration: 1000,
+          useNativeDriver: true
+        })
+      ).start();
+    } else if (newMessage.trim().length > 0) {
+      // Animation de pulse pour le bouton d'envoi quand on a du texte
+      RNAnimated.loop(
+        RNAnimated.sequence([
+          RNAnimated.timing(pulseAnim, {
+            toValue: 1.08, 
+            duration: 800,
+            useNativeDriver: true
+          }),
+          RNAnimated.timing(pulseAnim, {
+            toValue: 1,
+            duration: 800,
+            useNativeDriver: true
+          })
+        ])
+      ).start();
+    } else {
+      RNAnimated.timing(pulseAnim, {
+        toValue: 1,
+        duration: 300,
+        useNativeDriver: true
+      }).start();
+    }
+  }, [newMessage, loading]);
 
   const loadInitialData = async () => {
     try {
@@ -313,7 +353,7 @@ export default function ChatScreen({ route, navigation }: Props) {
     try {
       const token = await AsyncStorage.getItem('token');
       if (!token) {
-        console.error('Token non trouvé');
+        console.log('Token non trouvé');
         return;
       }
       
@@ -326,18 +366,17 @@ export default function ChatScreen({ route, navigation }: Props) {
       if (response.data) {
         console.log(`Données utilisateur reçues:`, JSON.stringify(response.data).substring(0, 200));
         
-        // S'assurer que nous avons bien le nom d'utilisateur
-        if (!response.data.username) {
-          console.error(`Nom d'utilisateur manquant pour l'ID: ${receiverId}`);
-        }
+        // S'assurer que nous avons bien le nom d'utilisateur et fournir un nom par défaut si manquant
+        const username = response.data.username || response.data.name || `Utilisateur #${receiverId}`;
         
+        // Définir directement le seller sans générer d'erreur
         setSeller({
-          id: response.data.id,
-          username: response.data.username || `Utilisateur #${receiverId}`,
+          id: response.data.id || receiverId,
+          username: username,
           avatar: response.data.avatar
         });
       } else {
-        console.error('Format de réponse invalide pour les détails du vendeur');
+        console.log('Format de réponse invalide pour les détails du vendeur');
         // Définir un nom par défaut en cas d'erreur
         setSeller({
           id: receiverId,
@@ -346,7 +385,7 @@ export default function ChatScreen({ route, navigation }: Props) {
         });
       }
     } catch (error) {
-      console.error('Erreur chargement vendeur:', error);
+      console.log('Erreur chargement vendeur:', error);
       // Définir un nom par défaut en cas d'erreur
       setSeller({
         id: receiverId,
@@ -537,7 +576,8 @@ export default function ChatScreen({ route, navigation }: Props) {
         )}
         
         <Animated.View
-          entering={isUser ? SlideInRight.duration(300) : SlideInLeft.duration(300)}
+          entering={isUser ? SlideInRight.duration(300).springify() : SlideInLeft.duration(300).springify()}
+          layout={Layout.springify()}
           style={[
             styles.messageBubble,
             isUser ? styles.sentMessage : styles.receivedMessage,
@@ -546,7 +586,7 @@ export default function ChatScreen({ route, navigation }: Props) {
         >
           {!isUser && showAvatar && (
             <Avatar.Text 
-              size={30} 
+              size={32} 
               label={(otherUser?.username?.[0] || seller?.username?.[0] || 'U').toUpperCase()}
               style={styles.messageAvatar}
               color="#fff"
@@ -565,12 +605,22 @@ export default function ChatScreen({ route, navigation }: Props) {
             ]}>
               {item.content}
             </Text>
-            <Text style={[
-              styles.messageTime,
-              isUser ? styles.sentMessageTime : styles.receivedMessageTime
-            ]}>
-              {formatTime(item.created_at)}
-            </Text>
+            <View style={styles.messageTimeContainer}>
+              <Text style={[
+                styles.messageTime,
+                isUser ? styles.sentMessageTime : styles.receivedMessageTime
+              ]}>
+                {formatTime(item.created_at)}
+              </Text>
+              {isUser && (
+                <Ionicons 
+                  name={item.read ? "checkmark-done" : "checkmark"} 
+                  size={12} 
+                  color="rgba(255,255,255,0.8)" 
+                  style={{marginLeft: 2}}
+                />
+              )}
+            </View>
           </Surface>
         </Animated.View>
       </>
@@ -634,10 +684,28 @@ export default function ChatScreen({ route, navigation }: Props) {
     return DEFAULT_AVATAR_URL;
   };
 
+  const onFocus = () => {
+    // Faire défiler jusqu'au dernier message quand le champ de saisie est activé
+    setTimeout(() => {
+      flatListRef.current?.scrollToOffset({ offset: 0, animated: true });
+    }, 100);
+  };
+
   if (loading) {
     return (
       <View style={[styles.loadingContainer, { paddingTop: insets.top }]}>
-        <ActivityIndicator size="large" color="#ff6b9b" />
+        <RNAnimated.View 
+          style={{
+            transform: [{
+              rotate: pulseAnim.interpolate({
+                inputRange: [1, 1.08],
+                outputRange: ['0deg', '10deg']
+              })
+            }]
+          }}
+        >
+          <Ionicons name="chatbubble-ellipses-outline" size={50} color="#ff6b9b" />
+        </RNAnimated.View>
         <Text style={styles.loadingText}>Chargement de la conversation...</Text>
       </View>
     );
@@ -729,14 +797,20 @@ export default function ChatScreen({ route, navigation }: Props) {
 
       {/* Section d'informations sur le produit améliorée - style Vinted */}
       {product && (
-        <View style={styles.productCardWrapper}>
+        <Animated.View 
+          entering={FadeIn.duration(500).delay(200)}
+          style={styles.productCardWrapper}
+        >
           <Surface style={styles.productInfoContainer}>
             <TouchableOpacity 
               style={styles.productInfoContent}
               onPress={product.id > 0 ? handleViewProduct : undefined}
               activeOpacity={0.8}
             >
-              <View style={styles.productImageContainer}>
+              <Animated.View 
+                entering={ZoomIn.duration(400).delay(300)}
+                style={styles.productImageContainer}
+              >
                 {product.images && product.images.length > 0 ? (
                   <Image 
                     source={{ uri: getProductImageUrl(product) }}
@@ -751,9 +825,12 @@ export default function ChatScreen({ route, navigation }: Props) {
                     <Ionicons name="image-outline" size={24} color="#bbb" />
                   </View>
                 )}
-              </View>
+              </Animated.View>
               
-              <View style={styles.productDetails}>
+              <Animated.View 
+                entering={SlideInRight.duration(400).delay(300)}
+                style={styles.productDetails}
+              >
                 <Text style={styles.productTitle} numberOfLines={1}>
                   {product.title || productTitle || 'Produit sans nom'}
                 </Text>
@@ -769,19 +846,21 @@ export default function ChatScreen({ route, navigation }: Props) {
                     <Text style={styles.viewProductText}>Voir l'annonce</Text>
                   )}
                 </View>
-              </View>
+              </Animated.View>
               
               {product.id > 0 && (
-                <IconButton
-                  icon="chevron-right"
-                  size={20}
-                  iconColor="#666"
-                  onPress={handleViewProduct}
-                />
+                <Animated.View entering={FadeIn.duration(500).delay(400)}>
+                  <IconButton
+                    icon="chevron-right"
+                    size={20}
+                    iconColor="#666"
+                    onPress={handleViewProduct}
+                  />
+                </Animated.View>
               )}
             </TouchableOpacity>
           </Surface>
-        </View>
+        </Animated.View>
       )}
 
       <FlatList
@@ -803,36 +882,54 @@ export default function ChatScreen({ route, navigation }: Props) {
             tintColor="#ff6b9b"
           />
         }
+        initialNumToRender={15}
+        maxToRenderPerBatch={10}
+        windowSize={10}
+        removeClippedSubviews={false}
+        showsVerticalScrollIndicator={false}
+        onEndReachedThreshold={0.5}
       />
 
       <Surface style={styles.inputContainer}>
-        <TextInput
-          ref={inputRef}
-          value={newMessage}
-          onChangeText={setNewMessage}
-          placeholder="Écrire un message..."
-          placeholderTextColor="#999"
-          style={styles.input}
-          multiline
-          maxLength={500}
-        />
-        
-        <TouchableOpacity
-          onPress={sendMessage}
-          style={[
-            styles.sendButton,
-            (!newMessage.trim() || sending) && styles.sendButtonDisabled
-          ]}
-          disabled={!newMessage.trim() || sending}
+        <Animated.View 
+          entering={FadeIn.duration(300)}
+          style={{ flex: 1 }}
         >
-          {sending ? (
-            <ActivityIndicator size={26} color="#fff" />
-          ) : (
-            <View style={styles.sendIconContainer}>
-              <Ionicons name="paper-plane" size={22} color="#fff" />
-            </View>
-          )}
-        </TouchableOpacity>
+          <TextInput
+            ref={inputRef}
+            value={newMessage}
+            onChangeText={setNewMessage}
+            placeholder="Écrire un message..."
+            placeholderTextColor="#999"
+            style={styles.input}
+            multiline
+            maxLength={500}
+            onFocus={onFocus}
+          />
+        </Animated.View>
+        
+        <Animated.View
+          entering={ZoomIn.duration(300)}
+        >
+          <RNAnimated.View style={{ transform: [{ scale: pulseAnim }] }}>
+            <TouchableOpacity
+              onPress={sendMessage}
+              style={[
+                styles.sendButton,
+                (!newMessage.trim() || sending) && styles.sendButtonDisabled
+              ]}
+              disabled={!newMessage.trim() || sending}
+            >
+              {sending ? (
+                <ActivityIndicator size={26} color="#fff" />
+              ) : (
+                <View style={styles.sendIconContainer}>
+                  <Ionicons name="paper-plane" size={22} color="#fff" />
+                </View>
+              )}
+            </TouchableOpacity>
+          </RNAnimated.View>
+        </Animated.View>
       </Surface>
 
       {/* Afficher le toast d'erreur s'il y en a un */}
@@ -861,6 +958,7 @@ const styles = StyleSheet.create({
     marginTop: 8,
     color: '#666',
     fontSize: 14,
+    fontWeight: '500',
   },
   // Conteneur affiché en cas d'erreur
   errorContainer: {
@@ -877,23 +975,31 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: 8,
     marginBottom: 16,
+    fontWeight: '500',
   },
   // Style du bouton de réessai en cas d'erreur
   retryButton: {
     paddingHorizontal: 24,
     borderRadius: 25,
+    elevation: 4,
+    shadowColor: '#ff6b9b',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 3,
   },
   // Barre d'en-tête contenant les informations du vendeur et du produit
   header: {
     backgroundColor: '#ffffff',
-    elevation: 2,
-    height: 50,
+    elevation: 4,
+    height: 55,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 3,
     paddingTop: 0,
     paddingBottom: 0,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
   },
   // Partie principale de l'en-tête contenant les infos
   headerContent: {
@@ -913,6 +1019,8 @@ const styles = StyleSheet.create({
   headerAvatar: {
     marginRight: 6,
     marginTop: 0,
+    borderWidth: 1,
+    borderColor: '#f0f0f0',
   },
   // Titre dans l'en-tête (nom du vendeur)
   headerTitle: {
@@ -941,18 +1049,21 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 8,
     backgroundColor: '#f8f9fa',
+    zIndex: 10,
   },
   // Conteneur principal des informations du produit
   productInfoContainer: {
     backgroundColor: '#fff',
     paddingVertical: 10,
     paddingHorizontal: 12,
-    elevation: 3,
-    borderRadius: 10,
+    elevation: 4,
+    borderRadius: 12,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
-    shadowRadius: 4,
+    shadowOpacity: 0.2,
+    shadowRadius: 5,
+    borderWidth: 1,
+    borderColor: '#f0f0f0',
   },
   // Disposition du contenu des informations du produit
   productInfoContent: {
@@ -962,23 +1073,28 @@ const styles = StyleSheet.create({
   },
   // Conteneur de l'image du produit
   productImageContainer: {
-    width: 56,
-    height: 56,
-    borderRadius: 8,
+    width: 60,
+    height: 60,
+    borderRadius: 10,
     overflow: 'hidden',
     borderWidth: 1,
     borderColor: '#f0f0f0',
     marginRight: 12,
     backgroundColor: '#fff',
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
   },
   // Conteneur de l'image placeholder quand aucune image n'est disponible
   placeholderImageContainer: {
-    width: 56, 
-    height: 56,
+    width: 60, 
+    height: 60,
     backgroundColor: '#f5f5f5',
     justifyContent: 'center', 
     alignItems: 'center',
-    borderRadius: 8,
+    borderRadius: 10,
   },
   // Style de l'image du produit
   productImage: {
@@ -1006,11 +1122,11 @@ const styles = StyleSheet.create({
   // Badge visuel pour le prix
   priceTag: {
     backgroundColor: 'rgba(255,107,155,0.15)',
-    paddingVertical: 3,
+    paddingVertical: 4,
     paddingHorizontal: 8,
-    borderRadius: 6,
+    borderRadius: 8,
     borderWidth: 1,
-    borderColor: 'rgba(255,107,155,0.1)',
+    borderColor: 'rgba(255,107,155,0.15)',
     marginRight: 10,
   },
   // Style du texte du prix
@@ -1024,12 +1140,12 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#6B3CE9',
     textDecorationLine: 'underline',
+    fontWeight: '500',
   },
   // Conteneur de la liste des messages
   messagesContainer: {
-    padding: 8,
-    paddingBottom: 12,
-    marginTop: hp('5%'),
+    padding: 12,
+    paddingBottom: 16,
     marginBottom: hp('2%'),
   },
   // Style pour le conteneur vide (pas de messages)
@@ -1069,7 +1185,7 @@ const styles = StyleSheet.create({
   // Bulle contenant un message
   messageBubble: {
     flexDirection: 'row',
-    marginBottom: 1,
+    marginBottom: 4,
     maxWidth: '85%',
   },
   // Avatar à côté des messages reçus
@@ -1077,22 +1193,26 @@ const styles = StyleSheet.create({
     marginRight: 4,
     alignSelf: 'flex-end',
     marginBottom: 2,
+    borderWidth: 1,
+    borderColor: '#f0f0f0',
   },
   // Style pour les messages envoyés (alignés à droite)
   sentMessage: {
     alignSelf: 'flex-end',
     marginLeft: 16,
+    marginBottom: 8,
   },
   // Style pour les messages reçus (alignés à gauche)
   receivedMessage: {
     alignSelf: 'flex-start',
     marginRight: 16,
+    marginBottom: 8,
   },
   // Contenu du message (texte et heure)
   messageContent: {
-    borderRadius: 16,
-    padding: 8,
-    paddingHorizontal: 12,
+    borderRadius: 18,
+    padding: 10,
+    paddingHorizontal: 14,
     minWidth: 60,
     maxWidth: '100%',
   },
@@ -1100,20 +1220,27 @@ const styles = StyleSheet.create({
   sentMessageContent: {
     backgroundColor: '#ff6b9b',
     borderBottomRightRadius: 4,
+    elevation: 2,
+    shadowColor: '#ff3b7b',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 2,
   },
   // Style spécifique pour le contenu des messages reçus
   receivedMessageContent: {
     backgroundColor: '#fff',
     borderBottomLeftRadius: 4,
-    elevation: 1,
+    elevation: 2,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.1,
-    shadowRadius: 1,
+    shadowRadius: 2,
+    borderWidth: 1,
+    borderColor: '#f0f0f0',
   },
   // Style pour les messages consécutifs du même expéditeur
   consecutiveMessage: {
-    marginLeft: 28,
+    marginLeft: 34,
   },
   // Style du texte des messages
   messageText: {
@@ -1123,20 +1250,28 @@ const styles = StyleSheet.create({
   // Style du texte pour les messages envoyés
   sentMessageText: {
     color: '#fff',
+    fontWeight: '400',
   },
   // Style du texte pour les messages reçus
   receivedMessageText: {
     color: '#333',
+    fontWeight: '400',
   },
   // Style de l'heure du message
   messageTime: {
     fontSize: 10,
-    marginTop: 2,
+    marginTop: 3,
+    alignSelf: 'flex-end',
+  },
+  // Conteneur pour l'heure et les indicateurs de lecture
+  messageTimeContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
     alignSelf: 'flex-end',
   },
   // Style de l'heure pour les messages envoyés
   sentMessageTime: {
-    color: 'rgba(255, 255, 255, 0.7)',
+    color: 'rgba(255, 255, 255, 0.8)',
   },
   // Style de l'heure pour les messages reçus
   receivedMessageTime: {
@@ -1145,16 +1280,17 @@ const styles = StyleSheet.create({
   // Conteneur pour la date séparant les messages
   dateContainer: {
     alignItems: 'center',
-    marginVertical: 6,
+    marginVertical: 10,
   },
   // Style du texte de la date
   dateText: {
-    fontSize: 11,
-    color: '#999',
-    backgroundColor: 'rgba(0, 0, 0, 0.03)',
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 10,
+    fontSize: 12,
+    color: '#888',
+    backgroundColor: 'rgba(0, 0, 0, 0.05)',
+    paddingHorizontal: 10,
+    paddingVertical: 3,
+    borderRadius: 12,
+    fontWeight: '500',
   },
   // Conteneur pour la zone de saisie de message en bas
   inputContainer: {
@@ -1164,11 +1300,11 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     borderTopWidth: 1,
     borderTopColor: '#f0f0f0',
-    elevation: 4,
+    elevation: 6,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: -2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 3,
+    shadowOpacity: 0.12,
+    shadowRadius: 4,
     marginHorizontal: 8,
     marginBottom: 8,
     borderRadius: 24,
@@ -1186,25 +1322,25 @@ const styles = StyleSheet.create({
     color: '#333',
     borderWidth: 1,
     borderColor: '#ececec',
-    elevation: 1,
+    elevation: 2,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 1,
+    shadowOpacity: 0.08,
+    shadowRadius: 2,
   },
   // Bouton d'envoi du message
   sendButton: {
     backgroundColor: '#ff6b9b',
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+    width: 50,
+    height: 50,
+    borderRadius: 25,
     justifyContent: 'center',
     alignItems: 'center',
-    elevation: 4,
+    elevation: 5,
     shadowColor: '#ff3b7b',
     shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.4,
-    shadowRadius: 5,
+    shadowOpacity: 0.5,
+    shadowRadius: 6,
   },
   // Style du bouton d'envoi désactivé
   sendButtonDisabled: {
@@ -1221,7 +1357,7 @@ const styles = StyleSheet.create({
   // Toast d'erreur en bas de l'écran
   errorToast: {
     position: 'absolute',
-    bottom: 64,
+    bottom: 70,
     right: 0,
     left: 0,
     zIndex: 999,
@@ -1230,19 +1366,21 @@ const styles = StyleSheet.create({
   },
   // Contenu du toast d'erreur
   errorToastContent: {
-    backgroundColor: 'rgba(255, 70, 70, 0.9)',
+    backgroundColor: 'rgba(255, 70, 70, 0.95)',
     borderRadius: 25,
     paddingHorizontal: 16,
     paddingVertical: 8,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    elevation: 4,
+    elevation: 6,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.3,
+    shadowRadius: 5,
     maxWidth: '90%',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.2)',
   },
   // Texte du toast d'erreur
   errorToastText: {

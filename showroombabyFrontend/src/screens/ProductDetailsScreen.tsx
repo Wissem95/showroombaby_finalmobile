@@ -13,6 +13,7 @@ import Carousel from 'react-native-reanimated-carousel';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { PanGestureHandler, State } from 'react-native-gesture-handler';
 import imageService from '../services/api/imageService';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 // URL de l'API
 // Pour les appareils externes, utiliser votre adresse IP locale au lieu de 127.0.0.1
@@ -103,7 +104,7 @@ const carouselStyles = StyleSheet.create({
     height: '100%',
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.2)',
+    backgroundColor: 'rgba(0,0,0,0.8)',
     overflow: 'hidden',
     zIndex: 1,
   },
@@ -113,23 +114,9 @@ const carouselStyles = StyleSheet.create({
     resizeMode: 'contain',
     zIndex: 2,
   },
-  debugInfo: {
-    position: 'absolute',
-    top: 100, 
-    left: 20,
-    right: 20,
-    backgroundColor: 'rgba(0,0,0,0.7)',
-    padding: 10,
-    borderRadius: 5,
-    zIndex: 100,
-  },
-  debugText: {
-    color: 'white',
-    fontSize: 12,
-  },
   overlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0,0,0,0.05)',
+    backgroundColor: 'rgba(0,0,0,0.1)',
     zIndex: 3,
   },
   headerBar: {
@@ -138,50 +125,76 @@ const carouselStyles = StyleSheet.create({
     left: 0,
     right: 0,
     height: 60,
+    paddingTop: 0,
+    zIndex: 30,
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
     paddingHorizontal: 15,
-    backgroundColor: 'rgba(0,0,0,0.4)',
-    zIndex: 999,
+    alignItems: 'center',
   },
-  pagination: {
-    flexDirection: 'row',
+  backButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(0,0,0,0.3)',
     justifyContent: 'center',
     alignItems: 'center',
+    marginRight: 10,
+  },
+  pagination: {
     position: 'absolute',
-    bottom: 100,
-    width: '100%',
-    zIndex: 10,
+    bottom: 20,
+    left: 0,
+    right: 0,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    zIndex: 20,
   },
   paginationDot: {
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: 'rgba(255, 255, 255, 0.5)',
     marginHorizontal: 4,
+    backgroundColor: 'rgba(255,255,255,0.4)',
   },
   paginationDotActive: {
-    width: 20,
-    height: 8,
     backgroundColor: '#fff',
-    borderRadius: 4,
+    width: 10,
+    height: 10,
+    borderRadius: 5,
   },
-  backButton: {
-    width: 50,
-    height: 50,
+  favoriteButton: {
+    position: 'absolute',
+    top: 60,
+    right: 15,
+    width: 45,
+    height: 45,
+    borderRadius: 22.5,
+    backgroundColor: 'rgba(255,255,255,0.9)',
     justifyContent: 'center',
     alignItems: 'center',
-    borderRadius: 25,
-    backgroundColor: 'rgba(0,0,0,0.8)',
+    zIndex: 20,
+    elevation: 3,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.5,
-    shadowRadius: 4,
-    elevation: 10,
-    margin: 5,
-    top: 20,
-    zIndex: 1000,
+    shadowOpacity: 0.2,
+    shadowRadius: 3,
+  },
+  shareButton: {
+    position: 'absolute',
+    top: 115,
+    right: 15,
+    width: 45,
+    height: 45,
+    borderRadius: 22.5,
+    backgroundColor: 'rgba(255,255,255,0.9)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 20,
+    elevation: 3,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 3,
   },
   productInfoOverlay: {
     position: 'absolute',
@@ -189,115 +202,77 @@ const carouselStyles = StyleSheet.create({
     left: 0,
     right: 0,
     padding: 20,
-    paddingBottom: 80,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    zIndex: 10,
+    zIndex: 20,
+    backgroundColor: 'rgba(0,0,0,0.3)',
+  },
+  productInfoContainer: {
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    borderRadius: 15,
+    padding: 15,
   },
   productTitle: {
-    fontSize: 22,
-    fontWeight: '700',
+    fontSize: 24,
+    fontWeight: 'bold',
     color: '#fff',
-    marginBottom: 8,
-    textShadowColor: 'rgba(0, 0, 0, 0.75)',
+    marginBottom: 5,
+    textShadowColor: 'rgba(0,0,0,0.3)',
     textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 2,
+    textShadowRadius: 3,
   },
   productPrice: {
-    fontSize: 26,
-    fontWeight: '700',
+    fontSize: 22,
+    fontWeight: 'bold',
     color: '#fff',
-    textShadowColor: 'rgba(0, 0, 0, 0.75)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 2,
+    marginBottom: 10,
+  },
+  imageLoadingContainer: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    zIndex: 4,
   },
   publishDate: {
     fontSize: 14,
-    color: 'rgba(255,255,255,0.8)',
-    marginTop: 8,
-  },
-  actionsBar: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    height: 65,
-    backgroundColor: '#fff',
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    alignItems: 'center',
-    zIndex: 20,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: -3,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 5,
-    elevation: 5,
-  },
-  actionButton: {
-    width: 55,
-    height: 55,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderRadius: 28,
-    backgroundColor: 'rgba(255, 255, 255, 0.9)',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 3,
-    elevation: 3,
-    margin: 4,
-  },
-  actionButtonActive: {
-    backgroundColor: 'rgba(107, 60, 233, 0.15)',
-    transform: [{ scale: 1.05 }],
-  },
-  errorContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: 'black',
-    padding: 20,
-  },
-  errorText: {
     color: '#fff',
-    fontSize: 16,
-    textAlign: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
-    padding: 15,
-    borderRadius: 10,
+    marginBottom: 10,
   },
   swipeIndicator: {
-    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: 20,
-    backgroundColor: 'rgba(255,255,255,0.15)',
-    padding: 8,
-    borderRadius: 20,
-    alignSelf: 'center',
-    zIndex: 15,
+    paddingVertical: 10,
   },
   swipeText: {
     color: '#fff',
     fontSize: 14,
-    marginLeft: 8,
-    fontWeight: '500',
+    marginTop: 5,
   },
-  imageLoadingContainer: {
+  actionsBar: {
     position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.3)',
-    zIndex: 15,
+    bottom: 20,
+    left: 20,
+    right: 20,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    zIndex: 25,
   },
+  actionButton: {
+    backgroundColor: 'rgba(255,255,255,0.9)',
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 25,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    elevation: 3,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 3,
+  },
+  actionButtonActive: {
+    backgroundColor: '#ff6b9b',
+  }
 });
 
 const ImageCarousel = ({ images, navigation, product, formatPrice, getProductImageSource, getFullImageUrl }: { 
@@ -308,57 +283,17 @@ const ImageCarousel = ({ images, navigation, product, formatPrice, getProductIma
   getProductImageSource: (product: Product | null) => any,
   getFullImageUrl: (imagePath: string | null) => string
 }) => {
+  const insets = useSafeAreaInsets();
   const [activeIndex, setActiveIndex] = useState(0);
   const [imageLoadError, setImageLoadError] = useState<Record<string, boolean>>({});
   const [isFavorite, setIsFavorite] = useState(false);
   const [imageLoading, setImageLoading] = useState<Record<string, boolean>>({});
-  const [showDebugInfo, setShowDebugInfo] = useState(__DEV__);
-  const [imageKey, setImageKey] = useState(0); // Clé pour forcer le rechargement
   
   // Animation pour l'indicateur de swipe
   const swipeAnim = useRef(new Animated.Value(0)).current;
   
   // Nouvelle animation pour la transition
   const transitionAnim = useRef(new Animated.Value(0)).current;
-  
-  // Fonction pour forcer le rechargement des images
-  const reloadImages = () => {
-    console.log('[DEBUG-IMAGES] Forçage du rechargement des images');
-    // Réinitialiser les erreurs et l'état de chargement
-    setImageLoadError({});
-    setImageLoading({});
-    // Incrémenter la clé pour forcer le rechargement du composant Image
-    setImageKey(prev => prev + 1);
-  };
-  
-  useEffect(() => {
-    if (images.length > 0) {
-      console.log('[DEBUG-IMAGES] Images disponibles dans le carrousel:', images.length);
-      images.forEach((img, index) => {
-        console.log(`[DEBUG-IMAGES] Image ${index}:`, img);
-      });
-    } else {
-      console.log('[DEBUG-IMAGES] Aucune image disponible dans le carrousel');
-    }
-  }, [images]);
-  
-  useEffect(() => {
-    // Animation de l'indicateur de swipe
-    Animated.loop(
-      Animated.sequence([
-        Animated.timing(swipeAnim, {
-          toValue: 10,
-          duration: 1000,
-          useNativeDriver: true,
-        }),
-        Animated.timing(swipeAnim, {
-          toValue: 0,
-          duration: 1000,
-          useNativeDriver: true,
-        }),
-      ])
-    ).start();
-  }, []);
   
   // Fonction pour animer la transition
   const animateTransition = () => {
@@ -409,11 +344,6 @@ const ImageCarousel = ({ images, navigation, product, formatPrice, getProductIma
   const renderItem = ({ item }: { item: string }) => {
     // Construire l'URL de l'image correctement avec le service
     const imageUrl = getFullImageUrl(item);
-    console.log('[DEBUG-IMAGES] URL générée pour le carrousel:', imageUrl);
-    console.log('[DEBUG-IMAGES] Item original:', item);
-    
-    // Test avec une URL directe connue pour fonctionner
-    const testUrl = 'https://via.placeholder.com/400';
     
     return (
       <View style={[carouselStyles.item, { zIndex: 1 }]}>
@@ -427,58 +357,26 @@ const ImageCarousel = ({ images, navigation, product, formatPrice, getProductIma
             <Text style={{color: 'black', textAlign: 'center', position: 'absolute'}}>
               Image non disponible
             </Text>
-            {showDebugInfo && (
-              <Text style={{color: 'red', textAlign: 'center', position: 'absolute', top: 20, fontSize: 12}}>
-                URL: {imageUrl || 'Vide'}
-              </Text>
-            )}
           </View>
         ) : (
           <>
-            {/* Image normale avec l'URL calculée */}
             <Image
-              key={`image-${imageKey}`} // Forcer le rechargement
               source={{ uri: imageUrl }}
               style={[carouselStyles.image, { zIndex: 1 }]}
               resizeMode="contain"
               defaultSource={placeholderImage}
               onLoadStart={() => {
-                console.log(`[DEBUG-IMAGES] Début chargement image: ${imageUrl}`);
                 setImageLoading(prev => ({ ...prev, [imageUrl]: true }));
               }}
               onLoad={() => {
-                console.log(`[DEBUG-IMAGES] Image chargée avec succès: ${imageUrl}`);
                 setImageLoading(prev => ({ ...prev, [imageUrl]: false }));
                 setImageLoadError(prev => ({ ...prev, [imageUrl]: false }));
               }}
-              onError={(error) => {
-                console.log('[DEBUG-IMAGES] Erreur de chargement image:', {
-                  url: imageUrl,
-                  error: error.nativeEvent.error
-                });
+              onError={() => {
                 setImageLoadError(prev => ({ ...prev, [imageUrl]: true }));
                 setImageLoading(prev => ({ ...prev, [imageUrl]: false }));
               }}
             />
-            
-            {/* Image de test statique pour comparer */}
-            {__DEV__ && showDebugInfo && (
-              <Image
-                source={{ uri: testUrl }}
-                style={[carouselStyles.image, { 
-                  position: 'absolute',
-                  top: '50%', 
-                  left: 0, 
-                  width: '30%', 
-                  height: '30%', 
-                  zIndex: 20,
-                  backgroundColor: 'white',
-                  borderWidth: 2,
-                  borderColor: 'red'
-                }]}
-                resizeMode="contain"
-              />
-            )}
             
             <View style={[carouselStyles.overlay, { zIndex: 2 }]} />
             {imageLoading[imageUrl] && (
@@ -497,9 +395,6 @@ const ImageCarousel = ({ images, navigation, product, formatPrice, getProductIma
       <TouchableOpacity 
         activeOpacity={1}
         style={{ flex: 1 }}
-        onPress={() => console.log('Tap sur le carrousel')}
-        onLongPress={() => setShowDebugInfo(!showDebugInfo)}
-        delayLongPress={250}
       >
         <Animated.View style={[
           carouselStyles.container,
@@ -524,48 +419,14 @@ const ImageCarousel = ({ images, navigation, product, formatPrice, getProductIma
             })
           }
         ]}>
-          <View style={carouselStyles.headerBar}>
+          <View style={[carouselStyles.headerBar, { height: 60 + insets.top, paddingTop: insets.top }]}>
             <TouchableOpacity 
               style={carouselStyles.backButton} 
               onPress={() => navigation.goBack()}
             >
               <Ionicons name="chevron-back" size={32} color="#fff" />
             </TouchableOpacity>
-            
-            {/* Boutons de débogage */}
-            {__DEV__ && (
-              <>
-                <TouchableOpacity 
-                  style={[carouselStyles.backButton, { backgroundColor: 'rgba(255,0,0,0.5)' }]} 
-                  onPress={() => setShowDebugInfo(!showDebugInfo)}
-                >
-                  <Ionicons name="bug-outline" size={24} color="#fff" />
-                </TouchableOpacity>
-                
-                {/* Bouton pour recharger les images */}
-                <TouchableOpacity 
-                  style={[carouselStyles.backButton, { backgroundColor: 'rgba(0,255,0,0.5)' }]} 
-                  onPress={reloadImages}
-                >
-                  <Ionicons name="refresh-outline" size={24} color="#fff" />
-                </TouchableOpacity>
-              </>
-            )}
           </View>
-          
-          {showDebugInfo && (
-            <View style={carouselStyles.debugInfo}>
-              <Text style={carouselStyles.debugText}>
-                Images: {images.length} | Index actif: {activeIndex}
-              </Text>
-              <Text style={carouselStyles.debugText}>
-                Image actuelle: {images[activeIndex] ? images[activeIndex].substring(0, 30) + '...' : 'N/A'}
-              </Text>
-              <Text style={carouselStyles.debugText}>
-                Erreurs: {Object.keys(imageLoadError).filter(key => imageLoadError[key]).length}
-              </Text>
-            </View>
-          )}
           
           <Carousel
             loop
@@ -579,20 +440,6 @@ const ImageCarousel = ({ images, navigation, product, formatPrice, getProductIma
             autoPlayInterval={4000}
             style={{ width: '100%' }}
           />
-          
-          {images.length > 1 && (
-            <View style={carouselStyles.pagination}>
-              {images.map((_, index) => (
-                <View
-                  key={index}
-                  style={[
-                    carouselStyles.paginationDot,
-                    index === activeIndex && carouselStyles.paginationDotActive,
-                  ]}
-                />
-              ))}
-            </View>
-          )}
           
           <View style={carouselStyles.productInfoOverlay}>
             <Text style={carouselStyles.productTitle}>{product.title}</Text>
@@ -611,6 +458,22 @@ const ImageCarousel = ({ images, navigation, product, formatPrice, getProductIma
               <Text style={carouselStyles.swipeText}>Appuyer pour voir plus de détails</Text>
             </TouchableOpacity>
           </View>
+          
+          <TouchableOpacity 
+            style={[carouselStyles.favoriteButton, { top: 60 + insets.top }]}
+            onPress={() => {
+              setIsFavorite(!isFavorite);
+            }}
+          >
+            <Ionicons name={isFavorite ? 'heart' : 'heart-outline'} size={24} color={isFavorite ? '#ff6b9b' : '#333'} />
+          </TouchableOpacity>
+          
+          <TouchableOpacity 
+            style={[carouselStyles.shareButton, { top: 115 + insets.top }]}
+            onPress={handleShare}
+          >
+            <Ionicons name="share-outline" size={24} color="#333" />
+          </TouchableOpacity>
           
           <View style={carouselStyles.actionsBar}>
             <TouchableOpacity 
@@ -697,11 +560,25 @@ const ImageCarousel = ({ images, navigation, product, formatPrice, getProductIma
           </View>
         </Animated.View>
       </TouchableOpacity>
+      <PanGestureHandler
+        onGestureEvent={onGestureEvent}
+        onHandlerStateChange={onHandlerStateChange}
+      >
+        <View style={{ 
+          position: 'absolute', 
+          height: 80, 
+          left: 0, 
+          right: 0, 
+          bottom: 0,
+          zIndex: 15
+        }} />
+      </PanGestureHandler>
     </GestureHandlerRootView>
   );
 };
 
 export default function ProductDetailsScreen({ route, navigation }: any) {
+  const insets = useSafeAreaInsets();
   const { productId, fullscreenMode, transitionAnimation } = route.params || {};
   const [product, setProduct] = useState<Product | null>(null);
   const [seller, setSeller] = useState<Seller | null>(null);
