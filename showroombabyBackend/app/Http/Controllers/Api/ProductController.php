@@ -152,6 +152,7 @@ class ProductController extends Controller
             'city' => 'required|string',
             'zipcode' => 'required|string',
             'phone' => 'required|string',
+            'brand' => 'nullable|string|max:255',
         ]);
 
         // Création du produit
@@ -170,6 +171,7 @@ class ProductController extends Controller
         $product->city = $request->city;
         $product->zipCode = $request->input('zipcode', $request->input('zipCode'));
         $product->phone = $request->phone;
+        $product->brand = $request->brand;
         $product->view_count = 0;
         $product->save();
 
@@ -452,6 +454,7 @@ class ProductController extends Controller
             'city' => 'sometimes|string',
             'zipCode' => 'sometimes|string',
             'phone' => 'sometimes|string',
+            'brand' => 'sometimes|nullable|string|max:255',
         ]);
 
         // Mise à jour des champs
@@ -467,6 +470,7 @@ class ProductController extends Controller
         if ($request->has('city')) $product->city = $request->city;
         if ($request->has('zipCode')) $product->zipCode = $request->input('zipcode', $request->input('zipCode'));
         if ($request->has('phone')) $product->phone = $request->phone;
+        if ($request->has('brand')) $product->brand = $request->brand;
 
         $product->save();
 

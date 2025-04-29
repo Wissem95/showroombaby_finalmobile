@@ -32,6 +32,7 @@ class Product extends Model
         'category_id',
         'subcategory_id',
         'user_id',
+        'brand',
     ];
 
     /**

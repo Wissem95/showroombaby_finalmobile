@@ -49,7 +49,7 @@ interface ProductData {
 enum Step {
   INFOS_BASE = 0,
   DESCRIPTION_PRIX = 1,
-  FACTURE_GARANTIE = 2,
+  CONDITION = 2,
   PHOTOS = 3,
   LOCATION = 4,
 }
@@ -517,65 +517,70 @@ export default function AjouterProduitScreen({ navigation, route }: any) {
     // Validation de l'étape actuelle
     switch (currentStep) {
       case Step.INFOS_BASE:
-        if (!productData.title) {
-          tempErrors.title = 'Veuillez saisir un titre.';
+        if (!productData.title.trim()) {
+          tempErrors.title = 'Le titre est obligatoire.';
+          valid = false;
+        } else if (productData.title.length < 3) {
+          tempErrors.title = 'Le titre doit contenir au moins 3 caractères.';
           valid = false;
         }
+        
         if (!productData.category_id) {
           tempErrors.category = 'Veuillez sélectionner une catégorie.';
           valid = false;
         }
         break;
+      
       case Step.DESCRIPTION_PRIX:
-        if (!productData.description) {
-          tempErrors.description = 'Veuillez saisir une description.';
+        if (!productData.description.trim()) {
+          tempErrors.description = 'La description est obligatoire.';
+          valid = false;
+        } else if (productData.description.length < 10) {
+          tempErrors.description = 'La description doit contenir au moins 10 caractères.';
           valid = false;
         }
-        if (!productData.price) {
-          tempErrors.price = 'Veuillez saisir un prix.';
+        
+        if (!productData.price.trim()) {
+          tempErrors.price = 'Le prix est obligatoire.';
           valid = false;
-        } else if (isNaN(parseFloat(productData.price))) {
-          tempErrors.price = 'Le prix doit être un nombre.';
+        } else if (isNaN(parseFloat(productData.price)) || parseFloat(productData.price) <= 0) {
+          tempErrors.price = 'Veuillez saisir un prix valide.';
           valid = false;
         }
         break;
-      case Step.FACTURE_GARANTIE:
+      
+      case Step.CONDITION:
         if (!productData.condition) {
-          tempErrors.condition = 'Veuillez sélectionner un état.';
+          tempErrors.condition = 'Veuillez sélectionner un état du produit.';
           valid = false;
+          console.log('Validation échouée : État du produit non sélectionné');
+        } else {
+          console.log('Validation réussie : État du produit =', productData.condition);
         }
         break;
+      
       case Step.PHOTOS:
-        if (!productData.images || productData.images.length === 0) {
+        if (productData.images.length === 0) {
           tempErrors.images = 'Veuillez ajouter au moins une photo.';
           valid = false;
         }
         break;
+      
       case Step.LOCATION:
-        if (!productData.location) {
-          tempErrors.location = "L'adresse est obligatoire";
+        if (!productData.location.trim()) {
+          tempErrors.location = 'L\'adresse est obligatoire.';
           valid = false;
         }
-        if (!productData.zipCode || productData.zipCode.length !== 5) {
-          tempErrors.zipCode = "Le code postal est obligatoire (5 chiffres)";
+        
+        if (!productData.telephone.trim()) {
+          tempErrors.telephone = 'Le numéro de téléphone est obligatoire.';
           valid = false;
         }
-        if (!productData.telephone || productData.telephone.length !== 10) {
-          tempErrors.telephone = "Le numéro de téléphone est obligatoire (10 chiffres)";
-          valid = false;
-        }
+        
         if (!termsAccepted) {
-          tempErrors.terms = "Vous devez accepter les conditions générales";
+          tempErrors.terms = 'Vous devez accepter les conditions générales.';
           valid = false;
         }
-        
-        // Vérifier que les coordonnées sont présentes
-        if (productData.latitude === undefined || productData.latitude === null || 
-            productData.longitude === undefined || productData.longitude === null) {
-          tempErrors.location = "Veuillez sélectionner une adresse dans la liste des suggestions";
-          valid = false;
-        }
-        
         break;
     }
     
@@ -634,7 +639,19 @@ export default function AjouterProduitScreen({ navigation, route }: any) {
       formData.append('title', productData.title);
       formData.append('description', productData.description);
       formData.append('price', productData.price);
-      formData.append('condition', productData.condition);
+      
+      // Make sure condition is set to a valid value
+      if (!productData.condition || productData.condition === '') {
+        // Default condition is not set anymore - require user selection
+        console.log('Erreur: État du produit non sélectionné');
+        setErrors({...errors, condition: 'Veuillez sélectionner un état du produit.'});
+        setIsLoading(false);
+        setCurrentStep(Step.CONDITION);
+        return;
+      } else {
+        formData.append('condition', productData.condition);
+        console.log('Condition sélectionnée utilisée:', productData.condition);
+      }
       
       // Important: Le backend attend 'address' et pas 'location'
       formData.append('address', productData.location);
@@ -891,9 +908,11 @@ export default function AjouterProduitScreen({ navigation, route }: any) {
 
   // Fonction pour sélectionner un élément et fermer la modale
   const handleSelect = (type: string, value: string, label: string) => {
+    console.log(`Sélection de type ${type}, valeur ${value}, label ${label}`);
     switch (type) {
       case 'condition':
         setProductData(prev => ({ ...prev, condition: value }));
+        console.log(`État du produit mis à jour: ${value}`);
         break;
       case 'warranty':
         setProductData(prev => ({ ...prev, warranty: value }));
@@ -1072,8 +1091,8 @@ export default function AjouterProduitScreen({ navigation, route }: any) {
         return renderInfosBaseStep();
       case Step.DESCRIPTION_PRIX:
         return renderDescriptionPrixStep();
-      case Step.FACTURE_GARANTIE:
-        return renderFactureGarantieStep();
+      case Step.CONDITION:
+        return renderConditionStep();
       case Step.PHOTOS:
         return renderPhotoStep();
       case Step.LOCATION:
@@ -1179,59 +1198,36 @@ export default function AjouterProduitScreen({ navigation, route }: any) {
     );
   };
 
-  // Étape facture, garantie, état
-  const renderFactureGarantieStep = () => {
+  const renderConditionSelector = () => {
     return (
-      <View style={styles.pageContainer}>
-        <Text style={styles.stepTitle}>Détails supplémentaires</Text>
-        <Text style={styles.stepDescription}>
-          Ces informations aideront les acheteurs à connaître l'état et les garanties de votre produit.
-        </Text>
-        
-        <Text style={styles.inputLabel}>Facture d'achat</Text>
-        <TouchableOpacity
-          style={styles.selectButton}
-          onPress={() => {/* Action pour facture */}}
-        >
-          <Text style={styles.selectPlaceholder}>Veuillez choisir...</Text>
-          <MaterialIcons name="arrow-drop-down" size={24} color="#999" />
-        </TouchableOpacity>
-        
-        <Text style={styles.inputLabel}>Envoi possible</Text>
-        <TouchableOpacity
-          style={styles.selectButton}
-          onPress={() => {/* Action pour envoi */}}
-        >
-          <Text style={styles.selectPlaceholder}>Veuillez choisir...</Text>
-          <MaterialIcons name="arrow-drop-down" size={24} color="#999" />
-        </TouchableOpacity>
-        
-        <Text style={styles.inputLabel}>Garantie</Text>
-        <TouchableOpacity
-          style={styles.selectButton}
-          onPress={() => setModalVisible('warranty')}
-        >
-          <Text style={productData.warranty ? styles.selectText : styles.selectPlaceholder}>
-            {productData.warranty ? 
-              WARRANTIES.find(w => w.id === productData.warranty)?.label || 'Sélectionnez une garantie' : 
-              'Veuillez choisir...'}
-          </Text>
-          <MaterialIcons name="arrow-drop-down" size={24} color="#999" />
-        </TouchableOpacity>
-        
+      <View>
         <Text style={styles.inputLabel}>État du produit</Text>
         <TouchableOpacity
-          style={styles.selectButton}
+          style={[styles.selectButton, errors.condition ? styles.inputError : null]}
           onPress={() => setModalVisible('condition')}
         >
           <Text style={productData.condition ? styles.selectText : styles.selectPlaceholder}>
             {productData.condition ? 
-              CONDITIONS.find(c => c.id === productData.condition)?.label || 'Sélectionnez un état' : 
-              'État du produit'}
+              CONDITIONS.find(c => c.id === productData.condition)?.label || 'État du produit' : 
+              'État du produit (obligatoire)'}
           </Text>
           <MaterialIcons name="arrow-drop-down" size={24} color="#999" />
         </TouchableOpacity>
         {errors.condition && <Text style={styles.errorText}>{errors.condition}</Text>}
+      </View>
+    );
+  };
+
+  // Étape facture, garantie, état
+  const renderConditionStep = () => {
+    return (
+      <View style={styles.pageContainer}>
+        <Text style={styles.stepTitle}>État du produit</Text>
+        <Text style={styles.stepDescription}>
+          Cette information aidera les acheteurs à connaître l'état de votre produit.
+        </Text>
+        
+        {renderConditionSelector()}
       </View>
     );
   };
@@ -1304,7 +1300,7 @@ export default function AjouterProduitScreen({ navigation, route }: any) {
           {productId ? 'Modifier l\'annonce' : 
           currentStep === Step.INFOS_BASE ? 'Informations produit' :
           currentStep === Step.DESCRIPTION_PRIX ? 'Description et prix' :
-          currentStep === Step.FACTURE_GARANTIE ? 'État et garantie' :
+          currentStep === Step.CONDITION ? 'État du produit' :
           currentStep === Step.PHOTOS ? 'Photos du produit' :
           'Localisation et contact'}
         </Text>
@@ -1774,5 +1770,9 @@ const styles = StyleSheet.create({
   selectPlaceholder: {
     fontSize: 16,
     color: '#999',
+  },
+  inputError: {
+    borderColor: '#E75A7C',
+    borderWidth: 1,
   },
 }); 
