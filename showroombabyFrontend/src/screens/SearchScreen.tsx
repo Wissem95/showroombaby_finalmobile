@@ -675,14 +675,20 @@ export default function SearchScreen({ navigation }: any) {
       <View style={styles.header}>
         <View style={styles.searchContainer}>
           <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-            <Ionicons name="arrow-back" size={24} color="#333" />
+            <Ionicons name="arrow-back" size={24} color="#ff6b9b" />
           </TouchableOpacity>
           <Searchbar
-            placeholder="Rechercher un produit"
+            placeholder="Rechercher un produit..."
             onChangeText={handleSearch}
             value={searchQuery}
             style={styles.searchBar}
             inputStyle={styles.searchInput}
+            icon={() => <Ionicons name="search" size={22} color="#ff6b9b" style={styles.searchIcon} />}
+            right={() => searchQuery.length > 0 ? 
+              <TouchableOpacity onPress={() => handleSearch('')}>
+                <Ionicons name="close-circle" size={22} color="#ff6b9b" style={styles.clearIcon} />
+              </TouchableOpacity> : null
+            }
           />
         </View>
         
@@ -877,6 +883,7 @@ export default function SearchScreen({ navigation }: any) {
         keyExtractor={item => item.id.toString()}
         numColumns={2}
         contentContainerStyle={styles.productsGrid}
+        columnWrapperStyle={styles.productRow}
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
             <Ionicons name="search-outline" size={80} color="#ccc" />
@@ -908,20 +915,40 @@ const styles = StyleSheet.create({
   searchContainer: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 5,
   },
   backButton: {
     padding: 10,
+    backgroundColor: 'rgba(255, 107, 155, 0.1)',
+    borderRadius: 20,
+    marginRight: 8,
   },
   searchBar: {
     flex: 1,
-    marginLeft: 5,
+    marginLeft: 0,
     borderRadius: 30,
-    height: 45,
-    backgroundColor: '#f5f5f5',
-    elevation: 0,
+    height: hp('6%'),
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    borderWidth: 1,
+    borderColor: '#ffd4e5',
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
   },
   searchInput: {
-    fontSize: 16,
+    fontSize: wp('3.8%'),
+    color: '#333',
+    marginLeft: wp('1%'),
+    fontWeight: '500',
+  },
+  searchIcon: {
+    marginLeft: wp('2%'),
+  },
+  clearIcon: {
+    marginRight: wp('2%'),
   },
   advancedSearchButton: {
     flexDirection: 'row',
@@ -1021,6 +1048,11 @@ const styles = StyleSheet.create({
   productsGrid: {
     padding: 8,
     paddingBottom: 40,
+    alignItems: 'center',
+  },
+  productRow: {
+    justifyContent: 'space-evenly',
+    width: '100%',
   },
   emptyContainer: {
     alignItems: 'center',
