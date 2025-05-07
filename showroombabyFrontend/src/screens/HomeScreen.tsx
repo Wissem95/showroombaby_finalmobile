@@ -507,14 +507,14 @@ export default function HomeScreen({ navigation }: Props) {
             onPress={() => navigation.navigate('Search')}
           >
             <Searchbar
-              placeholder="Rechercher"
+              placeholder="Rechercher un produit..."
               style={styles.searchBar}
               inputStyle={styles.searchInput}
               value={searchQuery}
               editable={false}
               pointerEvents="none"
-              icon={() => null}
-              right={() => <Ionicons name="search-outline" size={20} color="#666" />}
+              icon={() => <Ionicons name="search" size={22} color="#ff6b9b" style={styles.searchIcon} />}
+              right={() => <Ionicons name="arrow-forward" size={20} color="#ff6b9b" style={styles.searchArrow} />}
             />
           </TouchableOpacity>
         </View>
@@ -575,20 +575,36 @@ const styles = StyleSheet.create({
     top: -hp('7%'),
   },
   searchBarContainer: {
-    paddingHorizontal: wp('4%'),
-    marginTop: hp('2%'),
+    paddingHorizontal: wp('5%'),
+    marginTop: hp('4%'),
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 10,
   },
   searchBar: {
     borderRadius: 30,
-    height: hp('5.5%'),
-    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    height: hp('6%'),
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
     borderWidth: 1,
     borderColor: '#ffd4e5',
-    elevation: 0,
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    width: '100%',
   },
   searchInput: {
-    fontSize: wp('3.5%'),
-    color: '#666',
+    fontSize: wp('3.8%'),
+    color: '#333',
+    marginLeft: wp('1%'),
+    fontWeight: '500',
+  },
+  searchIcon: {
+    marginLeft: wp('2%'),
+  },
+  searchArrow: {
+    marginRight: wp('2%'),
   },
   categoriesContainer: {
     marginTop: hp('1%'),
