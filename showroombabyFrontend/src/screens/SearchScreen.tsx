@@ -879,7 +879,17 @@ export default function SearchScreen({ navigation }: any) {
       
       <FlatList
         data={filteredProducts}
-        renderItem={({ item }) => <ProductItem item={item} navigation={navigation} />}
+        renderItem={({ item, index }) => (
+          <View style={[
+            styles.productCardContainer,
+            // Si c'est un élément impair en fin de liste, le positionner à gauche
+            filteredProducts.length % 2 !== 0 && index === filteredProducts.length - 1 
+              ? styles.lastOddItem 
+              : null
+          ]}>
+            <ProductItem item={item} navigation={navigation} />
+          </View>
+        )}
         keyExtractor={item => item.id.toString()}
         numColumns={2}
         contentContainerStyle={styles.productsGrid}
@@ -1048,11 +1058,11 @@ const styles = StyleSheet.create({
   productsGrid: {
     padding: 8,
     paddingBottom: 40,
-    alignItems: 'center',
   },
   productRow: {
-    justifyContent: 'space-evenly',
+    justifyContent: 'space-between',
     width: '100%',
+    paddingHorizontal: wp('2%'),
   },
   emptyContainer: {
     alignItems: 'center',
@@ -1118,5 +1128,13 @@ const styles = StyleSheet.create({
     marginLeft: 8,
     fontSize: 15,
     color: '#333',
+  },
+  productCardContainer: {
+    width: '48%',  // Légèrement moins que 50% pour permettre l'espacement
+    marginVertical: hp('1%'),
+  },
+  lastOddItem: {
+    marginLeft: 0,
+    marginRight: 'auto',  // Pousse l'élément vers la gauche
   },
 }); 

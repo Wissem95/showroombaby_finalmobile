@@ -897,32 +897,33 @@ export default function ChatScreen({ route, navigation }: Props) {
         </Animated.View>
       )}
 
-      <FlatList
-        ref={flatListRef}
-        data={messages}
-        renderItem={renderMessage}
-        keyExtractor={(item) => item.id.toString()}
-        contentContainerStyle={[
-          styles.messagesContainer,
-          messages.length === 0 && styles.emptyContainer
-        ]}
-        inverted={true}
-        ListEmptyComponent={renderEmptyChat}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={onRefresh}
-            colors={['#ff6b9b']}
-            tintColor="#ff6b9b"
-          />
-        }
-        initialNumToRender={15}
-        maxToRenderPerBatch={10}
-        windowSize={10}
-        removeClippedSubviews={false}
-        showsVerticalScrollIndicator={false}
-        onEndReachedThreshold={0.5}
-      />
+      {/* Afficher le composant vide ou la liste des messages */}
+      {messages.length === 0 ? (
+        renderEmptyChat()
+      ) : (
+        <FlatList
+          ref={flatListRef}
+          data={messages}
+          renderItem={renderMessage}
+          keyExtractor={(item) => item.id.toString()}
+          contentContainerStyle={styles.messagesContainer}
+          inverted={true}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              colors={['#ff6b9b']}
+              tintColor="#ff6b9b"
+            />
+          }
+          initialNumToRender={15}
+          maxToRenderPerBatch={10}
+          windowSize={10}
+          removeClippedSubviews={false}
+          showsVerticalScrollIndicator={false}
+          onEndReachedThreshold={0.5}
+        />
+      )}
 
       <Surface style={styles.inputContainer}>
         <Animated.View 
@@ -1182,23 +1183,20 @@ const styles = StyleSheet.create({
     paddingBottom: 16,
     marginBottom: hp('2%'),
   },
-  // Style pour le conteneur vide (pas de messages)
-  emptyContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  // Wrapper pour le message "chat vide" (avec rotation pour l'inversion)
+  // Styles pour l'affichage du chat vide
   emptyChatWrapper: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    padding: 20,
+    transform: [],
   },
   // Conteneur pour le message "chat vide"
   emptyChatContainer: {
     alignItems: 'center',
     justifyContent: 'center',
     padding: 20,
+    transform: [],
   },
   // Titre pour le chat vide
   emptyChatTitle: {
@@ -1207,6 +1205,7 @@ const styles = StyleSheet.create({
     color: '#555',
     marginTop: 12,
     marginBottom: 8,
+    transform: [],
   },
   // Texte explicatif pour le chat vide
   emptyChatText: {
@@ -1214,6 +1213,7 @@ const styles = StyleSheet.create({
     color: '#999',
     textAlign: 'center',
     lineHeight: 20,
+    transform: [],
   },
   // Bulle contenant un message
   messageBubble: {
