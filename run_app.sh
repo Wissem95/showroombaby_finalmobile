@@ -88,7 +88,7 @@ echo -e "${GREEN}2. Scannez le QR code qui apparaîtra${NC}"
 echo -e "${GREEN}3. Ou entrez manuellement: exp://$LOCAL_IP:19000${NC}"
 
 # Lancement d'Expo en mode hors ligne pour éviter la connexion
-npx expo start --offline
+npx expo start 
 
 # 6. Nettoyage lors de la fermeture
 function cleanup() {
