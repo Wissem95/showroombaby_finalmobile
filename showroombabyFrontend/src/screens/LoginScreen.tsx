@@ -207,7 +207,7 @@ export default function LoginScreen({ navigation }: Props) {
           {debugVisible && (
             <View style={styles.debugContainer}>
               <Text style={styles.debugTitle}>Informations de débogage:</Text>
-              <Text style={styles.debugText}>Backend URL: http://192.168.0.34:8000/api</Text>
+              <Text style={styles.debugText}>Backend URL: http://172.20.10.3:8000/api</Text>
               <Text style={styles.debugText}>Données d'utilisateur test:</Text>
               <Text style={styles.debugText}>- Email: vendeur@test.com</Text>
               <Text style={styles.debugText}>- Mot de passe: password123</Text>

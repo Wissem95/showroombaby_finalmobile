@@ -78,7 +78,7 @@ const ProductItem = React.memo(({ item, navigation }: { item: Product; navigatio
 
   // Afficher la localisation complète avec département
   const getFullLocation = (product: Product) => {
-    let locationParts = [];
+    let locationParts: string[] = [];
     
     // Ajouter l'adresse si disponible
     if (product.address) {
@@ -100,39 +100,13 @@ const ProductItem = React.memo(({ item, navigation }: { item: Product; navigatio
 
   // Utiliser le service d'image pour obtenir la source de l'image
   const getProductImage = (product: Product) => {
-    // Si pas d'images, retourner le placeholder
-    if (!product.images || !Array.isArray(product.images) || product.images.length === 0) {
+    try {
+      return imageService.getProductImageSource(product, DEFAULT_IMAGE_URL);
+    } catch (error) {
+      console.error(`Erreur lors de la récupération de l'image pour le produit ${product.id}:`, error);
+      setImageError(true);
       return DEFAULT_IMAGE_URL;
     }
-    
-    try {
-      const image = product.images[0];
-      
-      // Si c'est une chaîne qui commence par http, c'est déjà une URL complète
-      if (typeof image === 'string' && image.startsWith('http')) {
-        return { uri: image };
-      }
-      
-      // Si c'est une chaîne sans http, ajouter le préfixe de stockage
-      if (typeof image === 'string') {
-        return { uri: `${API_URL}/storage/${image}` };
-      }
-      
-      // Si c'est un objet avec une propriété url
-      if (typeof image === 'object' && image && 'url' in image && (image as any).url) {
-        return { uri: (image as any).url };
-      }
-      
-      // Si c'est un objet avec une propriété path
-      if (typeof image === 'object' && image && 'path' in image && (image as any).path) {
-        return { uri: `${API_URL}/storage/${(image as any).path}` };
-      }
-    } catch (e) {
-      console.error('Erreur traitement image:', e);
-    }
-    
-    // Image par défaut en cas d'échec
-    return DEFAULT_IMAGE_URL;
   };
   
   useFocusEffect(
@@ -289,7 +263,7 @@ const ProductItem = React.memo(({ item, navigation }: { item: Product; navigatio
             setImageLoading(false);
             setImageError(true);
           }}
-          key={`home-image-${item.id}-${new Date().getTime()}`}
+          key={`home-image-${item.id}-${imageService.getProductImages(item).length > 0 ? imageService.getProductImages(item)[0] : ''}`}
           defaultSource={DEFAULT_IMAGE_URL}
         />
         {imageError && (
@@ -342,6 +316,8 @@ export default function HomeScreen({ navigation }: Props) {
   const [backgroundImage, setBackgroundImage] = useState(categories[0].image);
 
   useEffect(() => {
+    // Nettoyer le cache des images au démarrage
+    imageService.clearImageCache();
     fetchProducts();
   }, []);
   

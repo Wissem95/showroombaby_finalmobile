@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { ScrollView, View, StyleSheet, TouchableOpacity, RefreshControl, Alert, ActivityIndicator, Image, Modal } from 'react-native';
-import { Avatar, Text, Divider, List, Button, Card, TextInput, Surface, Portal, Provider, IconButton } from 'react-native-paper';
+import { ScrollView, View, StyleSheet, TouchableOpacity, RefreshControl, Alert, ActivityIndicator, Image, Modal, SafeAreaView } from 'react-native';
+import { Avatar, Text, Divider, List, Button, Card, TextInput, Surface, Portal, Provider, IconButton, Dialog } from 'react-native-paper';
 import AuthService from '../services/auth';
 import { Props } from '../types/navigation';
 import axios from 'axios';
@@ -8,11 +8,15 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
 import { ImageBackground } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { widthPercentageToDP as wp, heightPercentageToDP as hp } from 'react-native-responsive-screen';
+import { useIsFocused } from '@react-navigation/native';
+import { SERVER_IP } from '../config/ip';
+import imageService from '../services/api/imageService';
 
 // URL de l'API
 // Pour les appareils externes, utiliser votre adresse IP locale au lieu de 127.0.0.1
 const API_URL = process.env.NODE_ENV === 'development' || __DEV__ 
-  ? 'http://192.168.0.34:8000/api'  // Adresse IP locale de l'utilisateur
+  ? 'http://172.20.10.3:8000/api'  // Adresse IP locale de l'utilisateur
   : 'https://api.showroombaby.com';
 
 interface Product {
@@ -199,39 +203,7 @@ export default function ProfileScreen({ navigation }: Props) {
   };
 
   const getProductImage = (product: Product) => {
-    // Image par défaut si pas d'images
-    if (!product.images || !Array.isArray(product.images) || product.images.length === 0) {
-      return require('../../assets/placeholder.png');
-    }
-    
-    try {
-      const image = product.images[0];
-      
-      // Si c'est une chaîne qui commence par http, c'est déjà une URL complète
-      if (typeof image === 'string' && image.startsWith('http')) {
-        return { uri: image };
-      }
-      
-      // Si c'est une chaîne sans http, ajouter le préfixe de stockage
-      if (typeof image === 'string') {
-        return { uri: `${API_URL}/storage/${image}` };
-      }
-      
-      // Si c'est un objet avec une propriété url
-      if (typeof image === 'object' && image && 'url' in image && image.url) {
-        return { uri: image.url };
-      }
-      
-      // Si c'est un objet avec une propriété path
-      if (typeof image === 'object' && image && 'path' in image && image.path) {
-        return { uri: `${API_URL}/storage/${image.path}` };
-      }
-    } catch (e) {
-      console.error('Erreur traitement image:', e);
-    }
-    
-    // Image par défaut en cas d'échec
-    return require('../../assets/placeholder.png');
+    return imageService.getProductImageSource(product, require('../../assets/placeholder.png'));
   };
 
   const handleDeleteProduct = async (productId: number) => {

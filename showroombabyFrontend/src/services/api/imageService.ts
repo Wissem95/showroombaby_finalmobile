@@ -1,13 +1,39 @@
 import axios from 'axios';
 import { Alert } from 'react-native';
+import { SERVER_IP } from '../../config/ip';
 
-// URL de l'API
+// URL de l'API avec l'adresse IP importée du fichier de config
 const API_URL = process.env.NODE_ENV === 'development' || __DEV__
-  ? 'http://192.168.0.34:8000/api'
+  ? `http://${SERVER_IP}:8000/api`
+  : 'https://api.showroombaby.com/api';
+
+// Base URL pour les images (sans le /api)
+const IMAGE_BASE_URL = process.env.NODE_ENV === 'development' || __DEV__
+  ? `http://${SERVER_IP}:8000`
   : 'https://api.showroombaby.com';
+
+// Cache pour stocker les URL d'images déjà traitées
+const imageUrlCache: Record<string, string> = {};
+// Cache pour stocker les sources d'images déjà traitées
+const imageSourceCache: Record<string, any> = {};
+
+// Configuration des logs
+const LOG_THRESHOLD = 10; // Réduit le seuil pour éviter de surcharger la console
+let logCount = 0;
+let totalImageLoads = 0; // Compteur global d'images traitées
 
 // Image placeholder - à utiliser avec require dans les composants
 const DEFAULT_IMAGE_URL = ''; // Défini à l'extérieur pour éviter des références circulaires
+
+// Fonction utilitaire pour vérifier si une URL est valide
+const isValidUrl = (url: string): boolean => {
+  try {
+    new URL(url);
+    return true;
+  } catch (e) {
+    return false;
+  }
+};
 
 const imageService = {
   /**
@@ -17,36 +43,58 @@ const imageService = {
    */
   getFullImageUrl: (imagePath: string | null): string => {
     if (!imagePath) {
-      console.log('[DEBUG-IMG-SERVICE] URL image vide');
+      console.log('[DEBUG-IMG-SERVICE] Chemin d\'image NULL ou vide');
       return '';
     }
     
-    console.log('[DEBUG-IMG-SERVICE] Traitement URL image:', imagePath);
+    // Incrémente le compteur total
+    totalImageLoads++;
     
-    // Si c'est déjà une URL complète
-    if (imagePath.startsWith('http')) {
-      console.log('[DEBUG-IMG-SERVICE] URL déjà complète:', imagePath);
-      return imagePath;
+    // Vérifier si l'URL est déjà dans le cache
+    if (imageUrlCache[imagePath]) {
+      return imageUrlCache[imagePath];
     }
     
-    // Si c'est un chemin relatif commençant par /storage/
-    if (imagePath.startsWith('/storage/')) {
-      const fullUrl = `${API_URL.replace('/api', '')}${imagePath}`;
-      console.log('[DEBUG-IMG-SERVICE] Chemin /storage/ -> URL complète:', fullUrl);
-      return fullUrl;
+    // Toujours logger le premier lot d'images pour le débogage
+    if (totalImageLoads < LOG_THRESHOLD) {
+      console.log(`[DEBUG-IMG-SERVICE] (${totalImageLoads}) Traitement URL image:`, imagePath);
+      console.log(`[DEBUG-IMG-SERVICE] SERVER_IP utilisé:`, SERVER_IP);
     }
     
-    // Cas spécial pour les chemins commençant par "storage/"
-    if (imagePath.startsWith('storage/')) {
-      const fullUrl = `${API_URL.replace('/api', '')}/${imagePath}`;
-      console.log('[DEBUG-IMG-SERVICE] Chemin storage/ -> URL complète:', fullUrl);
-      return fullUrl;
+    let result = '';
+    
+    try {
+      // Si c'est déjà une URL complète et valide
+      if (isValidUrl(imagePath)) {
+        result = imagePath;
+      }
+      // Si c'est un chemin relatif commençant par /storage/
+      else if (imagePath.startsWith('/storage/')) {
+        result = `${IMAGE_BASE_URL}${imagePath}`;
+      }
+      // Cas spécial pour les chemins commençant par "storage/"
+      else if (imagePath.startsWith('storage/')) {
+        result = `${IMAGE_BASE_URL}/${imagePath}`;
+      }
+      // Autre cas - on ajoute /storage/ au chemin
+      else {
+        result = `${IMAGE_BASE_URL}/storage/${imagePath}`;
+      }
+      
+      // Vérification supplémentaire
+      if (!isValidUrl(result)) {
+        console.warn(`[DEBUG-IMG-SERVICE] URL générée invalide: ${result}`);
+        result = '';
+      }
+    } catch (error) {
+      console.error('[DEBUG-IMG-SERVICE] Erreur lors du traitement de l\'URL:', error);
+      result = '';
     }
     
-    // Autre cas - on ajoute /storage/ au chemin
-    const fullUrl = `${API_URL.replace('/api', '')}/storage/${imagePath}`;
-    console.log('[DEBUG-IMG-SERVICE] Chemin relatif -> URL complète:', fullUrl);
-    return fullUrl;
+    // Mettre en cache l'URL traitée
+    imageUrlCache[imagePath] = result;
+    
+    return result;
   },
 
   /**
@@ -55,25 +103,34 @@ const imageService = {
    * @returns Tableau d'URLs d'images
    */
   getProductImages: (product: any): string[] => {
-    console.log('[DEBUG-IMG-SERVICE] Traitement des images pour produit ID:', product?.id);
-    console.log('[DEBUG-IMG-SERVICE] Type d\'images:', typeof product?.images);
-    
     if (!product || !product.images) {
-      console.log(`[DEBUG-IMG-SERVICE] Produit ${product?.id} sans images, retourne tableau vide`);
+      console.log('[DEBUG-IMG-SERVICE] Produit sans images:', product?.id);
       return [];
     }
 
+    console.log('[DEBUG-IMG-SERVICE] Structure des images du produit:', JSON.stringify(product.images));
+    
+    // Identifiant unique pour ce produit et ses images
+    const cacheKey = `product_${product.id}_images`;
+    
+    // Vérifier si le résultat est déjà dans le cache
+    if (imageUrlCache[cacheKey]) {
+      // Retourner le résultat mis en cache sous forme de tableau
+      return JSON.parse(imageUrlCache[cacheKey]);
+    }
+
     try {
+      let result: string[] = [];
+      
       // Si les images sont stockées sous forme de chaîne JSON
       if (typeof product.images === 'string') {
-        console.log('[DEBUG-IMG-SERVICE] Format string pour les images:', product.images.substring(0, 100) + (product.images.length > 100 ? '...' : ''));
         try {
           // Tentative de parse JSON
           const parsedImages = JSON.parse(product.images);
           console.log('[DEBUG-IMG-SERVICE] Images JSON parsées:', parsedImages);
           
           if (Array.isArray(parsedImages)) {
-            const result = parsedImages.map((img: any) => {
+            result = parsedImages.map((img: any) => {
               if (typeof img === 'string') {
                 return img;
               }
@@ -87,49 +144,33 @@ const imageService = {
               }
               return '';
             }).filter(Boolean);
-            
-            console.log('[DEBUG-IMG-SERVICE] Images extraites du tableau JSON:', result);
-            return result;
           }
           // Si c'est une chaîne JSON mais pas un tableau (peut-être un objet unique)
-          if (typeof parsedImages === 'object' && parsedImages !== null) {
-            console.log('[DEBUG-IMG-SERVICE] JSON parsé comme un objet unique');
+          else if (typeof parsedImages === 'object' && parsedImages !== null) {
             if (parsedImages.path) {
-              console.log('[DEBUG-IMG-SERVICE] Utilisé le chemin path:', parsedImages.path);
-              return [parsedImages.path];
-            }
-            if (parsedImages.url) {
-              console.log('[DEBUG-IMG-SERVICE] Utilisé le chemin url:', parsedImages.url);
-              return [parsedImages.url];
+              result = [parsedImages.path];
+            } else if (parsedImages.url) {
+              result = [parsedImages.url];
             }
           }
           // Si c'est une autre forme de JSON, essayer de l'utiliser comme URL
-          console.log('[DEBUG-IMG-SERVICE] Utilisé la chaîne JSON directement comme URL');
-          return [product.images];
+          else {
+            result = [product.images];
+          }
         } catch (e) {
+          console.log('[DEBUG-IMG-SERVICE] Erreur de parsing JSON, traitement comme chaîne:', e);
           // Si ce n'est pas un JSON valide, essayer d'utiliser directement comme une URL
-          console.log('[DEBUG-IMG-SERVICE] Échec du parse JSON pour les images:', e);
           if (product.images.includes('.jpg') || 
               product.images.includes('.jpeg') || 
               product.images.includes('.png')) {
-            console.log('[DEBUG-IMG-SERVICE] Détection d\'extension image dans la chaîne, utilisation comme URL directe');
-            return [product.images];
+            result = [product.images];
           }
-          console.log('[DEBUG-IMG-SERVICE] Format d\'image non reconnu (chaîne):', product.images);
-          return [];
         }
       }
-
       // Si c'est déjà un tableau
-      if (Array.isArray(product.images)) {
-        console.log('[DEBUG-IMG-SERVICE] Format tableau pour les images, longueur:', product.images.length);
-        
-        if (product.images.length === 0) {
-          console.log('[DEBUG-IMG-SERVICE] Tableau d\'images vide');
-          return [];
-        }
-        
-        const result = product.images.map((img: any) => {
+      else if (Array.isArray(product.images)) {
+        console.log('[DEBUG-IMG-SERVICE] Images en format tableau:', product.images);
+        result = product.images.map((img: any) => {
           if (typeof img === 'string') {
             return img;
           }
@@ -143,27 +184,24 @@ const imageService = {
           }
           return '';
         }).filter(Boolean);
-        
-        console.log('[DEBUG-IMG-SERVICE] Images extraites du tableau:', result);
-        return result;
       }
-
       // Si c'est un objet avec une propriété path ou url
-      if (typeof product.images === 'object' && product.images !== null) {
-        console.log('[DEBUG-IMG-SERVICE] Format objet pour les images');
+      else if (typeof product.images === 'object' && product.images !== null) {
+        console.log('[DEBUG-IMG-SERVICE] Images en format objet:', product.images);
         const img = product.images;
         if (img.path) {
-          console.log('[DEBUG-IMG-SERVICE] Utilisé le chemin path de l\'objet:', img.path);
-          return [img.path];
-        }
-        if (img.url) {
-          console.log('[DEBUG-IMG-SERVICE] Utilisé le chemin url de l\'objet:', img.url);
-          return [img.url];
+          result = [img.path];
+        } else if (img.url) {
+          result = [img.url];
         }
       }
-
-      console.log('[DEBUG-IMG-SERVICE] Format d\'images non reconnu:', product.images);
-      return [];
+      
+      console.log('[DEBUG-IMG-SERVICE] Résultat final du traitement des images:', result);
+      
+      // Mettre en cache le résultat
+      imageUrlCache[cacheKey] = JSON.stringify(result);
+      
+      return result;
     } catch (error) {
       console.error('[DEBUG-IMG-SERVICE] Erreur lors du traitement des images:', error);
       return [];
@@ -178,31 +216,46 @@ const imageService = {
    * @returns Source d'image au format { uri: string } ou source locale
    */
   getProductImageSource: (product: any, placeholderImage: any) => {
-    const images = imageService.getProductImages(product);
-    
-    if (images.length === 0) {
-      console.log(`[DEBUG-IMG-SERVICE] Produit ${product?.id} sans images, utilisation du placeholder`);
+    if (!product) {
+      console.log('[DEBUG-IMG-SERVICE] Produit null dans getProductImageSource');
       return placeholderImage;
     }
     
-    // Test avec une URL d'image statique
-    if (__DEV__ && product?.id) {
-      // Tester avec une image statique connue pour fonctionner
-      const testUrl = 'https://via.placeholder.com/400';
-      console.log(`[DEBUG-IMG-SERVICE] TEST: Utilisation d'une URL statique pour le produit ${product.id}:`, testUrl);
+    // Identifiant unique pour ce produit
+    const cacheKey = `product_source_${product.id}`;
+    
+    // Vérifier si la source est déjà dans le cache
+    if (imageSourceCache[cacheKey]) {
+      return imageSourceCache[cacheKey];
+    }
+    
+    try {
+      const images = imageService.getProductImages(product);
       
-      // Décommenter pour tester avec l'URL statique
-      // return { uri: testUrl };
-    }
-    
-    const imageUrl = imageService.getFullImageUrl(images[0]);
-    if (!imageUrl) {
-      console.log(`[DEBUG-IMG-SERVICE] URL d'image vide après traitement, utilisation du placeholder`);
+      if (images.length === 0) {
+        console.log('[DEBUG-IMG-SERVICE] Aucune image trouvée pour le produit', product.id);
+        return placeholderImage;
+      }
+      
+      const imageUrl = imageService.getFullImageUrl(images[0]);
+      if (!imageUrl) {
+        console.log('[DEBUG-IMG-SERVICE] URL d\'image vide pour le produit', product.id);
+        return placeholderImage;
+      }
+      
+      if (totalImageLoads < LOG_THRESHOLD) {
+        console.log('[DEBUG-IMG-SERVICE] URL finale de l\'image:', imageUrl);
+      }
+      
+      // Mettre en cache la source d'image
+      const source = { uri: imageUrl };
+      imageSourceCache[cacheKey] = source;
+      
+      return source;
+    } catch (error) {
+      console.error('[DEBUG-IMG-SERVICE] Erreur dans getProductImageSource:', error);
       return placeholderImage;
     }
-    
-    console.log(`[DEBUG-IMG-SERVICE] Source d'image finale pour le produit ${product?.id}:`, imageUrl);
-    return { uri: imageUrl };
   },
 
   /**
@@ -250,23 +303,33 @@ const imageService = {
       
       const formData = imageService.createImageFormData(imageUri, fieldName);
       
-      // Ajouter des headers spécifiques pour l'upload
-      const config = {
+      const response = await axios.post(`${API_URL}/images/upload`, formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
           'Authorization': `Bearer ${token}`
-        },
-      };
+        }
+      });
       
-      const response = await axios.post(`${API_URL}/upload-image`, formData, config);
       return response.data;
-    } catch (error: any) {
+    } catch (error) {
       console.error('Erreur lors du téléchargement de l\'image:', error);
-      if (error.response) {
-        console.error('Réponse d\'erreur:', error.response.data);
-      }
       throw error;
     }
+  },
+  
+  // Méthode pour réinitialiser les compteurs de log pour le débogage
+  resetLogCounters: () => {
+    logCount = 0;
+    totalImageLoads = 0;
+  },
+  
+  // Méthode pour vider le cache d'images
+  clearImageCache: () => {
+    Object.keys(imageUrlCache).forEach(key => delete imageUrlCache[key]);
+    Object.keys(imageSourceCache).forEach(key => delete imageSourceCache[key]);
+    console.log('[DEBUG-IMG-SERVICE] Cache d\'images vidé');
+    // Réinitialiser les compteurs
+    imageService.resetLogCounters();
   }
 };
 

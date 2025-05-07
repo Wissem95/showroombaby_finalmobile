@@ -4,6 +4,7 @@ import { Text, Card, Surface } from 'react-native-paper';
 import { widthPercentageToDP as wp } from 'react-native-responsive-screen';
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
 import { SERVER_IP } from '../config/ip';
+import imageService from '../services/api/imageService';
 
 // Image placeholder
 const placeholderImage = require('../../assets/placeholder.png');
@@ -38,78 +39,11 @@ interface ProductItemProps {
 }
 
 const ProductItem: React.FC<ProductItemProps> = ({ item, navigation }) => {
-  // Fonction pour extraire l'URL de l'image
+  // Fonction pour extraire l'URL de l'image en utilisant imageService
   const getImageUrl = () => {
-    const DEFAULT_IMAGE_URL = 'https://placehold.co/400x300/f8bbd0/ffffff?text=Showroom+Baby';
-    
-    // Image par défaut
-    if (!item.images) {
-      return DEFAULT_IMAGE_URL;
-    }
-
-    try {
-      // Si images est une chaîne JSON, on essaie de l'analyser
-      if (typeof item.images === 'string') {
-        try {
-          const parsedImages = JSON.parse(item.images);
-          
-          if (Array.isArray(parsedImages) && parsedImages.length > 0) {
-            // Vérifier si l'image contient un chemin complet ou juste un nom de fichier
-            const imageUrl = parsedImages[0].includes('http') 
-              ? parsedImages[0] 
-              : `${API_URL}/storage/${parsedImages[0]}`;
-            
-            return imageUrl;
-          }
-        } catch (e) {
-          // Si ce n'est pas un JSON valide, on utilise directement la chaîne
-          const imageUrl = item.images.includes('http') 
-            ? item.images 
-            : `${API_URL}/storage/${item.images}`;
-          
-          return imageUrl;
-        }
-      } 
-      // Si c'est déjà un tableau d'objets avec propriété "path"
-      else if (Array.isArray(item.images) && item.images.length > 0) {
-        // Vérifier si c'est un tableau d'objets avec une propriété path
-        if (typeof item.images[0] === 'object' && item.images[0] !== null) {
-          // Si l'objet contient un champ path ou url
-          if (item.images[0].path) {
-            const imageUrl = item.images[0].path.includes('http') 
-              ? item.images[0].path 
-              : `${API_URL}/storage/${item.images[0].path}`;
-            
-            return imageUrl;
-          } else if (item.images[0].url) {
-            return item.images[0].url;
-          } else {
-            // Essayer de récupérer directement la première valeur
-            const firstImage = item.images[0];
-            
-            if (typeof firstImage === 'string') {
-              const imageUrl = firstImage.includes('http') 
-                ? firstImage 
-                : `${API_URL}/storage/${firstImage}`;
-              
-              return imageUrl;
-            }
-          }
-        } else if (typeof item.images[0] === 'string') {
-          // Si c'est un tableau de chaînes
-          const imageUrl = item.images[0].includes('http') 
-            ? item.images[0] 
-            : `${API_URL}/storage/${item.images[0]}`;
-          
-          return imageUrl;
-        }
-      }
-    } catch (e) {
-      // En cas d'erreur, on utilise l'image par défaut
-      console.error('Erreur lors du chargement de l\'image:', e);
-    }
-
-    return DEFAULT_IMAGE_URL;
+    // Utiliser imageService pour obtenir la source de l'image
+    const imageSource = imageService.getProductImageSource(item, placeholderImage);
+    return imageSource;
   };
   
   // Format de la date
@@ -178,7 +112,7 @@ const ProductItem: React.FC<ProductItemProps> = ({ item, navigation }) => {
       <Surface style={styles.surface}>
         <View style={styles.imageContainer}>
           <Image
-            source={{ uri: getImageUrl() }}
+            source={getImageUrl()}
             style={styles.image}
             resizeMode="cover"
           />

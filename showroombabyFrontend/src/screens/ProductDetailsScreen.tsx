@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { StyleSheet, View, ScrollView, Image, Share, ActivityIndicator, Alert, Dimensions, TouchableOpacity, Linking, Animated } from 'react-native';
-import { Button, Text, Card, Chip, Divider, IconButton, Dialog, Portal } from 'react-native-paper';
+import { Button, Text, IconButton, Divider, Portal, Dialog } from 'react-native-paper';
 import { Ionicons } from '@expo/vector-icons';
 import AuthService from '../services/auth';
 import axios from 'axios';
@@ -18,7 +18,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 // URL de l'API
 // Pour les appareils externes, utiliser votre adresse IP locale au lieu de 127.0.0.1
 const API_URL = process.env.NODE_ENV === 'development' || __DEV__ 
-  ? 'http://192.168.0.34:8000/api'  // Adresse IP locale de l'utilisateur
+  ? 'http://172.20.10.3:8000/api'  // Adresse IP locale de l'utilisateur
   : 'https://api.showroombaby.com';
 
 // Importer l'image placeholder directement
@@ -1031,33 +1031,6 @@ export default function ProductDetailsScreen({ route, navigation }: any) {
     }
     return price.toFixed(2).replace(/\d(?=(\d{3})+\.)/g, '$& ') + ' €';
   };
-
-  // Fonction unique pour obtenir les images d'un produit
-  const getProductImage = (product: Product | null): string[] => {
-    if (!product) return [];
-    
-    const images = imageService.getProductImages(product);
-    console.log('[DEBUG-IMAGES] Images extraites du produit:', images);
-    if (images.length === 0) {
-      console.log('[DEBUG-IMAGES] Aucune image trouvée dans le produit', product.id);
-    }
-    return images;
-  };
-
-  // Fonction unique pour obtenir la source d'image d'un produit
-  const getProductImageSource = (product: Product | null) => {
-    if (!product) return placeholderImage;
-    
-    const source = imageService.getProductImageSource(product, placeholderImage);
-    console.log('[DEBUG-IMAGES] Source image générée:', 
-      typeof source === 'object' && source.uri ? source.uri : 'Utilisation du placeholder');
-    return source;
-  };
-  
-  // Fonction pour obtenir l'URL complète d'une image
-  const getFullImageUrl = (imagePath: string | null): string => {
-    return imageService.getFullImageUrl(imagePath);
-  };
   
   // Autres fonctions utilitaires
   const getWarrantyLabel = (warranty: string) => {
@@ -1083,7 +1056,6 @@ export default function ProductDetailsScreen({ route, navigation }: any) {
 
   // Fonction pour afficher l'adresse complète avec département et code postal
   const getFullAddress = () => {
-    // Log tous les champs potentiels d'adresse pour le debug
     console.log("Champs d'adresse disponibles:", {
       address: product?.address,
       city: product?.city,
@@ -1091,7 +1063,7 @@ export default function ProductDetailsScreen({ route, navigation }: any) {
       zipCode: product?.zip_code
     });
     
-    let addressParts = [];
+    let addressParts: string[] = [];
     
     // Ajouter l'adresse si disponible
     if (product?.address) {
@@ -1316,12 +1288,12 @@ export default function ProductDetailsScreen({ route, navigation }: any) {
     return (
       <View style={{ flex: 1 }}>
         <ImageCarousel 
-          images={getProductImage(product)} 
+          images={imageService.getProductImages(product)} 
           navigation={navigation} 
           product={product}
           formatPrice={formatPrice}
-          getProductImageSource={getProductImageSource}
-          getFullImageUrl={getFullImageUrl}
+          getProductImageSource={(product) => imageService.getProductImageSource(product, placeholderImage)}
+          getFullImageUrl={(imagePath) => imageService.getFullImageUrl(imagePath)}
         />
       </View>
     );
@@ -1373,7 +1345,7 @@ export default function ProductDetailsScreen({ route, navigation }: any) {
           >
             <View style={styles.productImageContainer}>
               <Image
-                source={getProductImageSource(product)}
+                source={imageService.getProductImageSource(product, placeholderImage)}
                 style={styles.mainImage}
                 resizeMode="cover"
                 defaultSource={placeholderImage}
@@ -1398,9 +1370,9 @@ export default function ProductDetailsScreen({ route, navigation }: any) {
               <Text style={styles.miniPrice}>{formatPrice(product.price)}</Text>
             </View>
             
-            {getProductImage(product).length > 1 && (
+            {imageService.getProductImages(product).length > 1 && (
               <View style={styles.imagePagination}>
-                {getProductImage(product).map((_, index) => (
+                {imageService.getProductImages(product).map((_, index) => (
                   <View
                     key={index}
                     style={[

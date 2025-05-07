@@ -31,11 +31,12 @@ import Animated, {
 } from 'react-native-reanimated';
 import { useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import imageService from '../services/api/imageService';
 
 // API URL
 // Pour les appareils externes, utiliser votre adresse IP locale au lieu de 127.0.0.1
 const API_URL = process.env.NODE_ENV === 'development' || __DEV__ 
-  ? 'http://192.168.0.34:8000/api'  // Adresse IP locale de l'utilisateur
+  ? 'http://172.20.10.3:8000/api'  // Adresse IP locale de l'utilisateur
   : 'https://api.showroombaby.com';
 const DEFAULT_AVATAR_URL = 'https://ui-avatars.com/api/?background=ff6b9b&color=fff&name=User';
 const placeholderImage = require('../../assets/placeholder.png');
@@ -655,33 +656,11 @@ export default function ChatScreen({ route, navigation }: Props) {
 
   // Fonction pour obtenir l'URL d'image d'un produit
   const getProductImageUrl = (product?: Product | null): string => {
-    if (!product || !product.images || !product.images.length) {
+    if (!product) {
       return DEFAULT_AVATAR_URL;
     }
     
-    const image = product.images[0];
-    
-    // Si c'est une chaîne qui commence par http, c'est déjà une URL complète
-    if (typeof image === 'string' && image.startsWith('http')) {
-      return image;
-    }
-    
-    // Si c'est une chaîne sans http, ajouter le préfixe de stockage
-    if (typeof image === 'string') {
-      return `${API_URL}/storage/${image}`;
-    }
-    
-    // Si c'est un objet avec une propriété url
-    if (typeof image === 'object' && image && 'url' in image && (image as any).url) {
-      return (image as any).url;
-    }
-    
-    // Si c'est un objet avec une propriété path
-    if (typeof image === 'object' && image && 'path' in image && (image as any).path) {
-      return `${API_URL}/storage/${(image as any).path}`;
-    }
-    
-    return DEFAULT_AVATAR_URL;
+    return imageService.getFullImageUrl(imageService.getProductImages(product)[0] || null) || DEFAULT_AVATAR_URL;
   };
 
   const onFocus = () => {

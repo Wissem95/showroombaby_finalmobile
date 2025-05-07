@@ -8,12 +8,14 @@ import { widthPercentageToDP as wp, heightPercentageToDP as hp } from 'react-nat
 import ProductItem from '../components/ProductItem';
 import Slider from '@react-native-community/slider';
 import { Animated } from 'react-native';
+import imageService from '../services/api/imageService';
+import { SERVER_IP } from '../config/ip';
 
 // URL de l'API
 // Pour les appareils externes, utiliser votre adresse IP locale au lieu de 127.0.0.1
 const API_URL = process.env.NODE_ENV === 'development' || __DEV__ 
-  ? 'http://192.168.0.34:8000/api'  // Adresse IP locale de l'utilisateur
-  : 'https://api.showroombaby.com';
+  ? `http://${SERVER_IP}:8000/api`  // Adresse IP locale chargée depuis la configuration avec préfixe /api
+  : 'https://api.showroombaby.com/api';  // URL de production
 
 // Importer l'image placeholder directement
 const placeholderImage = require('../../assets/placeholder.png');
@@ -349,6 +351,8 @@ export default function SearchScreen({ navigation }: any) {
   };
 
   useEffect(() => {
+    // Nettoyer le cache des images lors du chargement de l'écran
+    imageService.clearImageCache();
     fetchProducts();
     fetchCategories();
   }, []);

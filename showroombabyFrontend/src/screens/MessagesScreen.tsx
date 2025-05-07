@@ -14,6 +14,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import ConversationService from '../services/conversation';
 import Toast from 'react-native-toast-message';
 import { EventRegister } from 'react-native-event-listeners';
+import imageService from '../services/api/imageService';
 
 // Ignorer les avertissements non critiques
 LogBox.ignoreLogs([
@@ -566,38 +567,13 @@ const EmptyConversationsList = ({ navigation, isAuthenticated }: { navigation: a
   );
 };
 
-// Fonction utilitaire simplifiée pour résoudre les URL d'images
-const getImageUrl = (image: any): string => {
-  // Si c'est une chaîne qui commence par http, c'est déjà une URL complète
-  if (typeof image === 'string' && image.startsWith('http')) {
-    return image;
-  }
-  
-  // Si c'est une chaîne sans http, ajouter le préfixe de stockage
-  if (typeof image === 'string') {
-    return `${API_URL}/storage/${image}`;
-  }
-  
-  // Si c'est un objet avec une propriété url
-  if (typeof image === 'object' && image && 'url' in image && image.url) {
-    return image.url;
-  }
-  
-  // Si c'est un objet avec une propriété path
-  if (typeof image === 'object' && image && 'path' in image && image.path) {
-    return `${API_URL}/storage/${image.path}`;
-  }
-  
-  return DEFAULT_AVATAR_URL;
-};
-
 // Fonction pour obtenir l'URL d'image d'un produit
 const getProductImageUrl = (product: any): string => {
-  if (!product || !product.images || !product.images.length) {
+  if (!product) {
     return DEFAULT_AVATAR_URL;
   }
   
-  return getImageUrl(product.images[0]);
+  return imageService.getFullImageUrl(imageService.getProductImages(product)[0] || null) || DEFAULT_AVATAR_URL;
 };
 
 const CONVERSATIONS_PER_PAGE = 20;
@@ -621,8 +597,12 @@ type RootStackParamList = {
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
-const MessagesScreen = () => {
-  const navigation = useNavigation<NavigationProp>();
+interface MessagesScreenProps {
+  navigation: any;
+  route?: any;
+}
+
+export default function MessagesScreen({ navigation, route }: MessagesScreenProps) {
   const insets = useSafeAreaInsets();
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [loading, setLoading] = useState(true);
@@ -725,7 +705,13 @@ const MessagesScreen = () => {
       };
       
       // Créer un objet produit si les données sont disponibles
-      let product = undefined;
+      let product: {
+        id: number;
+        title: string;
+        price?: number;
+        images?: any[];
+      } | undefined = undefined;
+      
       if (conv.product_id) {
         let productImages: Array<any> = [];
         
@@ -967,7 +953,7 @@ const MessagesScreen = () => {
       if (!isMounted.current) return;
       
       // Extraire les données
-      let productData = null;
+      let productData: any = null;
       if (response.data && response.data.data) {
         productData = response.data.data;
       } else if (response.data) {
@@ -976,19 +962,27 @@ const MessagesScreen = () => {
       
       if (productData) {
         // Traitement des images
+        let processedImages: string[] = [];
+        
         if (typeof productData.images === 'string') {
           try {
             // Tentative de parse JSON
-            productData.images = JSON.parse(productData.images);
+            const parsedImages = JSON.parse(productData.images);
+            if (Array.isArray(parsedImages)) {
+              processedImages = parsedImages;
+            } else {
+              processedImages = [productData.images];
+            }
           } catch (error) {
             // Si l'image est une chaîne simple, la mettre dans un tableau
-            productData.images = [productData.images];
+            processedImages = [productData.images];
           }
-        }
-        
-        // S'assurer que les images sont un tableau
-        if (!Array.isArray(productData.images)) {
-          productData.images = productData.images ? [productData.images] : [];
+        } else if (Array.isArray(productData.images)) {
+          processedImages = productData.images;
+        } else if (productData.images) {
+          processedImages = [productData.images];
+        } else {
+          processedImages = [];
         }
         
         // Mise à jour immédiate des données
@@ -1002,9 +996,11 @@ const MessagesScreen = () => {
               return { 
                 ...conv, 
                 product: {
-                  ...productData,
-                  // Force un rechargement si nécessaire
-                  images: productData.images
+                  id: productData.id,
+                  title: productData.title || '',
+                  description: productData.description || '',
+                  price: productData.price || 0,
+                  images: processedImages
                 }
               };
             }
@@ -1179,7 +1175,7 @@ const MessagesScreen = () => {
           <View style={[styles.userAvatar, isUnread && styles.unreadUserAvatar]}>
             {otherUser?.avatar ? (
               <Image 
-                source={{ uri: getImageUrl(otherUser.avatar) }} 
+                source={{ uri: imageService.getFullImageUrl(otherUser.avatar) }} 
                 style={styles.avatarImage}
                 defaultSource={placeholderImage}
               />
@@ -1241,7 +1237,7 @@ const MessagesScreen = () => {
                 }}>
                   {item.product.images && item.product.images.length > 0 ? (
                     <Image 
-                      source={{ uri: getProductImageUrl(item.product) }}
+                      source={{ uri: imageService.getFullImageUrl(imageService.getProductImages(item.product)[0]) }}
                       style={{ width: '100%', height: '100%' }}
                       defaultSource={placeholderImage}
                     />
@@ -1421,5 +1417,3 @@ const MessagesScreen = () => {
     </View>
   );
 }
-
-export default MessagesScreen; 

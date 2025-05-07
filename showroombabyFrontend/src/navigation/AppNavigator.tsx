@@ -10,7 +10,6 @@ import RegisterScreen from '../screens/RegisterScreen';
 import HomeScreen from '../screens/HomeScreen';
 import ProfileScreen from '../screens/ProfileScreen';
 import ProductDetailsScreen from '../screens/ProductDetailsScreen';
-import { Button } from 'react-native-paper';
 import { View, Text, TouchableOpacity, StyleSheet, SafeAreaView, Alert } from 'react-native';
 import FavoritesScreen from '../screens/FavoritesScreen';
 import AjouterProduitScreen from '../screens/AjouterProduitScreen';
@@ -20,13 +19,13 @@ import SearchScreen from '../screens/SearchScreen';
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import Icons3DStatic from '../components/Icons3DStatic';
+import Icons3DModel from '../components/Icons3DModel';
 import { EventRegister } from 'react-native-event-listeners';
 
 // URL de l'API
 // Pour les appareils externes, utiliser votre adresse IP locale au lieu de 127.0.0.1
 const API_URL = process.env.NODE_ENV === 'development' || __DEV__ 
-  ? 'http://192.168.0.34:8000/api'  // Adresse IP locale de l'utilisateur
+  ? 'http://172.20.10.3:8000/api'  // Adresse IP locale de l'utilisateur
   : 'https://api.showroombaby.com';
 
 // Définir les types pour les navigateurs
@@ -224,7 +223,7 @@ function CustomBottomBar({ navigation, activeRoute }: CustomBottomBarProps) {
       <TouchableOpacity
         onPress={() => navigation.navigate('Home')}
         style={styles.iconItem}>
-        <Icons3DStatic 
+        <Icons3DModel 
           name="search"
           size={32}
           isActive={activeRoute === 'Home'}
@@ -234,7 +233,7 @@ function CustomBottomBar({ navigation, activeRoute }: CustomBottomBarProps) {
       <TouchableOpacity 
         style={styles.iconItem}
         onPress={() => handleNavigate('Favoris')}>
-        <Icons3DStatic 
+        <Icons3DModel 
           name="heart"
           size={32}
           isActive={activeRoute === 'Favoris'}
@@ -242,12 +241,11 @@ function CustomBottomBar({ navigation, activeRoute }: CustomBottomBarProps) {
       </TouchableOpacity>
       
       <TouchableOpacity 
-        style={[styles.iconItem, styles.addButton]}
+        style={styles.iconItem}
         onPress={() => handleNavigate('AjouterProduit')}>
-        <Icons3DStatic 
+        <Icons3DModel 
           name="add"
-          size={32}
-          color="#FFFFFF"
+          size={45}
         />
       </TouchableOpacity>
       
@@ -255,7 +253,7 @@ function CustomBottomBar({ navigation, activeRoute }: CustomBottomBarProps) {
         style={styles.iconItem}
         onPress={() => handleNavigate('Messages')}>
         <View>
-          <Icons3DStatic 
+          <Icons3DModel 
             name="chat"
             size={32}
             isActive={activeRoute === 'Messages'}
@@ -274,7 +272,7 @@ function CustomBottomBar({ navigation, activeRoute }: CustomBottomBarProps) {
           navigation.navigate('Profile') : 
           navigation.navigate('Auth')
         }>
-        <Icons3DStatic 
+        <Icons3DModel 
           name="person"
           size={32}
           isActive={activeRoute === 'Auth' || activeRoute === 'Profile'}
@@ -496,18 +494,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     flex: 1,
     height: '100%',
-  },
-  addButton: {
-    backgroundColor: '#ff6b9b',
-    borderRadius: 30,
-    width: 50,
-    height: 50,
-    marginTop: -20,
-    shadowColor: '#ff6b9b',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 5,
   },
   statusDot: {
     backgroundColor: '#ff6b9b',

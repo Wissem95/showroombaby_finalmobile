@@ -1,4 +1,4 @@
-export const API_URL = 'http://192.168.0.34:8000';
+export const API_URL = 'http://172.20.10.3:8000';
 
 // Configuration par environnement
 export const IS_DEV = process.env.NODE_ENV === 'development';
