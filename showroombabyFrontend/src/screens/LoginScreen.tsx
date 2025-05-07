@@ -105,7 +105,7 @@ export default function LoginScreen({ navigation }: Props) {
           <Text style={styles.subtitle}>PARIS</Text>
 
           <View style={styles.tabs}>
-            <Text style={[styles.tab, styles.activeTab]}>Connection</Text>
+            <Text style={[styles.tab, styles.activeTab]}>Connexion</Text>
             <TouchableOpacity onPress={handleRegisterPress}>
               <Text style={styles.tab}>Inscription</Text>
             </TouchableOpacity>

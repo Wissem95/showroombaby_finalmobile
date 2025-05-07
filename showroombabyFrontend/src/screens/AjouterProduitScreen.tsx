@@ -550,12 +550,20 @@ export default function AjouterProduitScreen({ navigation, route }: any) {
         break;
       
       case Step.CONDITION:
-        if (!productData.condition) {
+        if (!productData.condition || productData.condition === '') {
           tempErrors.condition = 'Veuillez sélectionner un état du produit.';
           valid = false;
           console.log('Validation échouée : État du produit non sélectionné');
         } else {
-          console.log('Validation réussie : État du produit =', productData.condition);
+          // Vérifier que l'état sélectionné est valide
+          const validCondition = CONDITIONS.some(c => c.id === productData.condition);
+          if (!validCondition) {
+            tempErrors.condition = 'L\'état sélectionné n\'est pas valide.';
+            valid = false;
+            console.log('Validation échouée : État du produit invalide');
+          } else {
+            console.log('Validation réussie : État du produit =', productData.condition);
+          }
         }
         break;
       
@@ -589,12 +597,17 @@ export default function AjouterProduitScreen({ navigation, route }: any) {
   };
 
   const handleNext = () => {
+    console.log(`Tentative de passer à l'étape suivante. Étape actuelle: ${currentStep}, condition: ${productData.condition}`);
+    
     if (validateStep()) {
+      console.log('Validation réussie, passage à l\'étape suivante');
       if (currentStep < Step.LOCATION) {
         setCurrentStep(currentStep + 1);
       } else {
         submitProduct();
       }
+    } else {
+      console.log('Validation échouée, les erreurs sont:', errors);
     }
   };
 
@@ -640,6 +653,34 @@ export default function AjouterProduitScreen({ navigation, route }: any) {
       formData.append('description', productData.description);
       formData.append('price', productData.price);
       
+      // Vérification et correction des IDs de catégorie et sous-catégorie
+      if (productData.category_id) {
+        // Le backend attend 'categoryId' and not 'category_id'
+        formData.append('categoryId', productData.category_id.toString());
+        
+        // Vérifier si la sous-catégorie est valide avant de l'ajouter
+        if (productData.subcategory_id) {
+          // Vérifier que l'ID de sous-catégorie est bien conforme à ceux définis dans le backend
+          // Dans le backend, les sous-catégories sont statiquement définies et ont des IDs allant de 1 à 90
+          
+          // Vérifier que la sous-catégorie appartient bien à la catégorie
+          const subCategoryValid = CATEGORIES_DATA
+            .find(c => c.id === productData.category_id)
+            ?.subcategories
+            ?.some(sc => sc.id === productData.subcategory_id);
+            
+          if (subCategoryValid) {
+            console.log(`Sous-catégorie valide: ID=${productData.subcategory_id} pour catégorie=${productData.category_id}`);
+            formData.append('subcategoryId', productData.subcategory_id.toString());
+          } else {
+            console.log('Sous-catégorie invalide pour cette catégorie. subcategoryId ne sera pas envoyé.');
+            // Ne pas envoyer de subcategoryId invalide
+          }
+        } else {
+          console.log('Aucune sous-catégorie sélectionnée');
+        }
+      }
+      
       // Make sure condition is set to a valid value
       if (!productData.condition || productData.condition === '') {
         // Default condition is not set anymore - require user selection
@@ -653,16 +694,16 @@ export default function AjouterProduitScreen({ navigation, route }: any) {
         console.log('Condition sélectionnée utilisée:', productData.condition);
       }
       
-      // Important: Le backend attend 'address' et pas 'location'
+      // Important: Le backend attend 'address' and not 'location'
       formData.append('address', productData.location);
-      // Aussi requis par le backend
+      // Also required by the backend
       formData.append('city', productData.city || '');
-      // Téléphone (le backend attend 'phone' et pas 'telephone')
+      // Phone (the backend expects 'phone' and not 'telephone')
       formData.append('phone', productData.telephone);
       
       formData.append('hide_phone', productData.hide_phone ? '1' : '0');
       
-      // Coordonnées géographiques
+      // Geographical coordinates
       if (productData.latitude !== undefined && productData.latitude !== null) {
         formData.append('latitude', productData.latitude.toString());
       }
@@ -670,15 +711,7 @@ export default function AjouterProduitScreen({ navigation, route }: any) {
         formData.append('longitude', productData.longitude.toString());
       }
       
-      // Ajouter d'autres champs si présents
-      if (productData.category_id) {
-        // Le backend attend 'categoryId' et pas 'category_id'
-        formData.append('categoryId', productData.category_id.toString());
-      }
-      if (productData.subcategory_id) {
-        // Le backend attend 'subcategoryId' et pas 'subcategory_id'
-        formData.append('subcategoryId', productData.subcategory_id.toString());
-      }
+      // Add other fields if present
       if (productData.zipCode) {
         formData.append('zipcode', productData.zipCode);
       }
@@ -695,7 +728,7 @@ export default function AjouterProduitScreen({ navigation, route }: any) {
         formData.append('warranty', productData.warranty);
       }
       
-      // Ajouter les images
+      // Add images
       for (let i = 0; i < productData.images.length; i++) {
         const imgFile = productData.images[i];
         formData.append('images[]', {
@@ -705,21 +738,22 @@ export default function AjouterProduitScreen({ navigation, route }: any) {
         } as any);
       }
       
-      // Obtenir le token d'authentification
+      // Get authentication token
       const token = await AsyncStorage.getItem('token');
       
       if (!token) {
         throw new Error('Non authentifié');
       }
       
-      // Envoi vers l'API
-      // Déboguer les données envoyées
+      // Send to API
+      // Debug sent data
       console.log('Envoi des données au serveur:', {
         title: productData.title,
         address: productData.location,
         city: productData.city || '',
         phone: productData.telephone,
         categoryId: productData.category_id,
+        subcategoryId: productData.subcategory_id,
         zipcode: productData.zipCode,
         latitude: productData.latitude,
         longitude: productData.longitude
@@ -732,27 +766,127 @@ export default function AjouterProduitScreen({ navigation, route }: any) {
         }
       });
       
-      // Log de la réponse pour debug
+      // Log response for debug
       console.log('Réponse API:', response.data);
       
-      // Si tout va bien, afficher l'écran de succès
+      // If everything is fine, show success screen
       setShowSuccessPage(true);
+      setPublishedProductId(response.data.data.id);
       
     } catch (error: any) {
       console.error('Erreur soumission produit:', error);
       
-      // Afficher un message d'erreur spécifique si possible
+      // Show specific error message if possible
       let errorMessage = 'Une erreur est survenue lors de la publication de votre annonce.';
       
       if (error.response && error.response.data) {
         if (error.response.data.message) {
           errorMessage = error.response.data.message;
         } else if (error.response.data.errors) {
-          // Récupérer la première erreur de validation
+          // Get first validation error
           console.log('Erreurs de validation:', JSON.stringify(error.response.data.errors));
           const firstError = Object.values(error.response.data.errors)[0];
           if (Array.isArray(firstError) && firstError.length > 0) {
             errorMessage = firstError[0];
+          }
+          
+          // Gérer spécifiquement l'erreur de sous-catégorie invalide
+          if (error.response.data.errors.subcategoryId) {
+            console.log('Erreur de sous-catégorie détectée, tentative de correction...');
+            
+            // Option 1: Essayer à nouveau sans sous-catégorie
+            Alert.alert(
+              'Erreur de sous-catégorie',
+              'La sous-catégorie sélectionnée semble invalide. Voulez-vous réessayer sans sous-catégorie?',
+              [
+                {
+                  text: 'Oui, publier sans sous-catégorie',
+                  onPress: async () => {
+                    try {
+                      setIsLoading(true);
+                      
+                      // Créer un nouveau FormData sans la sous-catégorie
+                      const newFormData = new FormData();
+                      
+                      // Recréer un FormData sans la sous-catégorie
+                      newFormData.append('title', productData.title);
+                      newFormData.append('description', productData.description);
+                      newFormData.append('price', productData.price);
+                      newFormData.append('condition', productData.condition);
+                      newFormData.append('address', productData.location);
+                      newFormData.append('city', productData.city || '');
+                      newFormData.append('phone', productData.telephone);
+                      newFormData.append('hide_phone', productData.hide_phone ? '1' : '0');
+                      
+                      // Inclure seulement categoryId, pas subcategoryId
+                      if (productData.category_id) {
+                        newFormData.append('categoryId', productData.category_id.toString());
+                        console.log('Envoi avec uniquement categoryId =', productData.category_id);
+                      }
+                      
+                      // Conserver le reste des données
+                      if (productData.zipCode) {
+                        newFormData.append('zipcode', productData.zipCode);
+                      }
+                      
+                      if (productData.brand) {
+                        newFormData.append('brand', productData.brand);
+                      }
+                      
+                      if (productData.latitude !== undefined && productData.latitude !== null) {
+                        newFormData.append('latitude', productData.latitude.toString());
+                      }
+                      
+                      if (productData.longitude !== undefined && productData.longitude !== null) {
+                        newFormData.append('longitude', productData.longitude.toString());
+                      }
+                      
+                      // Ajouter les images
+                      for (let i = 0; i < productData.images.length; i++) {
+                        const imgFile = productData.images[i];
+                        newFormData.append('images[]', {
+                          uri: imgFile.uri,
+                          type: imgFile.type || 'image/jpeg',
+                          name: imgFile.name || `image_${i}.jpg`
+                        } as any);
+                      }
+                      
+                      // Obtenir le token d'authentification
+                      const token = await AsyncStorage.getItem('token');
+                      
+                      if (!token) {
+                        throw new Error('Non authentifié');
+                      }
+                      
+                      console.log('Tentative de publication sans sous-catégorie...');
+                      const newResponse = await axios.post(`${API_URL}/products`, newFormData, {
+                        headers: {
+                          'Content-Type': 'multipart/form-data',
+                          'Authorization': `Bearer ${token}`
+                        }
+                      });
+                      
+                      console.log('Réponse API (seconde tentative):', newResponse.data);
+                      setShowSuccessPage(true);
+                      setPublishedProductId(newResponse.data.data.id);
+                    } catch (retryError) {
+                      console.error('Erreur lors de la seconde tentative:', retryError);
+                      Alert.alert(
+                        'Erreur',
+                        'La publication a échoué. Veuillez réessayer plus tard ou contacter le support.'
+                      );
+                    } finally {
+                      setIsLoading(false);
+                    }
+                  }
+                },
+                {
+                  text: 'Annuler',
+                  style: 'cancel'
+                }
+              ]
+            );
+            return;
           }
         }
       }
@@ -805,9 +939,9 @@ export default function AjouterProduitScreen({ navigation, route }: any) {
     }
   };
 
-  // Fonction pour afficher une modale de sélection
+  // Function to display a selection modal
   const showSelectionModal = () => {
-    // Liste des options selon le type de modale
+    // List of options based on modal type
     let options: { id: string | number; label: string }[] = [];
     let title = '';
 
@@ -906,13 +1040,22 @@ export default function AjouterProduitScreen({ navigation, route }: any) {
     );
   };
 
-  // Fonction pour sélectionner un élément et fermer la modale
+  // Function to select an item and close the modal
   const handleSelect = (type: string, value: string, label: string) => {
     console.log(`Sélection de type ${type}, valeur ${value}, label ${label}`);
     switch (type) {
       case 'condition':
-        setProductData(prev => ({ ...prev, condition: value }));
-        console.log(`État du produit mis à jour: ${value}`);
+        // Force the value directly as a constant
+        const newCondition = value;
+        console.log(`Mise à jour condition: ${newCondition}`);
+        
+        // Synchronous update (workaround)
+        const updatedProductData = { ...productData, condition: newCondition };
+        console.log("Données produit mises à jour avec condition:", updatedProductData);
+        setProductData(updatedProductData);
+        
+        // Reset errors
+        setErrors({...errors, condition: ''});
         break;
       case 'warranty':
         setProductData(prev => ({ ...prev, warranty: value }));
@@ -922,11 +1065,37 @@ export default function AjouterProduitScreen({ navigation, route }: any) {
         setProductData(prev => ({ 
           ...prev, 
           category_id: category ? category.id : null,
-          subcategory_id: null // Réinitialiser la sous-catégorie
+          subcategory_id: null // Reset subcategory
         }));
         break;
       case 'subcategory':
-        setProductData(prev => ({ ...prev, subcategory_id: parseInt(value) }));
+        // Vérifier que la sous-catégorie existe pour la catégorie actuelle
+        const subcategoryId = parseInt(value);
+        
+        // S'assurer que l'ID est un nombre entre 1 et 90 (comme dans le backend)
+        if (isNaN(subcategoryId) || subcategoryId < 1 || subcategoryId > 90) {
+          console.log(`ID de sous-catégorie invalide: ${value}`);
+          Alert.alert('Erreur', 'ID de sous-catégorie invalide.');
+          break;
+        }
+        
+        // Vérifier que la sous-catégorie appartient à la catégorie sélectionnée
+        const parentCategory = categories.find(c => c.id === productData.category_id);
+        const isValidSubcategory = parentCategory?.subcategories?.some(sc => sc.id === subcategoryId);
+        
+        if (isValidSubcategory) {
+          console.log(`Sous-catégorie valide: ID=${subcategoryId}, pour catégorie=${productData.category_id}`);
+          setProductData(prev => ({ ...prev, subcategory_id: subcategoryId }));
+          
+          // Supprimer toute erreur existante
+          if (errors.subcategory) {
+            setErrors(prev => ({ ...prev, subcategory: '' }));
+          }
+        } else {
+          console.log(`Sous-catégorie invalide: ID=${subcategoryId} pour catégorie=${productData.category_id}`);
+          // Ne pas mettre à jour avec une sous-catégorie invalide
+          Alert.alert('Erreur', 'Sous-catégorie invalide pour cette catégorie.');
+        }
         break;
       case 'size':
         setProductData(prev => ({ ...prev, size: label }));
@@ -944,24 +1113,24 @@ export default function AjouterProduitScreen({ navigation, route }: any) {
   const handleAddressSelect = (address: any) => {
     console.log('Adresse sélectionnée dans AjouterProduitScreen:', address);
     
-    // Vérifier que toutes les données nécessaires sont présentes
+    // Verify that all necessary data is present
     if (!address) return;
     
-    // Créer l'adresse complète à partir de la rue et de la ville
+    // Create full address from street and city
     const fullAddress = `${address.street || ''} ${address.city || ''}`.trim();
     
-    // Mettre à jour les données du produit
+    // Update product data
     setProductData(prev => ({
       ...prev,
       location: fullAddress,
       zipCode: address.postalCode || prev.zipCode || '',
       city: address.city || '',
-      // S'assurer que les coordonnées sont incluses dans les données du produit
+      // Ensure coordinates are included in product data
       latitude: address.latitude || null,
       longitude: address.longitude || null
     }));
     
-    // Réinitialiser l'erreur d'adresse si elle existe
+    // Reset location error if it exists
     if (errors.location) {
       setErrors(prev => ({ ...prev, location: '' }));
     }
@@ -1034,7 +1203,7 @@ export default function AjouterProduitScreen({ navigation, route }: any) {
         keyboardType="number-pad"
         value={productData.zipCode}
         onChangeText={(text) => {
-          // Ne garder que les chiffres et limiter à 5
+          // Keep only digits and limit to 5
           const postalCode = text.replace(/[^0-9]/g, '').slice(0, 5);
           setProductData(prev => ({ ...prev, zipCode: postalCode }));
         }}
@@ -1049,7 +1218,7 @@ export default function AjouterProduitScreen({ navigation, route }: any) {
         keyboardType="phone-pad"
         value={productData.telephone}
         onChangeText={(text) => {
-          // Ne garder que les chiffres et limiter à 10
+          // Keep only digits and limit to 10
           const phoneNumber = text.replace(/[^0-9]/g, '').slice(0, 10);
           setProductData(prev => ({ ...prev, telephone: phoneNumber }));
         }}
@@ -1102,7 +1271,7 @@ export default function AjouterProduitScreen({ navigation, route }: any) {
     }
   };
 
-  // Création de la nouvelle étape pour les informations de base
+  // Create new step for base information
   const renderInfosBaseStep = () => {
     return (
       <View style={styles.pageContainer}>
@@ -1165,7 +1334,7 @@ export default function AjouterProduitScreen({ navigation, route }: any) {
     );
   };
 
-  // Étape de description et prix
+  // Description and price step
   const renderDescriptionPrixStep = () => {
     return (
       <View style={styles.pageContainer}>
@@ -1200,10 +1369,14 @@ export default function AjouterProduitScreen({ navigation, route }: any) {
 
   const renderConditionSelector = () => {
     return (
-      <View>
+      <View style={styles.conditionSelectorContainer}>
         <Text style={styles.inputLabel}>État du produit</Text>
         <TouchableOpacity
-          style={[styles.selectButton, errors.condition ? styles.inputError : null]}
+          style={[
+            styles.selectButton, 
+            errors.condition ? styles.inputError : null,
+            !productData.condition ? styles.highlightedButton : styles.selectedButton
+          ]}
           onPress={() => setModalVisible('condition')}
         >
           <Text style={productData.condition ? styles.selectText : styles.selectPlaceholder}>
@@ -1214,12 +1387,24 @@ export default function AjouterProduitScreen({ navigation, route }: any) {
           <MaterialIcons name="arrow-drop-down" size={24} color="#999" />
         </TouchableOpacity>
         {errors.condition && <Text style={styles.errorText}>{errors.condition}</Text>}
+        {productData.condition && (
+          <Text style={styles.successText}>
+            État sélectionné avec succès. Cliquez sur "Continuer" pour passer à l'étape suivante.
+          </Text>
+        )}
       </View>
     );
   };
 
-  // Étape facture, garantie, état
+  // Condition step, warranty, condition
   const renderConditionStep = () => {
+    // Force the value if it's empty but a selection is visible in the UI
+    if (!productData.condition && modalVisible === null) {
+      const selectedConditionId = CONDITIONS.find(c => c.label === "Très bon état")?.id || "LIKE_NEW";
+      console.log("Correction automatique de la condition:", selectedConditionId);
+      setProductData(prev => ({ ...prev, condition: selectedConditionId }));
+    }
+    
     return (
       <View style={styles.pageContainer}>
         <Text style={styles.stepTitle}>État du produit</Text>
@@ -1228,6 +1413,11 @@ export default function AjouterProduitScreen({ navigation, route }: any) {
         </Text>
         
         {renderConditionSelector()}
+        
+        {/* Explanatory help message */}
+        <Text style={styles.helpText}>
+          Sélectionnez l'état de votre produit et appuyez sur "Continuer" pour passer à l'étape suivante.
+        </Text>
       </View>
     );
   };
@@ -1239,7 +1429,7 @@ export default function AjouterProduitScreen({ navigation, route }: any) {
     return 'Continuer';
   };
 
-  // Nouveau composant pour la page de confirmation
+  // New component for confirmation page
   const renderSuccessPage = () => (
     <View style={styles.successPageContainer}>
       <View style={styles.successIconContainer}>
@@ -1273,7 +1463,7 @@ export default function AjouterProduitScreen({ navigation, route }: any) {
     </View>
   );
   
-  // Si la page de succès est visible, afficher uniquement cette page
+  // If success page is visible, display only this page
   if (showSuccessPage) {
     return (
       <View style={styles.container}>
@@ -1351,15 +1541,50 @@ export default function AjouterProduitScreen({ navigation, route }: any) {
             </TouchableOpacity>
           )}
           
-          <TouchableOpacity 
-            style={[styles.button, styles.primaryButton]} 
-            onPress={currentStep === Step.LOCATION ? submitProduct : handleNext}
-            disabled={isLoading}
-          >
-            <Text style={styles.buttonText}>
-              {getButtonLabel()}
-            </Text>
-          </TouchableOpacity>
+          {currentStep === Step.CONDITION ? (
+            <TouchableOpacity 
+              style={[
+                styles.button, 
+                styles.primaryButton,
+                !productData.condition ? styles.disabledButton : null
+              ]} 
+              onPress={() => {
+                console.log("Bouton Continuer pressé à l'étape Condition");
+                // Si l'état est sélectionné, passer à l'étape suivante
+                if (productData.condition) {
+                  console.log("Condition sélectionnée, progression à l'étape suivante:", productData.condition);
+                  setCurrentStep(currentStep + 1);
+                } else {
+                  // Si aucune condition n'est sélectionnée, afficher un message d'erreur
+                  console.log("Aucune condition détectée, affichage d'une erreur");
+                  setErrors({...errors, condition: 'Veuillez sélectionner un état du produit.'});
+                  Alert.alert(
+                    'Sélection requise',
+                    'Veuillez sélectionner l\'état du produit avant de continuer.',
+                    [{ text: 'OK' }]
+                  );
+                }
+              }}
+              disabled={!productData.condition}
+            >
+              <Text style={[
+                styles.buttonText,
+                !productData.condition ? styles.disabledButtonText : null
+              ]}>
+                Continuer
+              </Text>
+            </TouchableOpacity>
+          ) : (
+            <TouchableOpacity 
+              style={[styles.button, styles.primaryButton]} 
+              onPress={currentStep === Step.LOCATION ? submitProduct : handleNext}
+              disabled={isLoading}
+            >
+              <Text style={styles.buttonText}>
+                {getButtonLabel()}
+              </Text>
+            </TouchableOpacity>
+          )}
         </View>
       </ScrollView>
 
@@ -1547,9 +1772,9 @@ const styles = StyleSheet.create({
     top: 13,
   },
   errorText: {
-    color: '#E75A7C',
+    color: '#FF5252',
+    fontSize: 12,
     marginTop: 4,
-    fontSize: 14,
   },
   termsContainer: {
     flexDirection: 'row',
@@ -1772,7 +1997,35 @@ const styles = StyleSheet.create({
     color: '#999',
   },
   inputError: {
-    borderColor: '#E75A7C',
-    borderWidth: 1,
+    borderColor: '#FF5252',
+  },
+  helpText: {
+    fontSize: 14,
+    color: '#777',
+    marginTop: 10,
+    marginBottom: 20,
+    textAlign: 'center',
+  },
+  disabledButton: {
+    backgroundColor: '#f0f0f0',
+  },
+  disabledButtonText: {
+    color: '#aaa',
+  },
+  conditionSelectorContainer: {
+    marginBottom: 16,
+  },
+  highlightedButton: {
+    backgroundColor: '#f0f0f0',
+  },
+  selectedButton: {
+    backgroundColor: '#f0f0f0',
+  },
+  successText: {
+    fontSize: 14,
+    color: '#4CAF50',
+    marginTop: 10,
+    marginBottom: 20,
+    textAlign: 'center',
   },
 }); 

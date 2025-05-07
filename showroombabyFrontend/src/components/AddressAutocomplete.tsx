@@ -1,8 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { View, StyleSheet } from 'react-native';
 import { TextInput, List } from 'react-native-paper';
 import axios from 'axios';
-import debounce from 'lodash/debounce';
+import debounce from 'lodash.debounce';
 
 // Token Mapbox pour l'autocomplétion
 const MAPBOX_ACCESS_TOKEN = 'pk.eyJ1Ijoid2lzc2VtOTUiLCJhIjoiY204bG52Z3cyMWQ5dTJrcXI2d210ZnY2ZSJ9.-xQ5BHlcU51dTyLmbHoXog';
@@ -25,11 +25,7 @@ export default function AddressAutocomplete({ onSelect, placeholder = "Entrez un
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [selectedItem, setSelectedItem] = useState<any>(null);
 
-  // Appliquer un debounce pour éviter trop d'appels API
-  const debouncedSearch = debounce((text: string) => {
-    searchAddress(text);
-  }, 300);
-
+  // Fonction pour rechercher les adresses
   const searchAddress = async (text: string) => {
     if (text.length > 2) {
       try {
@@ -38,55 +34,57 @@ export default function AddressAutocomplete({ onSelect, placeholder = "Entrez un
           `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(text)}.json?access_token=${MAPBOX_ACCESS_TOKEN}&country=fr&types=address,place,postcode`
         );
         
-        console.log("Response complète de Mapbox:", JSON.stringify(response.data));
-        
-        // Transformation des résultats de l'API en suggestions
-        const apiSuggestions = response.data.features.map((feature: any) => {
-          // Extraire les composants de l'adresse
-          const addressParts = feature.place_name.split(',');
-          const streetAddress = addressParts[0] || '';
-          
-          // Extraire le code postal (s'il existe)
-          let postalCode = '';
-          let city = '';
-          
-          // Essayer d'extraire le code postal et la ville des context
-          if (feature.context) {
-            for (const context of feature.context) {
-              if (context.id.startsWith('postcode')) {
-                postalCode = context.text;
-              }
-              if (context.id.startsWith('place')) {
-                city = context.text;
+        if (response.data && response.data.features) {
+          // Transformation des résultats de l'API en suggestions
+          const apiSuggestions = response.data.features.map((feature: any) => {
+            // Extraire les composants de l'adresse
+            const addressParts = feature.place_name.split(',');
+            const streetAddress = addressParts[0] || '';
+            
+            // Extraire le code postal (s'il existe)
+            let postalCode = '';
+            let city = '';
+            
+            // Essayer d'extraire le code postal et la ville des context
+            if (feature.context) {
+              for (const context of feature.context) {
+                if (context.id.startsWith('postcode')) {
+                  postalCode = context.text;
+                }
+                if (context.id.startsWith('place')) {
+                  city = context.text;
+                }
               }
             }
-          }
-          
-          // Si la ville n'est pas trouvée dans les contextes, essayer de l'extraire du place_name
-          if (!city && addressParts.length > 1) {
-            // La ville est souvent le deuxième élément dans l'adresse
-            city = addressParts[1].trim();
-          }
-          
-          // Pour les lieux (places) sans contexte, utiliser le text comme ville
-          if (feature.place_type && feature.place_type.includes('place') && !city) {
-            city = feature.text;
-          }
-          
-          return {
-            title: feature.place_name,
-            id: feature.id,
-            city: city,
-            postalCode: postalCode,
-            place_type: feature.place_type,
-            position: {
-              lat: feature.center[1],
-              lng: feature.center[0]
+            
+            // Si la ville n'est pas trouvée dans les contextes, essayer de l'extraire du place_name
+            if (!city && addressParts.length > 1) {
+              // La ville est souvent le deuxième élément dans l'adresse
+              city = addressParts[1].trim();
             }
-          };
-        });
-        
-        setSuggestions(apiSuggestions);
+            
+            // Pour les lieux (places) sans contexte, utiliser le text comme ville
+            if (feature.place_type && feature.place_type.includes('place') && !city) {
+              city = feature.text;
+            }
+            
+            return {
+              title: feature.place_name,
+              id: feature.id,
+              city: city,
+              postalCode: postalCode,
+              place_type: feature.place_type,
+              position: {
+                lat: feature.center[1],
+                lng: feature.center[0]
+              }
+            };
+          });
+          
+          setSuggestions(apiSuggestions);
+        } else {
+          setSuggestions([]);
+        }
       } catch (error) {
         console.error('Erreur lors de la recherche d\'adresse:', error);
         setSuggestions([]);
@@ -96,9 +94,22 @@ export default function AddressAutocomplete({ onSelect, placeholder = "Entrez un
     }
   };
 
+  // Appliquer un debounce avec useCallback pour s'assurer qu'il n'est pas recréé à chaque rendu
+  const debouncedSearch = useCallback(
+    debounce((text: string) => {
+      searchAddress(text);
+    }, 300),
+    []
+  );
+
+  // Nettoyage du debounce lors du démontage du composant
+  useEffect(() => {
+    return () => {
+      debouncedSearch.cancel();
+    };
+  }, [debouncedSearch]);
+
   const handleSelect = (item: any) => {
-    console.log('Adresse sélectionnée:', JSON.stringify(item, null, 2));
-    
     // S'assurer que le code postal est correctement extrait
     const address = {
       street: item.title.split(',')[0] || '',
@@ -108,9 +119,7 @@ export default function AddressAutocomplete({ onSelect, placeholder = "Entrez un
       longitude: item.position?.lng,
     };
     
-    console.log('Données d\'adresse extraites:', address);
-    
-    // CORRECTION: Mettre à jour le champ de recherche avec l'adresse sélectionnée
+    // Mettre à jour le champ de recherche avec l'adresse sélectionnée
     setQuery(item.title);
     setSelectedItem(item);
     

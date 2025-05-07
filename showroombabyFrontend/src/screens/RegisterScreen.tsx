@@ -112,7 +112,7 @@ export default function RegisterScreen({ navigation }: Props) {
           <Text style={styles.subtitle}>PARIS</Text>
 
           <View style={styles.tabs}>
-            <Text style={styles.tab} onPress={() => navigation.navigate('Login')}>Connection</Text>
+            <Text style={styles.tab} onPress={() => navigation.navigate('Login')}>Connexion</Text>
             <Text style={[styles.tab, styles.activeTab]}>Inscription</Text>
           </View>
 
