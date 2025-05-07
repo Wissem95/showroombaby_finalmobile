@@ -358,41 +358,68 @@ export default function ChatScreen({ route, navigation }: Props) {
         return;
       }
       
-      console.log(`Chargement des détails de l'utilisateur #${receiverId}`);
+      console.log(`Chargement des détails de l'utilisateur ${receiverId}`);
       
+      // Utilisation de l'endpoint spécifique pour les profils utilisateur
       const response = await axios.get(`${API_URL}/users/profile/${receiverId}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       
-      if (response.data) {
-        console.log(`Données utilisateur reçues:`, JSON.stringify(response.data).substring(0, 200));
+      if (response.data && response.data.data) {
+        // Le backend retourne les données au format {status: 'success', data: {...}}
+        console.log(`Données utilisateur complètes:`, JSON.stringify(response.data.data));
         
-        // S'assurer que nous avons bien le nom d'utilisateur et fournir un nom par défaut si manquant
-        const username = response.data.username || response.data.name || `Utilisateur #${receiverId}`;
+        // Le champ data.username est prioritaire selon le backend
+        const userData = response.data.data;
         
-        // Définir directement le seller sans générer d'erreur
+        // Utilisation du champ username fourni directement par l'API
         setSeller({
-          id: response.data.id || receiverId,
-          username: username,
-          avatar: response.data.avatar
+          id: userData.id || receiverId,
+          username: userData.username || userData.name || '',
+          avatar: userData.avatar
+        });
+      } else if (response.data) {
+        // Format alternatif sans data imbriqué
+        console.log(`Données utilisateur complètes (format alternatif):`, JSON.stringify(response.data));
+        
+        const userData = response.data;
+        setSeller({
+          id: userData.id || receiverId,
+          username: userData.username || userData.name || '',
+          avatar: userData.avatar
         });
       } else {
         console.log('Format de réponse invalide pour les détails du vendeur');
-        // Définir un nom par défaut en cas d'erreur
-        setSeller({
-          id: receiverId,
-          username: `Utilisateur #${receiverId}`,
-          avatar: undefined
-        });
+        
+        // Requête alternative en utilisant l'endpoint standard des utilisateurs
+        try {
+          const userResponse = await axios.get(`${API_URL}/users/${receiverId}`, {
+            headers: { Authorization: `Bearer ${token}` }
+          });
+          
+          if (userResponse.data && userResponse.data.data) {
+            const userData = userResponse.data.data;
+            console.log(`Données utilisateur alternatives:`, JSON.stringify(userData));
+            
+            setSeller({
+              id: receiverId,
+              username: userData.username || userData.name || '',
+              avatar: userData.avatar
+            });
+          } else if (userResponse.data) {
+            const userData = userResponse.data;
+            setSeller({
+              id: receiverId,
+              username: userData.username || userData.name || '',
+              avatar: userData.avatar
+            });
+          }
+        } catch (err) {
+          console.log('Erreur lors de la requête alternative:', err);
+        }
       }
     } catch (error) {
       console.log('Erreur chargement vendeur:', error);
-      // Définir un nom par défaut en cas d'erreur
-      setSeller({
-        id: receiverId,
-        username: `Utilisateur #${receiverId}`,
-        avatar: undefined
-      });
     }
   };
 
@@ -404,16 +431,32 @@ export default function ChatScreen({ route, navigation }: Props) {
         return;
       }
 
+      // Créer l'URL de l'API avec le paramètre productId si disponible
+      let apiUrl = `${API_URL}/messages/conversation/${receiverId}`;
+      if (productId) {
+        apiUrl += `?productId=${productId}`;
+      }
+      
+      console.log(`Chargement des messages: ${apiUrl}`);
+
       const response = await axios.get(
-        `${API_URL}/messages/conversation/${receiverId}`,
+        apiUrl,
         { headers: { Authorization: `Bearer ${token}` } }
       );
       
       if (response.data && response.data.data) {
-        // Obtenir tous les messages avec cet utilisateur, indépendamment du produit
-        const allMessages = response.data.data;
+        // Obtenir les messages pour cet utilisateur et ce produit spécifique
+        let allMessages = response.data.data;
         
-        console.log(`Reçu ${allMessages.length} messages avec l'utilisateur #${receiverId}`);
+        console.log(`Reçu ${allMessages.length} messages avec l'utilisateur ${receiverId}`);
+        
+        // Filtrage côté client pour s'assurer que les messages correspondent au produit actuel
+        if (productId) {
+          allMessages = allMessages.filter((message: Message) => 
+            !message.product_id || message.product_id === productId
+          );
+          console.log(`Après filtrage par productId ${productId}: ${allMessages.length} messages`);
+        }
         
         // Si nous n'avons pas encore les infos du vendeur et qu'il y a des messages
         if (!seller && allMessages.length > 0) {
@@ -421,9 +464,19 @@ export default function ChatScreen({ route, navigation }: Props) {
           const otherUserMessage = allMessages.find((m: Message) => m.sender_id === receiverId);
           if (otherUserMessage && otherUserMessage.sender) {
             console.log(`Infos utilisateur trouvées dans les messages:`, JSON.stringify(otherUserMessage.sender));
+            
+            // Vérifier toutes les propriétés possibles pour le nom
+            const username = 
+              otherUserMessage.sender.username || 
+              otherUserMessage.sender.name ||
+              otherUserMessage.sender.fullname || 
+              otherUserMessage.sender.full_name;
+            
+            console.log(`Nom utilisateur extrait des messages: "${username}"`);
+            
             setSeller({
               id: receiverId,
-              username: otherUserMessage.sender.username || `Utilisateur #${receiverId}`,
+              username: username,
               avatar: otherUserMessage.sender.avatar
             });
           } else {
@@ -566,7 +619,9 @@ export default function ChatScreen({ route, navigation }: Props) {
     
     // Récupérer le nom d'utilisateur directement à partir du message
     const otherUser = isUser ? item.recipient : item.sender;
-    const otherUserName = otherUser?.username || seller?.username || `Utilisateur #${isUser ? item.recipient_id : item.sender_id}`;
+    
+    // On utilise seller?.username comme fallback uniquement si disponible
+    const otherUserName = otherUser?.username || seller?.username || '';
     
     return (
       <>
@@ -1135,7 +1190,6 @@ const styles = StyleSheet.create({
   },
   // Wrapper pour le message "chat vide" (avec rotation pour l'inversion)
   emptyChatWrapper: {
-    transform: [{ rotate: '180deg' }],
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',

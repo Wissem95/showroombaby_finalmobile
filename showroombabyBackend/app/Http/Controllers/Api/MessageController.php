@@ -127,6 +127,7 @@ class MessageController extends Controller
         $user = Auth::user();
         $page = $request->input('page', 1);
         $limit = $request->input('limit', 20);
+        $productId = $request->input('productId'); // Récupérer le productId de la requête
 
         // Vérifier que l'utilisateur existe
         $otherUser = User::find($userId);
@@ -137,23 +138,41 @@ class MessageController extends Controller
         }
 
         // Récupérer les messages entre les deux utilisateurs
-        $messages = Message::where(function($query) use ($user, $userId) {
+        $query = Message::where(function($query) use ($user, $userId) {
                 $query->where('sender_id', $user->id)
                       ->where('recipient_id', $userId);
             })
             ->orWhere(function($query) use ($user, $userId) {
                 $query->where('sender_id', $userId)
                       ->where('recipient_id', $user->id);
-            })
-            ->with(['sender', 'product'])
+            });
+
+        // Filtrer par productId si ce paramètre est fourni
+        if ($productId) {
+            $query->where(function($query) use ($productId) {
+                $query->where('product_id', $productId)
+                    ->orWhereNull('product_id'); // Inclure aussi les messages sans product_id (messages généraux)
+            });
+        }
+
+        $messages = $query->with(['sender', 'product'])
             ->orderBy('created_at', 'desc')
             ->paginate($limit, ['*'], 'page', $page);
 
         // Marquer les messages non lus comme lus (seulement ceux reçus par l'utilisateur)
-        Message::where('sender_id', $userId)
+        $markAsReadQuery = Message::where('sender_id', $userId)
             ->where('recipient_id', $user->id)
-            ->where('read', false)
-            ->update(['read' => true]);
+            ->where('read', false);
+
+        // Appliquer également le filtre par productId pour le marquage comme lu
+        if ($productId) {
+            $markAsReadQuery->where(function($query) use ($productId) {
+                $query->where('product_id', $productId)
+                    ->orWhereNull('product_id');
+            });
+        }
+
+        $markAsReadQuery->update(['read' => true]);
 
         return response()->json([
             'data' => $messages->items(),

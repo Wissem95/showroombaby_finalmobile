@@ -689,17 +689,28 @@ export default function MessagesScreen({ navigation, route }: MessagesScreenProp
   const processConversations = async (conversationsData: any[]) => {
     // Transformer les données pour s'assurer que les informations utilisateur sont complètes
     const processedConversations = conversationsData.map((conv: any) => {
-      // Créer des objets utilisateur complets à partir des données plates
+      // D'après l'analyse du backend (MessageController.php), les champs pour les utilisateurs
+      // sont renvoyés directement au format sender_username et recipient_username
+      console.log(`Données conversation #${conv.id || 'N/A'}:`, {
+        sender_id: conv.sender_id,
+        sender_username: conv.sender_username,
+        recipient_id: conv.recipient_id,
+        recipient_username: conv.recipient_username
+      });
+      
+      // Utiliser exactement les mêmes noms de champs que dans la requête du backend
+      // La méthode getConversationsQuery dans MessageController.php sélectionne:
+      // 'sender.username as sender_username' et 'recipient.username as recipient_username'
       const sender = {
         id: conv.sender_id,
-        username: conv.sender_username || `Utilisateur #${conv.sender_id}`,
+        username: conv.sender_username || '',
         email: conv.sender_email,
         avatar: conv.sender_avatar
       };
       
       const recipient = {
         id: conv.recipient_id,
-        username: conv.recipient_username || `Utilisateur #${conv.recipient_id}`,
+        username: conv.recipient_username || '',
         email: conv.recipient_email,
         avatar: conv.recipient_avatar
       };
@@ -749,12 +760,14 @@ export default function MessagesScreen({ navigation, route }: MessagesScreenProp
     // Création d'une Map pour stocker les conversations uniques
     const conversationsMap = new Map();
     
-    // Regrouper les conversations par paire d'utilisateurs et par produit
+    // Regrouper les conversations par paire d'utilisateurs ET par produit
+    // Chaque produit doit avoir sa propre conversation, même avec le même utilisateur
     processedConversations.forEach(conv => {
       // Créer une clé unique pour chaque conversation
-      // La clé est composée des ID des deux utilisateurs et de l'ID du produit
-      const userIds = [conv.sender_id, conv.recipient_id].sort((a, b) => a - b);
-      const key = `${userIds[0]}-${userIds[1]}-${conv.product_id || 'general'}`;
+      // Modification: on utilise toujours product_id comme partie de la clé, même s'il est 'general'
+      // Cela garantit que chaque produit a sa propre conversation distincte
+      const otherUserId = conv.sender_id === currentUserId ? conv.recipient_id : conv.sender_id;
+      const key = `${currentUserId}-${otherUserId}-${conv.product_id || 'general'}`;
       
       // Si cette conversation existe déjà, mettre à jour uniquement si le message est plus récent
       if (!conversationsMap.has(key) || 
@@ -1135,7 +1148,13 @@ export default function MessagesScreen({ navigation, route }: MessagesScreenProp
     const otherUser = item.sender_id === userId ? item.recipient : item.sender;
     
     // Déterminer le nom à afficher pour l'autre utilisateur
-    const otherUserName = otherUser?.username || `Utilisateur #${otherUserId}`;
+    console.log(`Rendu conversation avec utilisateur:`, otherUser);
+    
+    // Utiliser le nom d'utilisateur qui a été récupéré dans processConversations
+    // D'après le backend, le champ username est toujours présent dans les réponses
+    const otherUserName = otherUser?.username || '';
+    
+    console.log(`Nom d'utilisateur affiché: "${otherUserName}"`);
     
     // Vérifier si le message est non lu et vient de l'autre utilisateur
     const isUnread = !item.read && item.sender_id !== userId;
