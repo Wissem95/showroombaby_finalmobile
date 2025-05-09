@@ -14,7 +14,7 @@ import AddressAutocomplete from '../components/AddressAutocomplete';
 // URL de l'API
 // Pour les appareils externes, utiliser votre adresse IP locale au lieu de 127.0.0.1
 const API_URL = process.env.NODE_ENV === 'development' || __DEV__ 
-  ? 'http://192.168.1.68:8000/api'  // Adresse IP locale de l'utilisateur
+  ? 'http://172.20.10.3:8000/api'  // Adresse IP locale de l'utilisateur
   : 'https://api.showroombaby.com';
 
 type Category = {

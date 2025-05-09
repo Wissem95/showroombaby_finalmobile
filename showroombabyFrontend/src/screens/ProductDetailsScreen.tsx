@@ -19,7 +19,7 @@ import Icons3DModel from '../components/Icons3DModel';
 // URL de l'API
 // Pour les appareils externes, utiliser votre adresse IP locale au lieu de 127.0.0.1
 const API_URL = process.env.NODE_ENV === 'development' || __DEV__ 
-  ? 'http://192.168.1.68:8000/api'  // Adresse IP locale de l'utilisateur
+  ? 'http://172.20.10.3:8000/api'  // Adresse IP locale de l'utilisateur
   : 'https://api.showroombaby.com';
 
 // Importer l'image placeholder directement
@@ -299,10 +299,6 @@ const carouselStyles = StyleSheet.create({
   iconButton: {
     margin: 0,
     marginLeft: 5,
-  },
-  actions: {
-    flexDirection: 'row',
-    alignItems: 'center',
   },
   buttonContent: {
     minHeight: 60,
@@ -1419,11 +1415,6 @@ export default function ProductDetailsScreen({ route, navigation }: any) {
               <View style={styles.imageOverlay} />
             </View>
             
-            <View style={styles.imageInfo}>
-              <Text style={styles.miniTitle}>{product.title}</Text>
-              <Text style={styles.miniPrice}>{formatPrice(product.price)}</Text>
-            </View>
-            
             {imageService.getProductImages(product).length > 1 && (
               <View style={styles.imagePagination}>
                 {imageService.getProductImages(product).map((_, index) => (
@@ -1451,14 +1442,14 @@ export default function ProductDetailsScreen({ route, navigation }: any) {
                 size={28}
                 onPress={handleFavorite}
                 disabled={isProductOwner}
-                style={styles.iconButton}
+                style={{ margin: 0, marginLeft: 5 }}
                 touchableProps={{ activeOpacity: 0.7, hitSlop: { top: 10, bottom: 10, left: 10, right: 10 } }}
               />
               <IconButton
                 icon="share-variant"
                 size={28}
                 onPress={handleShare}
-                style={styles.iconButton}
+                style={{ margin: 0, marginLeft: 5 }}
                 touchableProps={{ activeOpacity: 0.7, hitSlop: { top: 10, bottom: 10, left: 10, right: 10 } }}
               />
             </View>
@@ -1649,10 +1640,10 @@ export default function ProductDetailsScreen({ route, navigation }: any) {
           <Button 
             mode="contained" 
             style={styles.contactButton}
-            contentStyle={styles.buttonContent}
+            contentStyle={{ minHeight: 60, paddingVertical: 8, width: '100%', justifyContent: 'center', alignItems: 'center' }}
             onPress={handleContactSeller}
             disabled={isProductOwner}
-            labelStyle={styles.buttonLabel}
+            labelStyle={{ fontSize: 16, fontWeight: '500', textAlign: 'center', width: '100%', flexShrink: 1, flexWrap: 'wrap' }}
           >
             {isProductOwner ? 'Votre produit' : 'Contacter le vendeur'}
           </Button>
@@ -1662,10 +1653,13 @@ export default function ProductDetailsScreen({ route, navigation }: any) {
               styles.favoriteActionButton,
               isProductOwner && styles.disabledButton
             ]}
-            contentStyle={styles.buttonContent}
+            contentStyle={{ minHeight: 60, paddingVertical: 8, width: '100%', justifyContent: 'center', alignItems: 'center' }}
             onPress={handleFavorite}
             disabled={isProductOwner}
-            labelStyle={[styles.buttonLabel, isFavorite && styles.favoriteButtonLabel]}
+            labelStyle={[
+              { fontSize: 16, fontWeight: '500', textAlign: 'center', width: '100%', flexShrink: 1, flexWrap: 'wrap' },
+              isFavorite && styles.favoriteButtonLabel
+            ]}
           >
             {isProductOwner ? 'Impossible d\'ajouter en favoris' : (isFavorite ? 'Retirer des favoris' : 'Ajouter aux favoris')}
           </Button>
@@ -1989,31 +1983,6 @@ const styles = StyleSheet.create({
     bottom: 0,
     backgroundColor: 'rgba(0,0,0,0.2)',
   },
-  imageInfo: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    padding: 20,
-    paddingBottom: 20,
-  },
-  miniTitle: {
-    fontSize: 22,
-    fontWeight: '700',
-    color: '#fff',
-    marginBottom: 8,
-    textShadowColor: 'rgba(0, 0, 0, 0.75)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 2,
-  },
-  miniPrice: {
-    fontSize: 26,
-    fontWeight: '700',
-    color: '#fff',
-    textShadowColor: 'rgba(0, 0, 0, 0.75)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 2,
-  },
   imagePagination: {
     position: 'absolute',
     bottom: 80,
@@ -2039,170 +2008,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#ffffff',
     width: 10,
     height: 10,
-  },
-  favoriteButton: {
-    position: 'absolute',
-    top: 60,
-    right: 15,
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    backgroundColor: 'rgba(255,255,255,0.9)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    zIndex: 20,
-    elevation: 3,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 3,
-    padding: 0,
-  },
-  shareButton: {
-    position: 'absolute',
-    top: 115,
-    right: 15,
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    backgroundColor: 'rgba(255,255,255,0.9)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    zIndex: 20,
-    elevation: 3,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 3,
-    padding: 0,
-  },
-  productInfoOverlay: {
-    position: 'absolute',
-    bottom: 100,
-    left: 0,
-    right: 0,
-    padding: 20,
-    zIndex: 20,
-    backgroundColor: 'rgba(0,0,0,0.3)',
-  },
-  productInfoContainer: {
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    borderRadius: 15,
-    padding: 15,
-  },
-  productTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#fff',
-    marginBottom: 5,
-    textShadowColor: 'rgba(0,0,0,0.3)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 3,
-  },
-  productPrice: {
-    fontSize: 22,
-    fontWeight: 'bold',
-    color: '#fff',
-    marginBottom: 10,
-  },
-  imageLoadingContainer: {
-    ...StyleSheet.absoluteFillObject,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    zIndex: 4,
-  },
-  publishDate: {
-    fontSize: 14,
-    color: '#fff',
-    marginBottom: 10,
-  },
-  swipeIndicator: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 15,
-    marginTop: 10,
-    width: '100%',
-  },
-  swipeText: {
-    color: '#fff',
-    fontSize: 16,
-    marginTop: 5,
-    fontWeight: '500',
-  },
-  actionsBar: {
-    position: 'absolute',
-    bottom: 15,
-    left: 0,
-    right: 0,
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    alignItems: 'center',
-    backgroundColor: '#ffffff',
-    height: 70,
-    borderTopWidth: 1,
-    borderTopColor: '#f0f0f0',
-    elevation: 10,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: -2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    zIndex: 25,
-    borderRadius: 30,
-    marginHorizontal: 10,
-  },
-  carouselActionButton: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    flex: 1,
-    height: '100%',
-  },
-  carouselActionButtonInner: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    backgroundColor: 'transparent',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 10,
-  },
-  carouselActionButtonActive: {
-    backgroundColor: '#ff6b9b',
-  },
-  carouselImage: {
-    width: '100%',
-    height: 300,
-    resizeMode: 'cover',
-  },
-  iconButton: {
-    margin: 0,
-    marginLeft: 5,
-  },
-  buttonContent: {
-    minHeight: 60,
-    paddingVertical: 8,
-    width: '100%',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  buttonLabel: {
-    fontSize: 16,
-    fontWeight: '500',
-    textAlign: 'center',
-    width: '100%',
-    flexShrink: 1,
-    flexWrap: 'wrap',
-  },
-  actionButton: {
-    borderRadius: 25,
-    height: 56,
-    justifyContent: 'center',
-  },
-  absoluteButtonInner: {
-    width: '100%',
-    height: '100%',
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   stickyBackButton: {
     position: 'absolute',
