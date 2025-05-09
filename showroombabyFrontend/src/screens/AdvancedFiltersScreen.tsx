@@ -482,10 +482,14 @@ const styles = StyleSheet.create({
     flex: 1,
     marginRight: 10,
     borderColor: '#6B3CE9',
+    height: 50,
+    justifyContent: 'center',
   },
   applyButton: {
     flex: 1,
     backgroundColor: '#6B3CE9',
+    height: 50,
+    justifyContent: 'center',
   },
   // Styles pour les modales
   modalOverlay: {

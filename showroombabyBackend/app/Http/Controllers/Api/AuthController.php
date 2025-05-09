@@ -32,6 +32,18 @@ class AuthController extends Controller
             'email' => $request->email,
             'password' => Hash::make($request->password),
             'username' => $request->username,
+            'name' => $request->username,
+            'firstName' => '',
+            'lastName' => '',
+            'phone' => '',
+            'street' => '',
+            'city' => '',
+            'zipCode' => '',
+            'country' => '',
+            'latitude' => 0,
+            'longitude' => 0,
+            'rating' => 0.0,
+            'isEmailVerified' => false,
             'role' => 'USER'
         ]);
 
@@ -42,7 +54,14 @@ class AuthController extends Controller
             'user' => [
                 'id' => $user->id,
                 'email' => $user->email,
-                'username' => $user->username
+                'username' => $user->username,
+                'name' => $user->name,
+                'firstName' => $user->firstName,
+                'lastName' => $user->lastName,
+                'phone' => $user->phone,
+                'street' => $user->street,
+                'city' => $user->city,
+                'zipCode' => $user->zipCode
             ],
             'access_token' => $token
         ], 201);

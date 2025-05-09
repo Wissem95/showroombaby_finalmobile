@@ -14,6 +14,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { PanGestureHandler, State } from 'react-native-gesture-handler';
 import imageService from '../services/api/imageService';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import Icons3DModel from '../components/Icons3DModel';
 
 // URL de l'API
 // Pour les appareils externes, utiliser votre adresse IP locale au lieu de 127.0.0.1
@@ -177,6 +178,7 @@ const carouselStyles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.2,
     shadowRadius: 3,
+    padding: 0,
   },
   shareButton: {
     position: 'absolute',
@@ -194,6 +196,7 @@ const carouselStyles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.2,
     shadowRadius: 3,
+    padding: 0,
   },
   productInfoOverlay: {
     position: 'absolute',
@@ -251,32 +254,41 @@ const carouselStyles = StyleSheet.create({
   },
   actionsBar: {
     position: 'absolute',
-    bottom: 40,
+    bottom: 15,
     left: 0,
     right: 0,
-    paddingHorizontal: 10,
     flexDirection: 'row',
     justifyContent: 'space-around',
+    alignItems: 'center',
+    backgroundColor: '#ffffff',
+    height: 70,
+    borderTopWidth: 1,
+    borderTopColor: '#f0f0f0',
+    elevation: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
     zIndex: 25,
+    borderRadius: 30,
+    marginHorizontal: 10,
   },
-  actionButton: {
-    backgroundColor: 'rgba(255,255,255,0.9)',
-    paddingVertical: 14,
-    paddingHorizontal: 20,
-    borderRadius: 25,
-    flexDirection: 'row',
+  carouselActionButton: {
     alignItems: 'center',
     justifyContent: 'center',
-    elevation: 4,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    minWidth: 65,
-    minHeight: 65,
-    marginHorizontal: 4,
+    flex: 1,
+    height: '100%',
   },
-  actionButtonActive: {
+  carouselActionButtonInner: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: 'transparent',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 10,
+  },
+  carouselActionButtonActive: {
     backgroundColor: '#ff6b9b',
   },
   carouselImage: {
@@ -286,42 +298,37 @@ const carouselStyles = StyleSheet.create({
   },
   iconButton: {
     margin: 0,
-    padding: 12,
+    marginLeft: 5,
   },
   actions: {
     flexDirection: 'row',
     alignItems: 'center',
   },
   buttonContent: {
-    height: 50,
+    minHeight: 60,
     paddingVertical: 8,
     width: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   buttonLabel: {
     fontSize: 16,
     fontWeight: '500',
     textAlign: 'center',
     width: '100%',
+    flexShrink: 1,
+    flexWrap: 'wrap',
   },
-  carouselActionButton: {
-    backgroundColor: 'rgba(255,255,255,0.9)',
-    paddingVertical: 20,
-    paddingHorizontal: 20,
+  actionButton: {
     borderRadius: 25,
-    flexDirection: 'row',
+    height: 56,
+    justifyContent: 'center',
+  },
+  absoluteButtonInner: {
+    width: '100%',
+    height: '100%',
     alignItems: 'center',
     justifyContent: 'center',
-    elevation: 4,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    minWidth: 65,
-    minHeight: 65,
-    marginHorizontal: 4,
-  },
-  carouselActionButtonActive: {
-    backgroundColor: '#ff6b9b',
   },
 });
 
@@ -653,11 +660,13 @@ const ImageCarousel = ({ images, navigation, product, formatPrice, getProductIma
             onPress={handleFavoriteToggle}
             disabled={isProductOwner}
           >
-            <Ionicons 
-              name={isFavorite ? 'heart' : 'heart-outline'} 
-              size={24} 
-              color={isProductOwner ? '#999' : (isFavorite ? '#ff6b9b' : '#333')} 
-            />
+            <View style={carouselStyles.absoluteButtonInner}>
+              <Icons3DModel 
+                name="heart"
+                size={24}
+                isActive={isFavorite}
+              />
+            </View>
           </TouchableOpacity>
           
           <TouchableOpacity 
@@ -666,14 +675,17 @@ const ImageCarousel = ({ images, navigation, product, formatPrice, getProductIma
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
             onPress={handleShare}
           >
-            <Ionicons name="share-outline" size={24} color="#333" />
+            <View style={carouselStyles.absoluteButtonInner}>
+              <View style={{ transform: [{ scale: 0.8 }] }}>
+                <Ionicons name="share-social-outline" size={38} color="#777" />
+              </View>
+            </View>
           </TouchableOpacity>
           
           <View style={carouselStyles.actionsBar}>
             <TouchableOpacity 
               activeOpacity={0.7}
               style={carouselStyles.carouselActionButton}
-              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
               onPress={async () => {
                 if (product && product.phone) {
                   if (isProductOwner || !product.hide_phone) {
@@ -706,12 +718,15 @@ const ImageCarousel = ({ images, navigation, product, formatPrice, getProductIma
                 }
               }}
             >
-              <Ionicons name="call-outline" size={26} color="#777" />
+              <Icons3DModel 
+                name="call"
+                size={36}
+                isActive={false}
+              />
             </TouchableOpacity>
             <TouchableOpacity 
               activeOpacity={0.7}
               style={carouselStyles.carouselActionButton}
-              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
               onPress={async () => {
                 if (product && product.user_id) {
                   try {
@@ -738,32 +753,32 @@ const ImageCarousel = ({ images, navigation, product, formatPrice, getProductIma
                 }
               }}
             >
-              <Ionicons name="chatbubble-outline" size={26} color="#777" />
-            </TouchableOpacity>
-            <TouchableOpacity 
-              activeOpacity={0.7}
-              style={[
-                carouselStyles.carouselActionButton, 
-                isFavorite && carouselStyles.carouselActionButtonActive,
-                isProductOwner && { backgroundColor: 'rgba(200,200,200,0.7)' }
-              ]}
-              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-              onPress={handleFavoriteToggle}
-              disabled={isProductOwner}
-            >
-              <Ionicons 
-                name={isFavorite ? "heart" : "heart-outline"} 
-                size={26} 
-                color={isProductOwner ? '#999' : (isFavorite ? "#e74c3c" : "#777")} 
+              <Icons3DModel 
+                name="chat"
+                size={36}
+                isActive={false}
               />
             </TouchableOpacity>
             <TouchableOpacity 
               activeOpacity={0.7}
               style={carouselStyles.carouselActionButton}
-              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              onPress={handleFavoriteToggle}
+              disabled={isProductOwner}
+            >
+              <Icons3DModel 
+                name="heart"
+                size={36}
+                isActive={isFavorite}
+              />
+            </TouchableOpacity>
+            <TouchableOpacity 
+              activeOpacity={0.7}
+              style={carouselStyles.carouselActionButton}
               onPress={handleShare}
             >
-              <Ionicons name="share-social-outline" size={26} color="#777" />
+              <View style={{ transform: [{ scale: 0.8 }] }}>
+                <Ionicons name="share-social-outline" size={38} color="#777" />
+              </View>
             </TouchableOpacity>
           </View>
         </Animated.View>
@@ -777,7 +792,7 @@ const ImageCarousel = ({ images, navigation, product, formatPrice, getProductIma
           height: 80, 
           left: 0, 
           right: 0, 
-          bottom: 0,
+          bottom: 75,
           zIndex: 15
         }} />
       </PanGestureHandler>
@@ -1404,26 +1419,6 @@ export default function ProductDetailsScreen({ route, navigation }: any) {
               <View style={styles.imageOverlay} />
             </View>
             
-            <View style={styles.imageHeader}>
-              <TouchableOpacity 
-                activeOpacity={0.7}
-                style={styles.backButton}
-                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                onPress={() => {
-                  if (route.params?.fromSuccess) {
-                    navigation.reset({
-                      index: 0,
-                      routes: [{ name: 'Home' }],
-                    });
-                  } else {
-                    navigation.navigate('Home');
-                  }
-                }}
-              >
-                <Ionicons name="chevron-back" size={32} color="#fff" />
-              </TouchableOpacity>
-            </View>
-            
             <View style={styles.imageInfo}>
               <Text style={styles.miniTitle}>{product.title}</Text>
               <Text style={styles.miniPrice}>{formatPrice(product.price)}</Text>
@@ -1664,14 +1659,15 @@ export default function ProductDetailsScreen({ route, navigation }: any) {
           <Button 
             mode="outlined" 
             style={[
+              styles.favoriteActionButton,
               isProductOwner && styles.disabledButton
             ]}
             contentStyle={styles.buttonContent}
             onPress={handleFavorite}
             disabled={isProductOwner}
-            labelStyle={styles.buttonLabel}
+            labelStyle={[styles.buttonLabel, isFavorite && styles.favoriteButtonLabel]}
           >
-            {isProductOwner ? 'Vous ne pouvez pas mettre votre produit en favoris' : (isFavorite ? 'Retirer des favoris' : 'Ajouter aux favoris')}
+            {isProductOwner ? 'Impossible d\'ajouter en favoris' : (isFavorite ? 'Retirer des favoris' : 'Ajouter aux favoris')}
           </Button>
         </View>
 
@@ -1692,6 +1688,25 @@ export default function ProductDetailsScreen({ route, navigation }: any) {
           </Dialog>
         </Portal>
       </ScrollView>
+      
+      {/* Bouton retour en position sticky */}
+      <TouchableOpacity 
+        activeOpacity={0.7}
+        style={styles.stickyBackButton}
+        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+        onPress={() => {
+          if (route.params?.fromSuccess) {
+            navigation.reset({
+              index: 0,
+              routes: [{ name: 'Home' }],
+            });
+          } else {
+            navigation.navigate('Home');
+          }
+        }}
+      >
+        <Ionicons name="chevron-back" size={32} color="#fff" />
+      </TouchableOpacity>
     </Animated.View>
   );
 }
@@ -1762,17 +1777,22 @@ const styles = StyleSheet.create({
   },
   priceRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 10,
+    marginBottom: 5,
+    width: '100%',
   },
   price: {
-    fontSize: 28,
-    fontWeight: '700',
+    fontSize: 26,
+    fontWeight: 'bold',
     color: '#ff6b9b',
+    flex: 1,
   },
   actions: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'flex-end',
   },
   divider: {
     marginVertical: 12,
@@ -1901,7 +1921,28 @@ const styles = StyleSheet.create({
     backgroundColor: '#ff6b9b',
     borderColor: '#ff6b9b',
     paddingVertical: 10,
+    paddingHorizontal: 15,
     borderRadius: 25,
+    elevation: 4,
+    shadowColor: "#ff6b9b",
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    minHeight: 60,
+  },
+  favoriteActionButton: {
+    borderColor: '#ff6b9b',
+    borderWidth: 1.5,
+    paddingVertical: 10,
+    paddingHorizontal: 15,
+    borderRadius: 25,
+    minHeight: 60,
+  },
+  favoriteButtonLabel: {
+    color: '#ff6b9b',
   },
   disabledButton: {
     backgroundColor: '#f0f0f0',
@@ -1947,33 +1988,6 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
     backgroundColor: 'rgba(0,0,0,0.2)',
-  },
-  imageHeader: {
-    position: 'absolute',
-    top: 20,
-    left: 0,
-    right: 0,
-    height: 60,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 15,
-    zIndex: 10,
-  },
-  backButton: {
-    width: 50,
-    height: 50,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderRadius: 25,
-    backgroundColor: 'rgba(0,0,0,0.8)',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.5,
-    shadowRadius: 4,
-    elevation: 10,
-    margin: 5,
-    top: 20,
   },
   imageInfo: {
     position: 'absolute',
@@ -2042,6 +2056,7 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.2,
     shadowRadius: 3,
+    padding: 0,
   },
   shareButton: {
     position: 'absolute',
@@ -2059,6 +2074,7 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.2,
     shadowRadius: 3,
+    padding: 0,
   },
   productInfoOverlay: {
     position: 'absolute',
@@ -2116,47 +2132,93 @@ const styles = StyleSheet.create({
   },
   actionsBar: {
     position: 'absolute',
-    bottom: 40,
+    bottom: 15,
     left: 0,
     right: 0,
-    paddingHorizontal: 10,
     flexDirection: 'row',
     justifyContent: 'space-around',
+    alignItems: 'center',
+    backgroundColor: '#ffffff',
+    height: 70,
+    borderTopWidth: 1,
+    borderTopColor: '#f0f0f0',
+    elevation: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
     zIndex: 25,
+    borderRadius: 30,
+    marginHorizontal: 10,
+  },
+  carouselActionButton: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    flex: 1,
+    height: '100%',
+  },
+  carouselActionButtonInner: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: 'transparent',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 10,
+  },
+  carouselActionButtonActive: {
+    backgroundColor: '#ff6b9b',
+  },
+  carouselImage: {
+    width: '100%',
+    height: 300,
+    resizeMode: 'cover',
   },
   iconButton: {
     margin: 0,
-    padding: 12,
+    marginLeft: 5,
   },
   buttonContent: {
-    height: 50,
+    minHeight: 60,
     paddingVertical: 8,
     width: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   buttonLabel: {
     fontSize: 16,
     fontWeight: '500',
     textAlign: 'center',
     width: '100%',
+    flexShrink: 1,
+    flexWrap: 'wrap',
   },
-  carouselActionButton: {
-    backgroundColor: 'rgba(255,255,255,0.9)',
-    paddingVertical: 20,
-    paddingHorizontal: 20,
+  actionButton: {
     borderRadius: 25,
-    flexDirection: 'row',
+    height: 56,
+    justifyContent: 'center',
+  },
+  absoluteButtonInner: {
+    width: '100%',
+    height: '100%',
     alignItems: 'center',
     justifyContent: 'center',
-    elevation: 4,
+  },
+  stickyBackButton: {
+    position: 'absolute',
+    top: 50,
+    left: 15,
+    width: 50,
+    height: 50,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderRadius: 25,
+    backgroundColor: 'rgba(0,0,0,0.8)',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
+    shadowOpacity: 0.5,
     shadowRadius: 4,
-    minWidth: 65,
-    minHeight: 65,
-    marginHorizontal: 4,
-  },
-  carouselActionButtonActive: {
-    backgroundColor: '#ff6b9b',
+    elevation: 10,
+    zIndex: 1000,
   },
 }); 

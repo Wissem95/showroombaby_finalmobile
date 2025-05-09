@@ -28,18 +28,18 @@ const BANNER_IMAGE_URL = require('../../assets/images/IMG_3139-Photoroom.png');
 
 // Catégories à afficher avec leurs images correspondantes
 const categories = [
-  { id: 0, name: 'Tendance', image: require('../../assets/images/2151157112.jpg') },                       // Cuillère bol repas pour bébé
-  { id: -1, name: 'Tous les produits', image: require('../../assets/images/IMG_3006-Photoroom.png') },     // Chambre
-  { id: 1, name: 'Poussette', image: require('../../assets/images/IMG_3127-Photoroom.png') },              // Poussette
-  { id: 2, name: 'Sièges auto', image: require('../../assets/images/Capture_decran_._2025-02-09_a_21.35.01.jpg') },            // Vêtement bébé (petit train avec fumée)
-  { id: 3, name: 'Chambre', image: require('../../assets/images/IMG_3139-Photoroom.png') },                          // Chaussure bébé
-  { id: 4, name: 'Chaussure / Vêtements', image: require('../../assets/images/IMG_3006-Photoroom.png') },  // Poussette noire (image connexion)
-  { id: 5, name: 'Jeux / Éveil', image: require('../../assets/images/2151157112.jpg') },    // Canapé avec nuages
-  { id: 6, name: 'Livre / Dvd', image: require('../../assets/images/IMG_3119.jpg') },                    // Cuillère bol repas pour bébé (même que Tendance)
-  { id: 7, name: 'Toilette', image: require('../../assets/images/IMG_3129.jpg') },                         // Baignoire avec mousse
-  { id: 8, name: 'Repas', image: require('../../assets/images/IMG_3132-Photoroom.png') },                  // Petit train avec fumée
-  { id: 9, name: 'Sortie', image: require('../../assets/images/IMG_3119.jpg') },                           // Livre avec nuage
-  { id: 10, name: 'Service', image: require('../../assets/images/Votre_texte_de_paragraphe.png.png') }, // Siège auto
+  { id: 0, name: 'Tendance', image: require('../../assets/images/2151157112.jpg'), slogan: 'Surfer sur les tendances !' },
+  { id: -1, name: 'Tous les produits', image: require('../../assets/images/IMG_3006-Photoroom.png'), slogan: 'Découvrez tout notre univers bébé !' },
+  { id: 1, name: 'Poussette', image: require('../../assets/images/IMG_3127-Photoroom.png'), slogan: 'En route pour l\'aventure !' },
+  { id: 2, name: 'Sièges auto', image: require('../../assets/images/Capture_decran_._2025-02-09_a_21.35.01.jpg'), slogan: 'Sécurité et confort pour vos trajets !' },
+  { id: 3, name: 'Chambre', image: require('../../assets/images/IMG_3139-Photoroom.png'), slogan: 'Un doux nid pour votre petit trésor !' },
+  { id: 4, name: 'Chaussure / Vêtements', image: require('../../assets/images/IMG_3006-Photoroom.png'), slogan: 'Style et confort pour les petits pieds !' },
+  { id: 5, name: 'Jeux / Éveil', image: require('../../assets/images/2151157112.jpg'), slogan: 'Éveiller les sens et la curiosité !' },
+  { id: 6, name: 'Livre / Dvd', image: require('../../assets/images/IMG_3119.jpg'), slogan: 'Des histoires pour rêver et grandir !' },
+  { id: 7, name: 'Toilette', image: require('../../assets/images/IMG_3129.jpg'), slogan: 'Moments de douceur et de bien-être !' },
+  { id: 8, name: 'Repas', image: require('../../assets/images/IMG_3132-Photoroom.png'), slogan: 'À table les petits gourmands !' },
+  { id: 9, name: 'Sortie', image: require('../../assets/images/IMG_3119.jpg'), slogan: 'Prêts pour les aventures en plein air !' },
+  { id: 10, name: 'Service', image: require('../../assets/images/Votre_texte_de_paragraphe.png.png'), slogan: 'Des services adaptés à vos besoins !' },
 ];
 
 interface Product {
@@ -314,6 +314,7 @@ export default function HomeScreen({ navigation }: Props) {
   const [selectedCategory, setSelectedCategory] = useState(0);
   const [searchQuery, setSearchQuery] = useState('');
   const [backgroundImage, setBackgroundImage] = useState(categories[0].image);
+  const [currentSlogan, setCurrentSlogan] = useState(categories[0].slogan);
 
   useEffect(() => {
     // Nettoyer le cache des images au démarrage
@@ -324,8 +325,13 @@ export default function HomeScreen({ navigation }: Props) {
   // Mettre à jour l'image de fond lorsque la catégorie change
   useEffect(() => {
     const selectedCat = categories.find(cat => cat.id === selectedCategory);
-    if (selectedCat && selectedCat.image) {
-      setBackgroundImage(selectedCat.image);
+    if (selectedCat) {
+      if (selectedCat.image) {
+        setBackgroundImage(selectedCat.image);
+      }
+      if (selectedCat.slogan) {
+        setCurrentSlogan(selectedCat.slogan);
+      }
     }
   }, [selectedCategory]);
 
@@ -348,10 +354,15 @@ export default function HomeScreen({ navigation }: Props) {
   const handleCategorySelect = (selectedId: number) => {
     setSelectedCategory(selectedId);
     
-    // Changer l'image de fond
+    // Changer l'image de fond et le slogan
     const selectedCat = categories.find(cat => cat.id === selectedId);
-    if (selectedCat && selectedCat.image) {
-      setBackgroundImage(selectedCat.image);
+    if (selectedCat) {
+      if (selectedCat.image) {
+        setBackgroundImage(selectedCat.image);
+      }
+      if (selectedCat.slogan) {
+        setCurrentSlogan(selectedCat.slogan);
+      }
     }
     
     // Filtrer les produits en fonction de la catégorie sélectionnée
@@ -434,7 +445,7 @@ export default function HomeScreen({ navigation }: Props) {
             resizeMode="cover"
           />
           <View style={styles.bannerTextContainer}>
-            <Text style={styles.bannerText}>Surfer sur les tendances!</Text>
+            <Text style={styles.bannerText}>{currentSlogan}</Text>
           </View>
         </View>
 
@@ -546,7 +557,7 @@ export default function HomeScreen({ navigation }: Props) {
       </View>
 
       <View style={styles.mainContent}>
-        <Text style={styles.bannerText}>Surfer sur les tendances !</Text>
+        <Text style={styles.bannerText}>{currentSlogan}</Text>
         <FlatList
           data={trendingProducts}
           renderItem={({ item }) => <ProductItem item={item} navigation={navigation} />}
@@ -582,7 +593,7 @@ const styles = StyleSheet.create({
     zIndex: 10,
   },
   searchBar: {
-    borderRadius: 30,
+    borderRadius: 8,
     height: hp('6%'),
     backgroundColor: 'rgba(255, 255, 255, 0.95)',
     borderWidth: 1,
@@ -626,6 +637,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     color: '#333',
     marginTop: hp('2%'),
+    marginBottom: hp('1%'),
   },
   sectionTitle: {
     fontSize: wp('5%'),
@@ -790,7 +802,7 @@ const styles = StyleSheet.create({
   },
   categoryChip: {
     backgroundColor: 'rgba(255, 255, 255, 0.9)',
-    borderRadius: 25,
+    borderRadius: 8,
     height: hp('4%'),
     marginRight: wp('2%'),
   },

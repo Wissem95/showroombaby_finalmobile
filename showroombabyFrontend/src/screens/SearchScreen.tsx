@@ -714,9 +714,11 @@ const styles = StyleSheet.create({
     elevation: 0,
     backgroundColor: '#f5f5f5',
     borderRadius: 8,
+    height: hp('6%'),
   },
   searchInput: {
     fontSize: 16,
+    height: hp('6%'),
   },
   searchIcon: {
     marginRight: 10,

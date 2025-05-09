@@ -7,6 +7,7 @@ use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\Rules\Password;
 use Illuminate\Validation\ValidationException;
 
@@ -38,18 +39,80 @@ class UserController extends Controller
     {
         $user = $request->user();
 
+        // Log pour débuguer les données reçues
+        Log::info('Données reçues pour la mise à jour du profil:', $request->all());
+
         // Validation des données
         $request->validate([
+            'name' => 'sometimes|string|max:255',
+            'email' => 'sometimes|email|unique:users,email,' . $user->id,
+            'username' => 'sometimes|string|max:255|unique:users,username,' . $user->id,
             'firstName' => 'sometimes|string|max:255',
             'lastName' => 'sometimes|string|max:255',
-            'username' => 'sometimes|string|max:255|unique:users,username,' . $user->id,
+            'phone' => ['sometimes', 'nullable', 'string', 'max:12',
+                        'regex:/^(0|\+33)[1-9](\d{2}){4}$/'], // Format français: 0612345678 ou +33612345678
             'avatar' => 'sometimes|image|mimes:jpeg,png,jpg,gif|max:2048',
+            'street' => 'sometimes|string|max:255',
+            'city' => 'sometimes|string|max:255',
+            'zipCode' => 'sometimes|string|max:20',
+            'address.street' => 'sometimes|string|max:255',
+            'address.city' => 'sometimes|string|max:255',
+            'address.zip_code' => 'sometimes|string|max:20',
+        ], [
+            'phone.regex' => 'Le numéro de téléphone doit être un format français valide (ex: 0612345678 ou +33612345678)'
         ]);
 
-        // Mise à jour des champs
-        if ($request->has('firstName')) $user->firstName = $request->firstName;
-        if ($request->has('lastName')) $user->lastName = $request->lastName;
-        if ($request->has('username')) $user->username = $request->username;
+        // Mise à jour des champs avec valeurs par défaut si NULL
+        if ($request->has('name')) {
+            $user->name = $request->input('name') ?: ''; // Valeur vide si NULL
+        }
+
+        if ($request->has('email')) {
+            $user->email = $request->input('email');  // Email ne peut pas être vide
+        }
+
+        if ($request->has('username')) {
+            $user->username = $request->input('username');  // Username ne peut pas être vide
+        }
+
+        if ($request->has('firstName')) {
+            $user->firstName = $request->input('firstName') ?: '';
+        }
+
+        if ($request->has('lastName')) {
+            $user->lastName = $request->input('lastName') ?: '';
+        }
+
+        if ($request->has('phone')) {
+            $user->phone = $request->input('phone') ?: '';
+        }
+
+        // Traitement des champs d'adresse (structure à plat)
+        if ($request->has('street')) {
+            $user->street = $request->input('street') ?: '';
+        }
+
+        if ($request->has('city')) {
+            $user->city = $request->input('city') ?: '';
+        }
+
+        if ($request->has('zipCode')) {
+            $user->zipCode = $request->input('zipCode') ?: '';
+        }
+
+        // Traitement des champs d'adresse (structure imbriquée)
+        if ($request->has('address')) {
+            $address = $request->address;
+            if (isset($address['street'])) {
+                $user->street = $address['street'] ?: '';
+            }
+            if (isset($address['city'])) {
+                $user->city = $address['city'] ?: '';
+            }
+            if (isset($address['zip_code'])) {
+                $user->zipCode = $address['zip_code'] ?: '';
+            }
+        }
 
         // Traitement de l'avatar
         if ($request->hasFile('avatar')) {
@@ -65,10 +128,16 @@ class UserController extends Controller
 
         $user->save();
 
+        Log::info('Profil utilisateur mis à jour avec succès. ID: ' . $user->id);
+
         // On ne renvoie pas le mot de passe
         $user->makeHidden(['password']);
 
-        return response()->json($user);
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Profil mis à jour avec succès',
+            'data' => $user
+        ]);
     }
 
     /**
