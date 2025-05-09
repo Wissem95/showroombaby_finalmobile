@@ -17,7 +17,6 @@ const API_URL = process.env.NODE_ENV === 'development' || __DEV__
 
 // Largeur de l'écran
 const { width } = Dimensions.get('window');
-const CARD_WIDTH = (width / 2) - 16;
 
 interface ProductItemProps {
   item: {
@@ -110,42 +109,44 @@ const ProductItem: React.FC<ProductItemProps> = ({ item, navigation }) => {
       onPress={() => navigation.navigate('ProductDetails', { productId: item.id })}
     >
       <Surface style={styles.surface}>
-        <View style={styles.imageContainer}>
-          <Image
-            source={getImageUrl()}
-            style={styles.image}
-            resizeMode="cover"
-          />
-          {item.condition && (
-            <View style={[styles.conditionBadge, getConditionStyle()]}>
-              <Text style={styles.conditionText}>{getConditionLabel()}</Text>
-            </View>
-          )}
-          
-          {/* Badge Pro/Particulier */}
-          <View style={[styles.sellerBadge, isProfessional() ? styles.proBadge : styles.particulierBadge]}>
-            <Text style={styles.sellerBadgeText}>
-              {isProfessional() ? 'Pro' : 'Part.'}
-            </Text>
-          </View>
-        </View>
-        
-        <View style={styles.contentContainer}>
-          <Text style={styles.price}>{item.price}€</Text>
-          <Text numberOfLines={2} style={styles.title}>
-            {item.title}
-          </Text>
-          
-          <View style={styles.footer}>
-            {item.city && (
-              <View style={styles.locationContainer}>
-                <Ionicons name="location-outline" size={12} color="#888" />
-                <Text style={styles.locationText} numberOfLines={1}>
-                  {item.city}
-                </Text>
+        <View style={styles.surfaceContent}>
+          <View style={styles.imageContainer}>
+            <Image
+              source={getImageUrl()}
+              style={styles.image}
+              resizeMode="cover"
+            />
+            {item.condition && (
+              <View style={[styles.conditionBadge, getConditionStyle()]}>
+                <Text style={styles.conditionText}>{getConditionLabel()}</Text>
               </View>
             )}
-            <Text style={styles.dateText}>{formatDate(item.created_at)}</Text>
+            
+            {/* Badge Pro/Particulier */}
+            <View style={[styles.sellerBadge, isProfessional() ? styles.proBadge : styles.particulierBadge]}>
+              <Text style={styles.sellerBadgeText}>
+                {isProfessional() ? 'Pro' : 'Part.'}
+              </Text>
+            </View>
+          </View>
+          
+          <View style={styles.contentContainer}>
+            <Text style={styles.price}>{item.price}€</Text>
+            <Text numberOfLines={2} style={styles.title}>
+              {item.title}
+            </Text>
+            
+            <View style={styles.footer}>
+              {item.city && (
+                <View style={styles.locationContainer}>
+                  <Ionicons name="location-outline" size={12} color="#888" />
+                  <Text style={styles.locationText} numberOfLines={1}>
+                    {item.city}
+                  </Text>
+                </View>
+              )}
+              <Text style={styles.dateText}>{formatDate(item.created_at)}</Text>
+            </View>
           </View>
         </View>
       </Surface>
@@ -155,20 +156,22 @@ const ProductItem: React.FC<ProductItemProps> = ({ item, navigation }) => {
 
 const styles = StyleSheet.create({
   cardContainer: {
-    width: CARD_WIDTH,
-    margin: 8,
+    flex: 1,
+    margin: 4,
   },
   surface: {
-    borderRadius: 10,
-    elevation: 1,
+    elevation: 2,
+  },
+  surfaceContent: {
     overflow: 'hidden',
   },
   imageContainer: {
     position: 'relative',
+    aspectRatio: 1,
   },
   image: {
     width: '100%',
-    height: 150,
+    height: '100%',
     backgroundColor: '#f0f0f0',
   },
   contentContainer: {

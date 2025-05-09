@@ -18,7 +18,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 // URL de l'API
 // Pour les appareils externes, utiliser votre adresse IP locale au lieu de 127.0.0.1
 const API_URL = process.env.NODE_ENV === 'development' || __DEV__ 
-  ? 'http://172.20.10.3:8000/api'  // Adresse IP locale de l'utilisateur
+  ? 'http://192.168.1.68:8000/api'  // Adresse IP locale de l'utilisateur
   : 'https://api.showroombaby.com';
 
 // Importer l'image placeholder directement
@@ -111,9 +111,8 @@ const carouselStyles = StyleSheet.create({
   },
   image: {
     width: '100%',
-    height: '100%',
-    resizeMode: 'contain',
-    zIndex: 2,
+    height: 300,
+    resizeMode: 'cover',
   },
   overlay: {
     ...StyleSheet.absoluteFillObject,
@@ -166,9 +165,9 @@ const carouselStyles = StyleSheet.create({
     position: 'absolute',
     top: 60,
     right: 15,
-    width: 45,
-    height: 45,
-    borderRadius: 22.5,
+    width: 50,
+    height: 50,
+    borderRadius: 25,
     backgroundColor: 'rgba(255,255,255,0.9)',
     justifyContent: 'center',
     alignItems: 'center',
@@ -183,9 +182,9 @@ const carouselStyles = StyleSheet.create({
     position: 'absolute',
     top: 115,
     right: 15,
-    width: 45,
-    height: 45,
-    borderRadius: 22.5,
+    width: 50,
+    height: 50,
+    borderRadius: 25,
     backgroundColor: 'rgba(255,255,255,0.9)',
     justifyContent: 'center',
     alignItems: 'center',
@@ -242,6 +241,7 @@ const carouselStyles = StyleSheet.create({
     justifyContent: 'center',
     paddingVertical: 15,
     marginTop: 10,
+    width: '100%',
   },
   swipeText: {
     color: '#fff',
@@ -252,16 +252,17 @@ const carouselStyles = StyleSheet.create({
   actionsBar: {
     position: 'absolute',
     bottom: 40,
-    left: 20,
-    right: 20,
+    left: 0,
+    right: 0,
+    paddingHorizontal: 10,
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    justifyContent: 'space-around',
     zIndex: 25,
   },
   actionButton: {
     backgroundColor: 'rgba(255,255,255,0.9)',
     paddingVertical: 14,
-    paddingHorizontal: 24,
+    paddingHorizontal: 20,
     borderRadius: 25,
     flexDirection: 'row',
     alignItems: 'center',
@@ -271,22 +272,60 @@ const carouselStyles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.3,
     shadowRadius: 4,
-    minWidth: 60,
-    minHeight: 55,
+    minWidth: 65,
+    minHeight: 65,
+    marginHorizontal: 4,
   },
   actionButtonActive: {
     backgroundColor: '#ff6b9b',
-  }
+  },
+  carouselImage: {
+    width: '100%',
+    height: 300,
+    resizeMode: 'cover',
+  },
+  iconButton: {
+    margin: 0,
+    padding: 12,
+  },
+  actions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  buttonContent: {
+    height: 50,
+    paddingVertical: 8,
+    width: '100%',
+  },
+  buttonLabel: {
+    fontSize: 16,
+    fontWeight: '500',
+    textAlign: 'center',
+    width: '100%',
+  },
+  carouselActionButton: {
+    backgroundColor: 'rgba(255,255,255,0.9)',
+    paddingVertical: 20,
+    paddingHorizontal: 20,
+    borderRadius: 25,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    minWidth: 65,
+    minHeight: 65,
+    marginHorizontal: 4,
+  },
+  carouselActionButtonActive: {
+    backgroundColor: '#ff6b9b',
+  },
 });
 
-const ImageCarousel = ({ images, navigation, product, formatPrice, getProductImageSource, getFullImageUrl }: { 
-  images: string[], 
-  navigation: any, 
-  product: Product,
-  formatPrice: (price: number) => string,
-  getProductImageSource: (product: Product | null) => any,
-  getFullImageUrl: (imagePath: string | null) => string
-}) => {
+const ImageCarousel = ({ images, navigation, product, formatPrice, getProductImageSource, getFullImageUrl, route }: any) => {
   const insets = useSafeAreaInsets();
   const [activeIndex, setActiveIndex] = useState(0);
   const [imageLoadError, setImageLoadError] = useState<Record<string, boolean>>({});
@@ -479,7 +518,7 @@ const ImageCarousel = ({ images, navigation, product, formatPrice, getProductIma
             <Image
               source={{ uri: imageUrl }}
               style={[carouselStyles.image, { zIndex: 1 }]}
-              resizeMode="contain"
+              resizeMode="cover"
               defaultSource={placeholderImage}
               onLoadStart={() => {
                 setImageLoading(prev => ({ ...prev, [imageUrl]: true }));
@@ -525,7 +564,7 @@ const ImageCarousel = ({ images, navigation, product, formatPrice, getProductIma
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <TouchableOpacity 
-        activeOpacity={1}
+        activeOpacity={0.7}
         style={{ flex: 1 }}
       >
         <Animated.View style={[
@@ -553,8 +592,18 @@ const ImageCarousel = ({ images, navigation, product, formatPrice, getProductIma
         ]}>
           <View style={[carouselStyles.headerBar, { height: 60 + insets.top, paddingTop: insets.top }]}>
             <TouchableOpacity 
+              activeOpacity={0.7}
               style={carouselStyles.backButton} 
-              onPress={() => navigation.goBack()}
+              onPress={() => {
+                if (route.params?.fromSuccess) {
+                  navigation.reset({
+                    index: 0,
+                    routes: [{ name: 'Home' }],
+                  });
+                } else {
+                  navigation.navigate('Home');
+                }
+              }}
             >
               <Ionicons name="chevron-back" size={32} color="#fff" />
             </TouchableOpacity>
@@ -581,7 +630,9 @@ const ImageCarousel = ({ images, navigation, product, formatPrice, getProductIma
             </Text>
             
             <TouchableOpacity 
+              activeOpacity={0.7}
               style={carouselStyles.swipeIndicator}
+              hitSlop={{ top: 20, bottom: 20, left: 20, right: 20 }}
               onPress={animateTransition}
             >
               <Animated.View style={{ transform: [{ translateY: swipeAnim }] }}>
@@ -592,11 +643,13 @@ const ImageCarousel = ({ images, navigation, product, formatPrice, getProductIma
           </View>
           
           <TouchableOpacity 
+            activeOpacity={0.7}
             style={[
               carouselStyles.favoriteButton, 
               { top: 60 + insets.top },
               isProductOwner && { backgroundColor: 'rgba(200,200,200,0.7)' }
             ]}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
             onPress={handleFavoriteToggle}
             disabled={isProductOwner}
           >
@@ -608,7 +661,9 @@ const ImageCarousel = ({ images, navigation, product, formatPrice, getProductIma
           </TouchableOpacity>
           
           <TouchableOpacity 
+            activeOpacity={0.7}
             style={[carouselStyles.shareButton, { top: 115 + insets.top }]}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
             onPress={handleShare}
           >
             <Ionicons name="share-outline" size={24} color="#333" />
@@ -616,10 +671,16 @@ const ImageCarousel = ({ images, navigation, product, formatPrice, getProductIma
           
           <View style={carouselStyles.actionsBar}>
             <TouchableOpacity 
-              style={carouselStyles.actionButton}
+              activeOpacity={0.7}
+              style={carouselStyles.carouselActionButton}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
               onPress={async () => {
                 if (product && product.phone) {
-                  Linking.openURL(`tel:${product.phone}`);
+                  if (isProductOwner || !product.hide_phone) {
+                    Linking.openURL(`tel:${product.phone}`);
+                  } else {
+                    Alert.alert("Information", "Le numéro de téléphone est masqué");
+                  }
                 } else if (product && product.user_id) {
                   try {
                     // Vérifier si l'utilisateur essaie de s'envoyer un message à lui-même
@@ -648,7 +709,9 @@ const ImageCarousel = ({ images, navigation, product, formatPrice, getProductIma
               <Ionicons name="call-outline" size={26} color="#777" />
             </TouchableOpacity>
             <TouchableOpacity 
-              style={carouselStyles.actionButton}
+              activeOpacity={0.7}
+              style={carouselStyles.carouselActionButton}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
               onPress={async () => {
                 if (product && product.user_id) {
                   try {
@@ -678,11 +741,13 @@ const ImageCarousel = ({ images, navigation, product, formatPrice, getProductIma
               <Ionicons name="chatbubble-outline" size={26} color="#777" />
             </TouchableOpacity>
             <TouchableOpacity 
+              activeOpacity={0.7}
               style={[
-                carouselStyles.actionButton, 
-                isFavorite && carouselStyles.actionButtonActive,
+                carouselStyles.carouselActionButton, 
+                isFavorite && carouselStyles.carouselActionButtonActive,
                 isProductOwner && { backgroundColor: 'rgba(200,200,200,0.7)' }
               ]}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
               onPress={handleFavoriteToggle}
               disabled={isProductOwner}
             >
@@ -693,7 +758,9 @@ const ImageCarousel = ({ images, navigation, product, formatPrice, getProductIma
               />
             </TouchableOpacity>
             <TouchableOpacity 
-              style={carouselStyles.actionButton}
+              activeOpacity={0.7}
+              style={carouselStyles.carouselActionButton}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
               onPress={handleShare}
             >
               <Ionicons name="share-social-outline" size={26} color="#777" />
@@ -824,10 +891,11 @@ export default function ProductDetailsScreen({ route, navigation }: any) {
         const paramProduct = route.params.product;
         setProduct(paramProduct);
         
-        console.log('[DEBUG-IMAGES] Produit provenant des params:', {
+        console.log('[DEBUG-PRODUCT] Produit provenant des params:', {
           id: paramProduct.id,
-          images: paramProduct.images,
-          image_type: typeof paramProduct.images
+          hide_phone: paramProduct.hide_phone,
+          phone: paramProduct.phone,
+          isProductOwner: paramProduct.user_id === parseInt(await AsyncStorage.getItem('userId') || '0')
         });
         
         // Utiliser les données du vendeur du produit si disponibles
@@ -847,88 +915,66 @@ export default function ProductDetailsScreen({ route, navigation }: any) {
 
       try {
         setLoading(true);
-        const response = await axios.get(`${API_URL}/products/${productId}`);
+        const token = await AsyncStorage.getItem('token');
+        const response = await axios.get(`${API_URL}/products/${productId}`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+
+        const productData = response.data.data;
+        console.log('[DEBUG-PRODUCT] Produit chargé depuis API:', {
+          id: productData.id,
+          hide_phone: productData.hide_phone,
+          phone: productData.phone,
+          user_id: productData.user_id,
+          current_user_id: await AsyncStorage.getItem('userId')
+        });
         
-        if (response.data) {
-          const productData = response.data.data || response.data;
-          console.log('[DEBUG-IMAGES] Données du produit reçues:', {
-            id: productData.id,
-            images: productData.images,
-            image_type: typeof productData.images
-          });
-          
-          // Si les images sont un string (JSON), essayer de l'analyser
-          if (typeof productData.images === 'string') {
+        setProduct(productData);
+        
+        // Utiliser d'abord les données du vendeur incluses dans la réponse du produit
+        if (productData.seller) {
+          setSeller(productData.seller);
+        } 
+        // Si le vendeur n'est pas inclus, essayer de l'obtenir par API
+        else if (productData.user_id) {
+          try {
+            // Tenter de récupérer les informations du vendeur depuis l'API
             try {
-              console.log('[DEBUG-IMAGES] Tentative de parse JSON pour les images:', productData.images);
-              const parsed = JSON.parse(productData.images);
-              productData.images = parsed;
-              console.log('[DEBUG-IMAGES] Images parsées avec succès:', parsed);
-            } catch (e) {
-              console.log('[DEBUG-IMAGES] Échec du parse JSON pour les images');
-            }
-          }
-          
-          setProduct(productData);
-          
-          // Utiliser d'abord les données du vendeur incluses dans la réponse du produit
-          if (productData.seller) {
-            setSeller(productData.seller);
-          } 
-          // Si le vendeur n'est pas inclus, essayer de l'obtenir par API
-          else if (productData.user_id) {
-            try {
-              const token = await AsyncStorage.getItem('token');
+              const sellerResponse = await axios.get(`${API_URL}/users/${productData.user_id}`, {
+                headers: { Authorization: `Bearer ${token}` },
+                timeout: 5000
+              });
               
-              if (!token) {
-                // Créer un vendeur minimal sans appeler l'API si pas de token
+              if (sellerResponse.data && sellerResponse.data.data) {
                 setSeller({
                   id: productData.user_id,
-                  name: productData.seller_name || "3Wsolution",
+                  name: sellerResponse.data.data.name || sellerResponse.data.data.username || "3Wsolution",
+                  username: sellerResponse.data.data.username,
+                  email: sellerResponse.data.data.email,
+                  avatar: sellerResponse.data.data.avatar,
+                  rating: sellerResponse.data.data.rating || 0,
                 });
-                return;
-              }
-              
-              // Tenter de récupérer les informations du vendeur depuis l'API
-              try {
-                const sellerResponse = await axios.get(`${API_URL}/users/${productData.user_id}`, {
-                  headers: { Authorization: `Bearer ${token}` },
-                  timeout: 5000
-                });
-                
-                if (sellerResponse.data && sellerResponse.data.data) {
-                  setSeller({
-                    id: productData.user_id,
-                    name: sellerResponse.data.data.name || sellerResponse.data.data.username || "3Wsolution",
-                    username: sellerResponse.data.data.username,
-                    email: sellerResponse.data.data.email,
-                    avatar: sellerResponse.data.data.avatar,
-                    rating: sellerResponse.data.data.rating || 0,
-                  });
-                } else {
-                  setSeller({
-                    id: productData.user_id,
-                    name: productData.seller_name || "3Wsolution",
-                  });
-                }
-              } catch (error) {
-                console.log('Impossible de récupérer les infos du vendeur, utilisation du nom par défaut');
+              } else {
                 setSeller({
                   id: productData.user_id,
                   name: productData.seller_name || "3Wsolution",
                 });
               }
-            } catch (sellerError) {
-              console.error('Erreur lors du chargement des informations du vendeur:', sellerError);
-              // Créer un vendeur minimal avec l'ID uniquement
+            } catch (error) {
+              console.log('Impossible de récupérer les infos du vendeur, utilisation du nom par défaut');
               setSeller({
                 id: productData.user_id,
                 name: productData.seller_name || "3Wsolution",
               });
             }
+          } catch (sellerError) {
+            console.error('Erreur lors du chargement des informations du vendeur:', sellerError);
+            // Créer un vendeur minimal avec l'ID uniquement
+            setSeller({
+              id: productData.user_id,
+              name: productData.seller_name || "3Wsolution",
+            });
           }
-        } else {
-          setError('Produit non trouvé');
         }
       } catch (error: any) {
         console.error('Erreur lors du chargement du produit:', error);
@@ -1294,6 +1340,7 @@ export default function ProductDetailsScreen({ route, navigation }: any) {
           formatPrice={formatPrice}
           getProductImageSource={(product) => imageService.getProductImageSource(product, placeholderImage)}
           getFullImageUrl={(imagePath) => imageService.getFullImageUrl(imagePath)}
+          route={route}
         />
       </View>
     );
@@ -1336,11 +1383,12 @@ export default function ProductDetailsScreen({ route, navigation }: any) {
       <ScrollView style={styles.container}>
         <View style={styles.imageContainer}>
           <TouchableOpacity 
+            activeOpacity={0.7}
             style={styles.fullImageButton}
-            activeOpacity={0.95}
             onPress={() => navigation.navigate('ProductDetails', { 
               productId: product.id,
-              fullscreenMode: true
+              fullscreenMode: true,
+              fromSuccess: route.params?.fromSuccess
             })}
           >
             <View style={styles.productImageContainer}>
@@ -1358,8 +1406,19 @@ export default function ProductDetailsScreen({ route, navigation }: any) {
             
             <View style={styles.imageHeader}>
               <TouchableOpacity 
+                activeOpacity={0.7}
                 style={styles.backButton}
-                onPress={() => navigation.goBack()}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                onPress={() => {
+                  if (route.params?.fromSuccess) {
+                    navigation.reset({
+                      index: 0,
+                      routes: [{ name: 'Home' }],
+                    });
+                  } else {
+                    navigation.navigate('Home');
+                  }
+                }}
               >
                 <Ionicons name="chevron-back" size={32} color="#fff" />
               </TouchableOpacity>
@@ -1394,14 +1453,18 @@ export default function ProductDetailsScreen({ route, navigation }: any) {
               <IconButton
                 icon={isFavorite ? "heart" : "heart-outline"}
                 iconColor={isProductOwner ? "#aaa" : (isFavorite ? "#e74c3c" : "#000")}
-                size={24}
+                size={28}
                 onPress={handleFavorite}
                 disabled={isProductOwner}
+                style={styles.iconButton}
+                touchableProps={{ activeOpacity: 0.7, hitSlop: { top: 10, bottom: 10, left: 10, right: 10 } }}
               />
               <IconButton
                 icon="share-variant"
-                size={24}
+                size={28}
                 onPress={handleShare}
+                style={styles.iconButton}
+                touchableProps={{ activeOpacity: 0.7, hitSlop: { top: 10, bottom: 10, left: 10, right: 10 } }}
               />
             </View>
           </View>
@@ -1482,10 +1545,21 @@ export default function ProductDetailsScreen({ route, navigation }: any) {
               </Text>
             </View>
             
-            {!product.hide_phone && product.phone && (
+            {product.phone && (
               <View style={styles.detailItem}>
                 <Text style={styles.detailLabel}>Téléphone</Text>
-                <Text style={styles.detailValue}>{product.phone}</Text>
+                <Text style={styles.detailValue}>
+                  {(() => {
+                    console.log('[DEBUG-PHONE] Affichage du téléphone:', {
+                      isProductOwner,
+                      hide_phone: product.hide_phone,
+                      phone: product.phone
+                    });
+                    // Convertir explicitement hide_phone en booléen
+                    const shouldHidePhone = Boolean(product.hide_phone);
+                    return isProductOwner ? product.phone : (shouldHidePhone ? 'Numéro masqué' : product.phone);
+                  })()}
+                </Text>
               </View>
             )}
             
@@ -1579,20 +1653,23 @@ export default function ProductDetailsScreen({ route, navigation }: any) {
         <View style={styles.actionButtons}>
           <Button 
             mode="contained" 
-            style={[styles.actionButton, styles.contactButton]}
+            style={styles.contactButton}
+            contentStyle={styles.buttonContent}
             onPress={handleContactSeller}
             disabled={isProductOwner}
+            labelStyle={styles.buttonLabel}
           >
             {isProductOwner ? 'Votre produit' : 'Contacter le vendeur'}
           </Button>
           <Button 
             mode="outlined" 
             style={[
-              styles.actionButton,
               isProductOwner && styles.disabledButton
             ]}
+            contentStyle={styles.buttonContent}
             onPress={handleFavorite}
             disabled={isProductOwner}
+            labelStyle={styles.buttonLabel}
           >
             {isProductOwner ? 'Vous ne pouvez pas mettre votre produit en favoris' : (isFavorite ? 'Retirer des favoris' : 'Ajouter aux favoris')}
           </Button>
@@ -1813,20 +1890,25 @@ const styles = StyleSheet.create({
     color: '#666',
   },
   actionButtons: {
-    padding: 15,
-    paddingBottom: 25,
-    gap: 10,
-    backgroundColor: '#fff',
-    borderTopWidth: 1,
-    borderTopColor: '#f0f0f0',
+    flexDirection: 'column',
+    paddingHorizontal: 15,
+    paddingBottom: 20,
+    marginTop: 10,
+    gap: 15,
+    width: '100%',
   },
   contactButton: {
     backgroundColor: '#ff6b9b',
+    borderColor: '#ff6b9b',
+    paddingVertical: 10,
+    borderRadius: 25,
   },
   disabledButton: {
     backgroundColor: '#f0f0f0',
     borderColor: '#ddd',
     opacity: 0.7,
+    paddingVertical: 10,
+    borderRadius: 25,
   },
   mapContainerWrapper: {
     height: 250,
@@ -1846,6 +1928,7 @@ const styles = StyleSheet.create({
     flex: 1,
     position: 'relative',
     height: '100%',
+    width: '100%',
   },
   productImageContainer: {
     width: '100%',
@@ -1947,9 +2030,9 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 60,
     right: 15,
-    width: 45,
-    height: 45,
-    borderRadius: 22.5,
+    width: 50,
+    height: 50,
+    borderRadius: 25,
     backgroundColor: 'rgba(255,255,255,0.9)',
     justifyContent: 'center',
     alignItems: 'center',
@@ -1964,9 +2047,9 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 115,
     right: 15,
-    width: 45,
-    height: 45,
-    borderRadius: 22.5,
+    width: 50,
+    height: 50,
+    borderRadius: 25,
     backgroundColor: 'rgba(255,255,255,0.9)',
     justifyContent: 'center',
     alignItems: 'center',
@@ -2023,6 +2106,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingVertical: 15,
     marginTop: 10,
+    width: '100%',
   },
   swipeText: {
     color: '#fff',
@@ -2033,16 +2117,32 @@ const styles = StyleSheet.create({
   actionsBar: {
     position: 'absolute',
     bottom: 40,
-    left: 20,
-    right: 20,
+    left: 0,
+    right: 0,
+    paddingHorizontal: 10,
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    justifyContent: 'space-around',
     zIndex: 25,
   },
-  actionButton: {
+  iconButton: {
+    margin: 0,
+    padding: 12,
+  },
+  buttonContent: {
+    height: 50,
+    paddingVertical: 8,
+    width: '100%',
+  },
+  buttonLabel: {
+    fontSize: 16,
+    fontWeight: '500',
+    textAlign: 'center',
+    width: '100%',
+  },
+  carouselActionButton: {
     backgroundColor: 'rgba(255,255,255,0.9)',
-    paddingVertical: 14,
-    paddingHorizontal: 24,
+    paddingVertical: 20,
+    paddingHorizontal: 20,
     borderRadius: 25,
     flexDirection: 'row',
     alignItems: 'center',
@@ -2052,10 +2152,11 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.3,
     shadowRadius: 4,
-    minWidth: 60,
-    minHeight: 55,
+    minWidth: 65,
+    minHeight: 65,
+    marginHorizontal: 4,
   },
-  actionButtonActive: {
+  carouselActionButtonActive: {
     backgroundColor: '#ff6b9b',
-  }
+  },
 }); 

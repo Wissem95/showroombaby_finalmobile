@@ -14,7 +14,7 @@ import AddressAutocomplete from '../components/AddressAutocomplete';
 // URL de l'API
 // Pour les appareils externes, utiliser votre adresse IP locale au lieu de 127.0.0.1
 const API_URL = process.env.NODE_ENV === 'development' || __DEV__ 
-  ? 'http://172.20.10.3:8000/api'  // Adresse IP locale de l'utilisateur
+  ? 'http://192.168.1.68:8000/api'  // Adresse IP locale de l'utilisateur
   : 'https://api.showroombaby.com';
 
 type Category = {
@@ -243,6 +243,8 @@ const BRANDS = [
 
 export default function AjouterProduitScreen({ navigation, route }: any) {
   const productId = route.params?.productId;
+  
+  // Regrouper tous les useState au début
   const [currentStep, setCurrentStep] = useState<Step>(Step.INFOS_BASE);
   const [isLoading, setIsLoading] = useState(false);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -266,13 +268,19 @@ export default function AjouterProduitScreen({ navigation, route }: any) {
     is_professional: false,
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const [locationPermission, setLocationPermission] = useState<boolean | null>(null);
+  const [locationPermission, setLocationPermission] = useState<boolean>(false);
   const [userLocation, setUserLocation] = useState<string>('');
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [modalVisible, setModalVisible] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [showSuccessPage, setShowSuccessPage] = useState(false);
   const [publishedProductId, setPublishedProductId] = useState<number | null>(null);
+  const [lastLocationCheck, setLastLocationCheck] = useState<number>(0);
+  const [isNavigating, setIsNavigating] = useState(false);
+  const LOCATION_CHECK_INTERVAL = 5000; // 5 secondes
+  const [brandInput, setBrandInput] = useState('');
+  const [showBrandSuggestions, setShowBrandSuggestions] = useState(false);
+  const [filteredBrands, setFilteredBrands] = useState<typeof BRANDS>([]);
 
   useEffect(() => {
     // Utiliser les catégories prédéfinies au lieu de les charger depuis l'API
@@ -397,13 +405,24 @@ export default function AjouterProduitScreen({ navigation, route }: any) {
   };
 
   const checkPermissions = async () => {
+    // Vérifier si on a déjà fait une vérification récemment
+    const now = Date.now();
+    if (now - lastLocationCheck < LOCATION_CHECK_INTERVAL) {
+      return;
+    }
+    
     const { status } = await Location.requestForegroundPermissionsAsync();
     setLocationPermission(status === 'granted');
     
     if (status === 'granted') {
       try {
-        const location = await Location.getCurrentPositionAsync({});
+        const location = await Location.getCurrentPositionAsync({
+          accuracy: Location.Accuracy.Balanced
+        });
         const { latitude, longitude } = location.coords;
+        
+        // Mettre à jour le timestamp de la dernière vérification
+        setLastLocationCheck(now);
         
         const response = await Location.reverseGeocodeAsync({
           latitude,
@@ -512,9 +531,8 @@ export default function AjouterProduitScreen({ navigation, route }: any) {
 
   const validateStep = () => {
     let valid = true;
-    let tempErrors: Record<string, string> = {};
-    
-    // Validation de l'étape actuelle
+    const tempErrors: Record<string, string> = {};
+
     switch (currentStep) {
       case Step.INFOS_BASE:
         if (!productData.title.trim()) {
@@ -526,8 +544,21 @@ export default function AjouterProduitScreen({ navigation, route }: any) {
         }
         
         if (!productData.category_id) {
-          tempErrors.category = 'Veuillez sélectionner une catégorie.';
+          tempErrors.category = 'La catégorie est obligatoire.';
           valid = false;
+        }
+        
+        if (!productData.subcategory_id) {
+          tempErrors.subcategory = 'La sous-catégorie est obligatoire.';
+          valid = false;
+        } else {
+          // Vérifier que la sous-catégorie appartient bien à la catégorie sélectionnée
+          const category = categories.find(c => c.id === productData.category_id);
+          const subcategoryExists = category?.subcategories?.some(sub => sub.id === productData.subcategory_id);
+          if (!subcategoryExists) {
+            tempErrors.subcategory = 'La sous-catégorie sélectionnée n\'est pas valide pour cette catégorie.';
+            valid = false;
+          }
         }
         break;
       
@@ -543,33 +574,41 @@ export default function AjouterProduitScreen({ navigation, route }: any) {
         if (!productData.price.trim()) {
           tempErrors.price = 'Le prix est obligatoire.';
           valid = false;
-        } else if (isNaN(parseFloat(productData.price)) || parseFloat(productData.price) <= 0) {
-          tempErrors.price = 'Veuillez saisir un prix valide.';
-          valid = false;
+        } else {
+          const price = parseFloat(productData.price);
+          if (isNaN(price) || price <= 0) {
+            tempErrors.price = 'Veuillez saisir un prix valide (supérieur à 0).';
+            valid = false;
+          } else if (price > 1000000) {
+            tempErrors.price = 'Le prix ne peut pas dépasser 1 000 000 €.';
+            valid = false;
+          }
         }
         break;
       
       case Step.CONDITION:
-        if (!productData.condition || productData.condition === '') {
+        if (!productData.condition) {
           tempErrors.condition = 'Veuillez sélectionner un état du produit.';
           valid = false;
-          console.log('Validation échouée : État du produit non sélectionné');
         } else {
           // Vérifier que l'état sélectionné est valide
           const validCondition = CONDITIONS.some(c => c.id === productData.condition);
           if (!validCondition) {
             tempErrors.condition = 'L\'état sélectionné n\'est pas valide.';
             valid = false;
-            console.log('Validation échouée : État du produit invalide');
-          } else {
-            console.log('Validation réussie : État du produit =', productData.condition);
           }
         }
         break;
       
       case Step.PHOTOS:
         if (productData.images.length === 0) {
-          tempErrors.images = 'Veuillez ajouter au moins une photo.';
+          tempErrors.images = 'Veuillez ajouter au moins deux photos.';
+          valid = false;
+        } else if (productData.images.length < 2) {
+          tempErrors.images = 'Vous devez ajouter au moins deux photos.';
+          valid = false;
+        } else if (productData.images.length > MAX_IMAGES) {
+          tempErrors.images = `Vous ne pouvez pas ajouter plus de ${MAX_IMAGES} photos.`;
           valid = false;
         }
         break;
@@ -582,6 +621,14 @@ export default function AjouterProduitScreen({ navigation, route }: any) {
         
         if (!productData.telephone.trim()) {
           tempErrors.telephone = 'Le numéro de téléphone est obligatoire.';
+          valid = false;
+        } else if (!/^0[1-9][0-9]{8}$/.test(productData.telephone)) {
+          tempErrors.telephone = 'Le numéro de téléphone doit commencer par 0 et contenir 10 chiffres.';
+          valid = false;
+        }
+        
+        if (productData.zipCode && !/^\d{5}$/.test(productData.zipCode)) {
+          tempErrors.zipCode = 'Le code postal doit contenir 5 chiffres.';
           valid = false;
         }
         
@@ -597,17 +644,22 @@ export default function AjouterProduitScreen({ navigation, route }: any) {
   };
 
   const handleNext = () => {
-    console.log(`Tentative de passer à l'étape suivante. Étape actuelle: ${currentStep}, condition: ${productData.condition}`);
-    
     if (validateStep()) {
-      console.log('Validation réussie, passage à l\'étape suivante');
       if (currentStep < Step.LOCATION) {
         setCurrentStep(currentStep + 1);
       } else {
         submitProduct();
       }
     } else {
-      console.log('Validation échouée, les erreurs sont:', errors);
+      // Afficher une alerte pour informer l'utilisateur des champs manquants
+      const errorMessages = Object.values(errors).filter(msg => msg);
+      if (errorMessages.length > 0) {
+        Alert.alert(
+          'Champs obligatoires',
+          errorMessages.join('\n'),
+          [{ text: 'OK' }]
+        );
+      }
     }
   };
 
@@ -661,20 +713,29 @@ export default function AjouterProduitScreen({ navigation, route }: any) {
         // Vérifier si la sous-catégorie est valide avant de l'ajouter
         if (productData.subcategory_id) {
           // Vérifier que l'ID de sous-catégorie est bien conforme à ceux définis dans le backend
-          // Dans le backend, les sous-catégories sont statiquement définies et ont des IDs allant de 1 à 90
-          
-          // Vérifier que la sous-catégorie appartient bien à la catégorie
-          const subCategoryValid = CATEGORIES_DATA
-            .find(c => c.id === productData.category_id)
-            ?.subcategories
-            ?.some(sc => sc.id === productData.subcategory_id);
+          const category = CATEGORIES_DATA.find(c => c.id === productData.category_id);
+          const subCategoryValid = category?.subcategories?.some(sc => sc.id === productData.subcategory_id);
             
           if (subCategoryValid) {
             console.log(`Sous-catégorie valide: ID=${productData.subcategory_id} pour catégorie=${productData.category_id}`);
             formData.append('subcategoryId', productData.subcategory_id.toString());
           } else {
-            console.log('Sous-catégorie invalide pour cette catégorie. subcategoryId ne sera pas envoyé.');
-            // Ne pas envoyer de subcategoryId invalide
+            console.log('Sous-catégorie invalide pour cette catégorie');
+            Alert.alert(
+              'Sous-catégorie invalide',
+              'La sous-catégorie sélectionnée n\'est pas valide pour cette catégorie. Veuillez en sélectionner une autre.',
+              [
+                {
+                  text: 'OK',
+                  onPress: () => {
+                    setCurrentStep(Step.INFOS_BASE);
+                    setProductData(prev => ({ ...prev, subcategory_id: null }));
+                  }
+                }
+              ]
+            );
+            setIsLoading(false);
+            return;
           }
         } else {
           console.log('Aucune sous-catégorie sélectionnée');
@@ -1042,20 +1103,10 @@ export default function AjouterProduitScreen({ navigation, route }: any) {
 
   // Function to select an item and close the modal
   const handleSelect = (type: string, value: string, label: string) => {
-    console.log(`Sélection de type ${type}, valeur ${value}, label ${label}`);
     switch (type) {
       case 'condition':
-        // Force the value directly as a constant
-        const newCondition = value;
-        console.log(`Mise à jour condition: ${newCondition}`);
-        
-        // Synchronous update (workaround)
-        const updatedProductData = { ...productData, condition: newCondition };
-        console.log("Données produit mises à jour avec condition:", updatedProductData);
-        setProductData(updatedProductData);
-        
-        // Reset errors
-        setErrors({...errors, condition: ''});
+        setProductData(prev => ({ ...prev, condition: value }));
+        setErrors(prev => ({ ...prev, condition: '' }));
         break;
       case 'warranty':
         setProductData(prev => ({ ...prev, warranty: value }));
@@ -1072,13 +1123,6 @@ export default function AjouterProduitScreen({ navigation, route }: any) {
         // Vérifier que la sous-catégorie existe pour la catégorie actuelle
         const subcategoryId = parseInt(value);
         
-        // S'assurer que l'ID est un nombre entre 1 et 90 (comme dans le backend)
-        if (isNaN(subcategoryId) || subcategoryId < 1 || subcategoryId > 90) {
-          console.log(`ID de sous-catégorie invalide: ${value}`);
-          Alert.alert('Erreur', 'ID de sous-catégorie invalide.');
-          break;
-        }
-        
         // Vérifier que la sous-catégorie appartient à la catégorie sélectionnée
         const parentCategory = categories.find(c => c.id === productData.category_id);
         const isValidSubcategory = parentCategory?.subcategories?.some(sc => sc.id === subcategoryId);
@@ -1093,7 +1137,6 @@ export default function AjouterProduitScreen({ navigation, route }: any) {
           }
         } else {
           console.log(`Sous-catégorie invalide: ID=${subcategoryId} pour catégorie=${productData.category_id}`);
-          // Ne pas mettre à jour avec une sous-catégorie invalide
           Alert.alert('Erreur', 'Sous-catégorie invalide pour cette catégorie.');
         }
         break;
@@ -1143,7 +1186,8 @@ export default function AjouterProduitScreen({ navigation, route }: any) {
     <View style={styles.pageContainer}>
       <Text style={styles.stepTitle}>Ajoutez des photos</Text>
       <Text style={styles.stepDescription}>
-        Des photos de qualité augmentent vos chances de vendre rapidement. Ajoutez jusqu'à 5 images.
+        Des photos de qualité augmentent vos chances de vendre rapidement. 
+        Vous devez ajouter au minimum 2 photos et maximum 5 images.
       </Text>
       
       <View style={styles.photosGrid}>
@@ -1160,7 +1204,11 @@ export default function AjouterProduitScreen({ navigation, route }: any) {
         ))}
         
         {productData.images.length < 5 && (
-          <TouchableOpacity style={styles.addPhotoButton} onPress={pickImage}>
+          <TouchableOpacity 
+            style={styles.addPhotoButton} 
+            onPress={pickImage}
+            activeOpacity={0.7}
+          >
             <Ionicons name="camera-outline" size={40} color="#888" />
             <Text style={styles.addPhotoText}>Ajouter</Text>
           </TouchableOpacity>
@@ -1168,6 +1216,11 @@ export default function AjouterProduitScreen({ navigation, route }: any) {
       </View>
       
       {errors.images && <Text style={styles.errorText}>{errors.images}</Text>}
+      {productData.images.length < 2 && (
+        <Text style={styles.warningText}>
+          Vous devez ajouter au moins 2 photos pour publier votre annonce.
+        </Text>
+      )}
     </View>
   );
 
@@ -1242,13 +1295,25 @@ export default function AjouterProduitScreen({ navigation, route }: any) {
       )}
       
       <View style={styles.termsContainer}>
-        <Checkbox
-          status={termsAccepted ? 'checked' : 'unchecked'}
+        <TouchableOpacity 
+          style={styles.termsCheckboxContainer}
           onPress={() => setTermsAccepted(!termsAccepted)}
-        />
-        <Text style={styles.termsText}>
-          J'accepte les conditions générales d'utilisation et les règles de diffusion du site Showroombaby.com et autorise Showroombaby à diffuser mon annonce.
-        </Text>
+        >
+          <View style={[
+            styles.termsCheckbox,
+            termsAccepted && styles.termsCheckboxChecked
+          ]}>
+            {termsAccepted && (
+              <Ionicons name="checkmark" size={20} color="#fff" />
+            )}
+          </View>
+          <Text style={[
+            styles.termsText,
+            !termsAccepted && styles.termsTextRequired
+          ]}>
+            J'accepte les conditions générales d'utilisation et les règles de diffusion du site Showroombaby.com et autorise Showroombaby à diffuser mon annonce.
+          </Text>
+        </TouchableOpacity>
       </View>
       {errors.terms && <Text style={styles.errorText}>{errors.terms}</Text>}
     </View>
@@ -1269,6 +1334,28 @@ export default function AjouterProduitScreen({ navigation, route }: any) {
       default:
         return null;
     }
+  };
+
+  // Fonction pour filtrer les marques
+  const filterBrands = (text: string) => {
+    setBrandInput(text);
+    if (text.length > 0) {
+      const filtered = BRANDS.filter(brand => 
+        brand.name.toLowerCase().includes(text.toLowerCase())
+      );
+      setFilteredBrands(filtered);
+      setShowBrandSuggestions(true);
+    } else {
+      setFilteredBrands([]);
+      setShowBrandSuggestions(false);
+    }
+  };
+
+  // Fonction pour sélectionner une marque
+  const selectBrand = (brand: string) => {
+    setProductData(prev => ({ ...prev, brand }));
+    setBrandInput(brand);
+    setShowBrandSuggestions(false);
   };
 
   // Create new step for base information
@@ -1321,15 +1408,30 @@ export default function AjouterProduitScreen({ navigation, route }: any) {
         )}
         
         <Text style={styles.inputLabel}>Marque</Text>
-        <TouchableOpacity
-          style={styles.selectButton}
-          onPress={() => setModalVisible('brand')}
-        >
-          <Text style={productData.brand ? styles.selectText : styles.selectPlaceholder}>
-            {productData.brand ? productData.brand : 'Sélectionnez une marque (optionnel)'}
-          </Text>
-          <MaterialIcons name="arrow-drop-down" size={24} color="#999" />
-        </TouchableOpacity>
+        <View style={styles.brandInputContainer}>
+          <TextInput
+            style={styles.input}
+            placeholder="Entrez une marque"
+            value={brandInput}
+            onChangeText={filterBrands}
+            onFocus={() => setShowBrandSuggestions(true)}
+          />
+          {showBrandSuggestions && filteredBrands.length > 0 && (
+            <View style={styles.brandSuggestionsContainer}>
+              <ScrollView style={styles.brandSuggestionsList}>
+                {filteredBrands.map((brand) => (
+                  <TouchableOpacity
+                    key={brand.id}
+                    style={styles.brandSuggestionItem}
+                    onPress={() => selectBrand(brand.name)}
+                  >
+                    <Text style={styles.brandSuggestionText}>{brand.name}</Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            </View>
+          )}
+        </View>
       </View>
     );
   };
@@ -1349,7 +1451,18 @@ export default function AjouterProduitScreen({ navigation, route }: any) {
           placeholder="Prix"
           keyboardType="numeric"
           value={productData.price}
-          onChangeText={(text) => setProductData(prev => ({ ...prev, price: text }))}
+          onChangeText={(text) => {
+            // Ne garder que les chiffres et le point décimal
+            const numericValue = text.replace(/[^0-9.]/g, '');
+            // S'assurer qu'il n'y a qu'un seul point décimal
+            const parts = numericValue.split('.');
+            if (parts.length > 2) {
+              const formattedValue = parts[0] + '.' + parts.slice(1).join('');
+              setProductData(prev => ({ ...prev, price: formattedValue }));
+            } else {
+              setProductData(prev => ({ ...prev, price: numericValue }));
+            }
+          }}
         />
         {errors.price && <Text style={styles.errorText}>{errors.price}</Text>}
         
@@ -1398,13 +1511,6 @@ export default function AjouterProduitScreen({ navigation, route }: any) {
 
   // Condition step, warranty, condition
   const renderConditionStep = () => {
-    // Force the value if it's empty but a selection is visible in the UI
-    if (!productData.condition && modalVisible === null) {
-      const selectedConditionId = CONDITIONS.find(c => c.label === "Très bon état")?.id || "LIKE_NEW";
-      console.log("Correction automatique de la condition:", selectedConditionId);
-      setProductData(prev => ({ ...prev, condition: selectedConditionId }));
-    }
-    
     return (
       <View style={styles.pageContainer}>
         <Text style={styles.stepTitle}>État du produit</Text>
@@ -1414,7 +1520,6 @@ export default function AjouterProduitScreen({ navigation, route }: any) {
         
         {renderConditionSelector()}
         
-        {/* Explanatory help message */}
         <Text style={styles.helpText}>
           Sélectionnez l'état de votre produit et appuyez sur "Continuer" pour passer à l'étape suivante.
         </Text>
@@ -1423,45 +1528,104 @@ export default function AjouterProduitScreen({ navigation, route }: any) {
   };
 
   const getButtonLabel = () => {
-    if (currentStep === Step.LOCATION) {
-      return productId ? 'Modifier l\'annonce' : 'Publier mon annonce';
+    switch (currentStep) {
+      case Step.INFOS_BASE:
+        return 'Continuer';
+      case Step.DESCRIPTION_PRIX:
+        return 'Continuer';
+      case Step.CONDITION:
+        return 'Continuer';
+      case Step.PHOTOS:
+        return 'Continuer';
+      case Step.LOCATION:
+        return productId ? 'Modifier l\'annonce' : 'Publier mon annonce';
+      default:
+        return 'Continuer';
     }
-    return 'Continuer';
   };
 
   // New component for confirmation page
-  const renderSuccessPage = () => (
-    <View style={styles.successPageContainer}>
-      <View style={styles.successIconContainer}>
-        <AntDesign name="checkcircle" size={80} color="#4CAF50" />
-      </View>
-      <Text style={styles.successTitle}>Félicitations !</Text>
-      <Text style={styles.successMessage}>Votre annonce a été publiée avec succès.</Text>
-      <Text style={styles.successDescription}>
-        Votre produit est maintenant visible pour tous les utilisateurs de Showroombaby.
-      </Text>
-      
-      <View style={styles.successButtonsContainer}>
-        <TouchableOpacity
-          style={[styles.successButton, styles.viewProductButton]}
-          onPress={() => {
-            navigation.navigate('ProductDetails', { productId: publishedProductId, fullscreenMode: true });
-          }}
+  const renderSuccessPage = () => {
+    const handleViewProduct = () => {
+      if (isNavigating) return;
+      setIsNavigating(true);
+      navigation.reset({
+        index: 0,
+        routes: [
+          { 
+            name: 'ProductDetails', 
+            params: { 
+              productId: publishedProductId,
+              fullscreenMode: true,
+              fromSuccess: true // Ajouter ce paramètre
+            }
+          }
+        ],
+      });
+    };
+
+    const handleGoHome = () => {
+      if (isNavigating) return;
+      setIsNavigating(true);
+      navigation.reset({
+        index: 0,
+        routes: [{ name: 'Home' }],
+      });
+    };
+
+    return (
+      <View style={styles.successPageContainer}>
+        <TouchableOpacity 
+          style={styles.closeSuccessButton}
+          onPress={handleGoHome}
+          activeOpacity={0.7}
         >
-          <Text style={styles.viewProductButtonText}>Voir mon produit</Text>
+          <Ionicons name="close" size={24} color="#333" />
         </TouchableOpacity>
+
+        <View style={styles.successIconContainer}>
+          <AntDesign name="checkcircle" size={80} color="#4CAF50" />
+        </View>
+        <Text style={styles.successTitle}>Félicitations !</Text>
+        <Text style={styles.successMessage}>Votre annonce a été publiée avec succès.</Text>
+        <Text style={styles.successDescription}>
+          Votre produit est maintenant visible pour tous les utilisateurs de Showroombaby.
+        </Text>
         
-        <TouchableOpacity
-          style={[styles.successButton, styles.goHomeButton]}
-          onPress={() => {
-            navigation.navigate('Home');
-          }}
-        >
-          <Text style={styles.goHomeButtonText}>Retour à l'accueil</Text>
-        </TouchableOpacity>
+        <View style={styles.successButtonsContainer}>
+          <TouchableOpacity
+            style={[
+              styles.successButton, 
+              styles.viewProductButton,
+              isNavigating && styles.disabledButton
+            ]}
+            onPress={handleViewProduct}
+            disabled={isNavigating}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.viewProductButtonText}>
+              {isNavigating ? 'Chargement...' : 'Voir mon produit'}
+            </Text>
+          </TouchableOpacity>
+          
+          <TouchableOpacity
+            style={[
+              styles.successButton, 
+              styles.goHomeButton,
+              isNavigating && styles.disabledButton
+            ]}
+            onPress={handleGoHome}
+            disabled={isNavigating}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.goHomeButtonText}>
+              {isNavigating ? 'Chargement...' : 'Retour à l\'accueil'}
+            </Text>
+          </TouchableOpacity>
+        </View>
       </View>
-    </View>
-  );
+    );
+  };
   
   // If success page is visible, display only this page
   if (showSuccessPage) {
@@ -1482,7 +1646,11 @@ export default function AjouterProduitScreen({ navigation, route }: any) {
       <StatusBar style="dark" />
       
       <View style={styles.header}>
-        <TouchableOpacity style={styles.backButton} onPress={handleBackPress}>
+        <TouchableOpacity 
+          style={styles.backButton} 
+          onPress={handleBackPress}
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+        >
           <Ionicons name="arrow-back" size={24} color="#333" />
         </TouchableOpacity>
         
@@ -1495,7 +1663,11 @@ export default function AjouterProduitScreen({ navigation, route }: any) {
           'Localisation et contact'}
         </Text>
         
-        <TouchableOpacity style={styles.closeButton} onPress={handleClosePress}>
+        <TouchableOpacity 
+          style={styles.closeButton} 
+          onPress={handleClosePress}
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+        >
           <Ionicons name="close" size={24} color="#333" />
         </TouchableOpacity>
       </View>
@@ -1532,59 +1704,21 @@ export default function AjouterProduitScreen({ navigation, route }: any) {
         {renderCurrentStep()}
         
         <View style={styles.buttonContainer}>
-          {currentStep > 0 && (
-            <TouchableOpacity 
-              style={[styles.button, styles.secondaryButton]} 
-              onPress={handleBackPress}
-            >
-              <Text style={styles.secondaryButtonText}>Retour</Text>
-            </TouchableOpacity>
-          )}
-          
-          {currentStep === Step.CONDITION ? (
-            <TouchableOpacity 
-              style={[
-                styles.button, 
-                styles.primaryButton,
-                !productData.condition ? styles.disabledButton : null
-              ]} 
-              onPress={() => {
-                console.log("Bouton Continuer pressé à l'étape Condition");
-                // Si l'état est sélectionné, passer à l'étape suivante
-                if (productData.condition) {
-                  console.log("Condition sélectionnée, progression à l'étape suivante:", productData.condition);
-                  setCurrentStep(currentStep + 1);
-                } else {
-                  // Si aucune condition n'est sélectionnée, afficher un message d'erreur
-                  console.log("Aucune condition détectée, affichage d'une erreur");
-                  setErrors({...errors, condition: 'Veuillez sélectionner un état du produit.'});
-                  Alert.alert(
-                    'Sélection requise',
-                    'Veuillez sélectionner l\'état du produit avant de continuer.',
-                    [{ text: 'OK' }]
-                  );
-                }
-              }}
-              disabled={!productData.condition}
-            >
-              <Text style={[
-                styles.buttonText,
-                !productData.condition ? styles.disabledButtonText : null
-              ]}>
-                Continuer
-              </Text>
-            </TouchableOpacity>
-          ) : (
-            <TouchableOpacity 
-              style={[styles.button, styles.primaryButton]} 
-              onPress={currentStep === Step.LOCATION ? submitProduct : handleNext}
-              disabled={isLoading}
-            >
-              <Text style={styles.buttonText}>
-                {getButtonLabel()}
-              </Text>
-            </TouchableOpacity>
-          )}
+          <TouchableOpacity 
+            style={[
+              styles.button, 
+              styles.primaryButton,
+              isLoading && styles.disabledButton
+            ]} 
+            onPress={currentStep === Step.LOCATION ? submitProduct : handleNext}
+            disabled={isLoading}
+            activeOpacity={0.7}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          >
+            <Text style={styles.buttonText}>
+              {getButtonLabel()}
+            </Text>
+          </TouchableOpacity>
         </View>
       </ScrollView>
 
@@ -1777,31 +1911,52 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   termsContainer: {
-    flexDirection: 'row',
-    marginTop: 16,
-    alignItems: 'flex-start',
+    marginTop: 24,
+    marginBottom: 16,
     backgroundColor: '#f8f8f8',
-    padding: 10,
+    padding: 16,
     borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#E75A7C',
+  },
+  termsCheckboxContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  termsCheckbox: {
+    width: 24,
+    height: 24,
+    borderRadius: 4,
+    borderWidth: 2,
+    borderColor: '#E75A7C',
+    marginRight: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#fff',
+  },
+  termsCheckboxChecked: {
+    backgroundColor: '#E75A7C',
   },
   termsText: {
     flex: 1,
-    marginLeft: 8,
     fontSize: 14,
-    color: '#555',
+    color: '#333',
+    lineHeight: 20,
+  },
+  termsTextRequired: {
+    color: '#E75A7C',
   },
   buttonContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
     marginTop: 24,
     marginBottom: 16,
     width: '100%',
+    paddingHorizontal: 16,
   },
   button: {
     borderRadius: 8,
     paddingVertical: 14,
     paddingHorizontal: 20,
-    minWidth: '45%',
+    width: '100%',
     alignItems: 'center',
     justifyContent: 'center',
     elevation: 2,
@@ -1809,26 +1964,15 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.1,
     shadowRadius: 1,
+    transform: [{ scale: 1 }], // Pour l'animation
   },
   primaryButton: {
     backgroundColor: '#E75A7C',
-    flex: 1,
-    marginLeft: 8,
-  },
-  secondaryButton: {
-    backgroundColor: '#f0f0f0',
-    flex: 1,
-    marginRight: 8,
   },
   buttonText: {
     fontSize: 16,
     fontWeight: 'bold',
     color: '#fff',
-  },
-  secondaryButtonText: {
-    color: '#333',
-    fontSize: 16,
-    fontWeight: 'bold',
   },
   loadingContainer: {
     ...StyleSheet.absoluteFillObject,
@@ -1885,15 +2029,15 @@ const styles = StyleSheet.create({
     fontStyle: 'italic',
   },
   warningText: {
-    fontSize: 13,
-    color: '#ff9500',
+    fontSize: 14,
+    color: '#E75A7C',
     marginTop: 8,
-    marginBottom: 10,
-    padding: 8,
-    backgroundColor: '#FFF9EC',
-    borderRadius: 6,
+    textAlign: 'center',
+    backgroundColor: '#FFF0F0',
+    padding: 10,
+    borderRadius: 8,
     borderWidth: 1,
-    borderColor: '#FFE0B2',
+    borderColor: '#E75A7C',
   },
   progressBar: {
     height: 4,
@@ -2007,7 +2151,8 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   disabledButton: {
-    backgroundColor: '#f0f0f0',
+    opacity: 0.5,
+    backgroundColor: '#ccc',
   },
   disabledButtonText: {
     color: '#aaa',
@@ -2027,5 +2172,44 @@ const styles = StyleSheet.create({
     marginTop: 10,
     marginBottom: 20,
     textAlign: 'center',
+  },
+  brandInputContainer: {
+    position: 'relative',
+    zIndex: 1000,
+  },
+  brandSuggestionsContainer: {
+    position: 'absolute',
+    top: '100%',
+    left: 0,
+    right: 0,
+    backgroundColor: 'white',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#ddd',
+    maxHeight: 200,
+    elevation: 3,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+  },
+  brandSuggestionsList: {
+    maxHeight: 200,
+  },
+  brandSuggestionItem: {
+    padding: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+  },
+  brandSuggestionText: {
+    fontSize: 16,
+    color: '#333',
+  },
+  closeSuccessButton: {
+    position: 'absolute',
+    top: Platform.OS === 'ios' ? 50 : 20,
+    right: 20,
+    padding: 10,
+    zIndex: 1000,
   },
 }); 

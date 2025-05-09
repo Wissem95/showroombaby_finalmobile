@@ -29,7 +29,7 @@
       "eas": {
         "projectId": "7c0ffdf3-8dc5-42dd-9aa1-214f28ca28f7"
       },
-      "apiUrl": "http://172.20.10.3:8000"
+      "apiUrl": "http://192.168.1.68:8000"
     }
   }
 }

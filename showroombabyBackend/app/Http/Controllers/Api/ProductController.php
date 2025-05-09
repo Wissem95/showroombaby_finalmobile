@@ -11,9 +11,17 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Auth;
+use App\Http\Controllers\Api\CategoryController;
 
 class ProductController extends Controller
 {
+    protected $categoryController;
+
+    public function __construct(CategoryController $categoryController)
+    {
+        $this->categoryController = $categoryController;
+    }
+
     /**
      * Affiche une liste paginée des produits avec filtres
      *
@@ -144,7 +152,40 @@ class ProductController extends Controller
             'price' => 'required|numeric|min:0',
             'condition' => 'required|string|in:NEW,LIKE_NEW,GOOD,FAIR',
             'categoryId' => 'required|exists:categories,id',
-            'subcategoryId' => 'required|exists:categories,id',
+            'subcategoryId' => [
+                'required',
+                function ($attribute, $value, $fail) use ($request) {
+                    $categoryId = $request->input('categoryId');
+                    $subcategories = $this->getStaticSubcategories();
+
+                    // Vérification de la catégorie parente
+                    $parentCategory = null;
+                    foreach ($subcategories as $category) {
+                        if ($category['id'] == $categoryId) {
+                            $parentCategory = $category;
+                            break;
+                        }
+                    }
+
+                    if (!$parentCategory) {
+                        $fail('Catégorie parente non trouvée.');
+                        return;
+                    }
+
+                    // Vérification de la sous-catégorie
+                    $validSubcategory = false;
+                    foreach ($parentCategory['subcategories'] as $subcat) {
+                        if ($subcat['id'] == $value) {
+                            $validSubcategory = true;
+                            break;
+                        }
+                    }
+
+                    if (!$validSubcategory) {
+                        $fail('La sous-catégorie sélectionnée n\'appartient pas à la catégorie choisie.');
+                    }
+                }
+            ],
             'images.*' => 'image|mimes:jpeg,png,jpg,gif|max:2048',
             'latitude' => 'required|numeric',
             'longitude' => 'required|numeric',
@@ -152,6 +193,7 @@ class ProductController extends Controller
             'city' => 'required|string',
             'zipcode' => 'required|string',
             'phone' => 'required|string',
+            'hide_phone' => 'required|boolean',
             'brand' => 'nullable|string|max:255',
         ]);
 
@@ -171,6 +213,7 @@ class ProductController extends Controller
         $product->city = $request->city;
         $product->zipCode = $request->input('zipcode', $request->input('zipCode'));
         $product->phone = $request->phone;
+        $product->hide_phone = $request->hide_phone;
         $product->brand = $request->brand;
         $product->view_count = 0;
         $product->save();
@@ -297,130 +340,7 @@ class ProductController extends Controller
      */
     private function getStaticSubcategories()
     {
-        $allSubcategories = [];
-
-        // Liste statique des sous-catégories (identique à celle dans CategoryController)
-        $subcategoriesByCategory = [
-            1 => [ // Poussette
-                ['id' => 1, 'name' => 'Poussette canne'],
-                ['id' => 2, 'name' => 'Poussette 3 roues'],
-                ['id' => 3, 'name' => 'Poussette 4 roues'],
-                ['id' => 4, 'name' => 'Poussette combiné duo'],
-                ['id' => 5, 'name' => 'Poussette combiné trio'],
-                ['id' => 6, 'name' => 'Poussette double'],
-                ['id' => 7, 'name' => 'Poussette tout terrain'],
-            ],
-            2 => [ // Sièges auto
-                ['id' => 8, 'name' => 'Groupe 0/0+'],
-                ['id' => 9, 'name' => 'Groupe 0+/1'],
-                ['id' => 10, 'name' => 'Groupe 1'],
-                ['id' => 11, 'name' => 'Groupe 2/3'],
-                ['id' => 12, 'name' => 'Groupe 1/2/3'],
-                ['id' => 13, 'name' => 'Siège auto pivotant'],
-            ],
-            3 => [ // Chambre
-                ['id' => 14, 'name' => 'Applique et suspension'],
-                ['id' => 15, 'name' => 'Armoire'],
-                ['id' => 16, 'name' => 'Berceau bébé'],
-                ['id' => 17, 'name' => 'Bibliothèque'],
-                ['id' => 18, 'name' => 'Bureau'],
-                ['id' => 19, 'name' => 'Coffre à jouet'],
-                ['id' => 20, 'name' => 'Commode'],
-                ['id' => 21, 'name' => 'Deco/ lampe'],
-                ['id' => 22, 'name' => 'Lit bébé'],
-                ['id' => 23, 'name' => 'Lit enfant'],
-                ['id' => 24, 'name' => 'Lit mezzanine'],
-                ['id' => 25, 'name' => 'Matelas'],
-                ['id' => 26, 'name' => 'Parc à bébé'],
-                ['id' => 27, 'name' => 'Table à langer'],
-                ['id' => 28, 'name' => 'Table de nuit'],
-                ['id' => 29, 'name' => 'Tiroir de lit'],
-                ['id' => 30, 'name' => 'Tour de lit'],
-            ],
-            4 => [ // Chaussure / Vêtements
-                ['id' => 31, 'name' => 'Gigoteuse'],
-                ['id' => 32, 'name' => 'Pyjama'],
-                ['id' => 33, 'name' => 'T-shirt'],
-                ['id' => 34, 'name' => 'Body'],
-                ['id' => 35, 'name' => 'Salopette / Combinaison'],
-                ['id' => 36, 'name' => 'Pantalon / Jean'],
-                ['id' => 37, 'name' => 'Pull / Gilet / Sweat'],
-                ['id' => 38, 'name' => 'Robe / Jupe'],
-                ['id' => 39, 'name' => 'Short'],
-                ['id' => 40, 'name' => 'Chemise / Blouse'],
-                ['id' => 41, 'name' => 'Legging'],
-                ['id' => 42, 'name' => 'Maillot de bain'],
-                ['id' => 43, 'name' => 'Manteau / Blouson'],
-                ['id' => 44, 'name' => 'Chaussure'],
-                ['id' => 45, 'name' => 'Basket'],
-                ['id' => 46, 'name' => 'Chausson'],
-                ['id' => 47, 'name' => 'Chaussette'],
-                ['id' => 48, 'name' => 'Culotte'],
-            ],
-            5 => [ // Jeux / Éveil
-                ['id' => 49, 'name' => 'Transat'],
-                ['id' => 50, 'name' => 'Balancelle / Bascule'],
-                ['id' => 51, 'name' => 'Ballon'],
-                ['id' => 52, 'name' => 'Trotteur / Porteur/ Chariot'],
-                ['id' => 53, 'name' => 'Vélo'],
-                ['id' => 54, 'name' => 'Doudou / Peluche'],
-                ['id' => 55, 'name' => 'Tapis d\'éveil'],
-                ['id' => 56, 'name' => 'Jouet de bain'],
-                ['id' => 57, 'name' => 'Jouet en bois'],
-                ['id' => 58, 'name' => 'Poupon / Poupée'],
-                ['id' => 59, 'name' => 'Jeu de construction'],
-                ['id' => 60, 'name' => 'Figurine'],
-                ['id' => 61, 'name' => 'Puzzle'],
-            ],
-            6 => [ // Livre / Dvd
-                ['id' => 62, 'name' => 'Livre sonore'],
-                ['id' => 63, 'name' => 'Éveil et premier âge'],
-                ['id' => 64, 'name' => 'Livre 0 mois à 2 ans'],
-                ['id' => 65, 'name' => 'Livre 2 ans à 4 ans'],
-                ['id' => 66, 'name' => 'Livre de bain'],
-            ],
-            7 => [ // Toilette
-                ['id' => 67, 'name' => 'Baignoire'],
-                ['id' => 68, 'name' => 'Couche réutilisable'],
-                ['id' => 69, 'name' => 'Housse matelas à langer'],
-                ['id' => 70, 'name' => 'Matelas à langer'],
-                ['id' => 71, 'name' => 'Mouche bébé'],
-                ['id' => 72, 'name' => 'Peigne / Brosse'],
-                ['id' => 73, 'name' => 'Table à langer'],
-                ['id' => 74, 'name' => 'Thermomètre de bain'],
-                ['id' => 75, 'name' => 'Trousse de toilette'],
-            ],
-            8 => [ // Repas
-                ['id' => 76, 'name' => 'Allaitement'],
-                ['id' => 77, 'name' => 'Boîte'],
-                ['id' => 78, 'name' => 'Boîte doseurs'],
-                ['id' => 79, 'name' => 'Chaise haute bebe'],
-                ['id' => 80, 'name' => 'Chauffe biberon'],
-                ['id' => 81, 'name' => 'Chauffe repas'],
-                ['id' => 82, 'name' => 'Coussin pour chaise haute'],
-                ['id' => 83, 'name' => 'Vaisselle'],
-                ['id' => 84, 'name' => 'Soutien gorge allaitement'],
-            ],
-            9 => [ // Sortie
-                ['id' => 85, 'name' => 'Chancelière'],
-                ['id' => 86, 'name' => 'Lit pliant'],
-                ['id' => 87, 'name' => 'Sac a langer'],
-                ['id' => 88, 'name' => 'Porte bébé'],
-            ],
-            10 => [ // Service
-                ['id' => 89, 'name' => 'Garde d\'enfant'],
-                ['id' => 90, 'name' => 'Aide au devoir'],
-            ]
-        ];
-
-        // Aplatir toutes les sous-catégories en une seule liste
-        foreach ($subcategoriesByCategory as $categorySubcats) {
-            foreach ($categorySubcats as $subcat) {
-                $allSubcategories[] = $subcat;
-            }
-        }
-
-        return $allSubcategories;
+        return $this->categoryController->getCategoriesWithSubcategories();
     }
 
     /**

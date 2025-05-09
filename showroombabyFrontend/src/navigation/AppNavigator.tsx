@@ -21,11 +21,12 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import Icons3DModel from '../components/Icons3DModel';
 import { EventRegister } from 'react-native-event-listeners';
+import AdvancedFiltersScreen from '../screens/AdvancedFiltersScreen';
 
 // URL de l'API
 // Pour les appareils externes, utiliser votre adresse IP locale au lieu de 127.0.0.1
 const API_URL = process.env.NODE_ENV === 'development' || __DEV__ 
-  ? 'http://172.20.10.3:8000/api'  // Adresse IP locale de l'utilisateur
+  ? 'http://192.168.1.68:8000/api'  // Adresse IP locale de l'utilisateur
   : 'https://api.showroombaby.com';
 
 // Définir les types pour les navigateurs
@@ -467,6 +468,8 @@ export default function AppNavigator() {
             animation: 'default'
           }}
         />
+        
+        <Stack.Screen name="AdvancedFilters" component={AdvancedFiltersScreen} />
       </Stack.Navigator>
     </NavigationContainer>
   );

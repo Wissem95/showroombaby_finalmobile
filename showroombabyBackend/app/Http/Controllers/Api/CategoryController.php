@@ -9,14 +9,13 @@ use Illuminate\Http\Request;
 class CategoryController extends Controller
 {
     /**
-     * Affiche la liste de toutes les catégories
+     * Retourne la liste complète des catégories avec leurs sous-catégories
      *
-     * @return \Illuminate\Http\JsonResponse
+     * @return array
      */
-    public function index()
+    public function getCategoriesWithSubcategories(): array
     {
-        // Définir manuellement les sous-catégories pour chaque catégorie
-        $categoriesWithSubcategories = [
+        return [
             [
                 'id' => 1,
                 'name' => 'Poussette',
@@ -168,8 +167,16 @@ class CategoryController extends Controller
                 ]
             ]
         ];
+    }
 
-        // Récupérer également les catégories depuis la base de données pour obtenir les descriptions etc.
+    /**
+     * Affiche la liste de toutes les catégories
+     *
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function index()
+    {
+        $categoriesWithSubcategories = $this->getCategoriesWithSubcategories();
         $dbCategories = Category::all();
 
         // Fusionner les données de la base avec les sous-catégories définies statiquement
@@ -177,7 +184,6 @@ class CategoryController extends Controller
             $dbCategory = $dbCategories->firstWhere('id', $category['id']);
             if ($dbCategory) {
                 $categoriesWithSubcategories[$key]['description'] = $dbCategory->description;
-                // Ajouter d'autres champs de la base de données si nécessaire
             }
         }
 

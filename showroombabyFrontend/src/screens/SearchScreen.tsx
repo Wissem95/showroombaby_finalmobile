@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { StyleSheet, View, ScrollView, FlatList, TouchableOpacity, Image, Dimensions, Alert, SafeAreaView, Modal, TextInput } from 'react-native';
+import React, { useState, useEffect, useRef } from 'react';
+import { StyleSheet, View, ScrollView, FlatList, TouchableOpacity, Image, Dimensions, Alert, SafeAreaView, Modal, TextInput, KeyboardAvoidingView, Platform, ActivityIndicator } from 'react-native';
 import { Text, Searchbar, Button, Chip, Card, Checkbox, Divider, ProgressBar, RadioButton } from 'react-native-paper';
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
 import axios from 'axios';
@@ -10,6 +10,7 @@ import Slider from '@react-native-community/slider';
 import { Animated } from 'react-native';
 import imageService from '../services/api/imageService';
 import { SERVER_IP } from '../config/ip';
+import FilterService, { Filters } from '../services/FilterService';
 
 // URL de l'API
 // Pour les appareils externes, utiliser votre adresse IP locale au lieu de 127.0.0.1
@@ -61,6 +62,12 @@ interface Category {
   id: number;
   name: string;
   subcategories?: { id: number; name: string }[];
+}
+
+// Interface pour les options de modale
+interface ModalOption {
+  id: number | string;
+  label: string;
 }
 
 // Définition des catégories principales et leurs sous-catégories
@@ -250,32 +257,59 @@ const CONDITIONS = [
   { id: 'FAIR', label: 'État satisfaisant' },
 ];
 
-export default function SearchScreen({ navigation }: any) {
+export default function SearchScreen({ navigation, route }: any) {
   const [searchQuery, setSearchQuery] = useState('');
   const [products, setProducts] = useState<Product[]>([]);
   const [filteredProducts, setFilteredProducts] = useState<Product[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [showAdvancedSearch, setShowAdvancedSearch] = useState(false);
   const [categories, setCategories] = useState<Category[]>(CATEGORIES_DATA);
   
-  // Filtres avancés
-  const [selectedCategory, setSelectedCategory] = useState<number | null>(null);
-  const [selectedSubcategory, setSelectedSubcategory] = useState<number | null>(null);
-  const [selectedSize, setSelectedSize] = useState<string | null>(null);
-  const [priceRange, setPriceRange] = useState<[number, number]>([0, 1000]);
-  const [minPrice, setMinPrice] = useState<string>('0');
-  const [maxPrice, setMaxPrice] = useState<string>('1000');
-  const [selectedCondition, setSelectedCondition] = useState<string | null>(null);
-  const [sellerType, setSellerType] = useState<string | null>(null); // 'professional', 'individual', null (les deux)
-  
-  // Animation pour le filtre avancé
-  const [expandAnimation] = useState(new Animated.Value(0));
-  
-  // Modal
-  const [modalVisible, setModalVisible] = useState<string | null>(null);
-  const [modalTitle, setModalTitle] = useState('');
-  const [modalOptions, setModalOptions] = useState<any[]>([]);
+  // Référence pour le listener des changements de filtres
+  const filterListenerId = useRef<string | null>(null);
+
+  // S'abonner aux changements de filtres
+  useEffect(() => {
+    console.log("SearchScreen: S'abonne aux changements de filtres");
+    filterListenerId.current = FilterService.subscribe((filters) => {
+      console.log("SearchScreen: Filtres mis à jour:", filters);
+      applyFilters(filters);
+    });
+
+    // Nettoyage: se désabonner lors du démontage du composant
+    return () => {
+      if (filterListenerId.current) {
+        console.log("SearchScreen: Se désabonne des changements de filtres");
+        FilterService.unsubscribe(filterListenerId.current);
+      }
+    };
+  }, [products]); // Dépend de products pour pouvoir appliquer les filtres
+
+  // Chargement initial des données
+  useEffect(() => {
+    // Nettoyer le cache des images lors du chargement de l'écran
+    imageService.clearImageCache();
+    setIsLoading(true);
+    
+    // Charger d'abord les catégories puis les produits
+    fetchCategories().then(() => {
+      fetchProducts();
+    });
+  }, []);
+
+  // Fonction pour vérifier les filtres stockés dans AsyncStorage
+  const checkStoredFilters = async () => {
+    try {
+      const storedFilters = await AsyncStorage.getItem('activeFilters');
+      if (storedFilters) {
+        const filters = JSON.parse(storedFilters);
+        console.log("Filtres récupérés depuis AsyncStorage:", filters);
+        FilterService.setFilters(filters);
+      }
+    } catch (error) {
+      console.error("Erreur lors de la récupération des filtres:", error);
+    }
+  };
 
   // Fonction de débogage pour vérifier les incohérences entre produits et catégories
   const logCategoryIssues = (prods: Product[], cats: Category[]) => {
@@ -349,13 +383,6 @@ export default function SearchScreen({ navigation }: any) {
       return correctedProduct;
     });
   };
-
-  useEffect(() => {
-    // Nettoyer le cache des images lors du chargement de l'écran
-    imageService.clearImageCache();
-    fetchProducts();
-    fetchCategories();
-  }, []);
 
   const fetchCategories = async () => {
     try {
@@ -438,8 +465,18 @@ export default function SearchScreen({ navigation }: any) {
       let productsData = Array.isArray(response.data) 
         ? response.data 
         : response.data.data || response.data.items || [];
+      
+      console.log(`SearchScreen: Récupération de ${productsData.length} produits`);
       setProducts(productsData);
-      setFilteredProducts(productsData);
+      
+      // Appliquer les filtres actuels aux produits
+      const currentFilters = FilterService.getFilters();
+      if (currentFilters.category || currentFilters.condition || currentFilters.sellerType) {
+        console.log("SearchScreen: Application des filtres actuels aux nouveaux produits");
+        applyFilters(currentFilters);
+      } else {
+        setFilteredProducts(productsData);
+      }
       
       // Vérifier la cohérence avec les catégories si elles sont déjà chargées
       if (categories.length > 0) {
@@ -456,56 +493,61 @@ export default function SearchScreen({ navigation }: any) {
   const handleSearch = (query: string) => {
     setSearchQuery(query);
     if (!query.trim()) {
-      setFilteredProducts(products);
+      // Si aucune recherche, applique uniquement les filtres
+      const currentFilters = FilterService.getFilters();
+      applyFilters(currentFilters);
       return;
     }
     
     // Recherche basique par titre et description
-    const filtered = products.filter(product => 
+    let filtered = products.filter(product => 
       product.title.toLowerCase().includes(query.toLowerCase()) || 
       (product.description && product.description.toLowerCase().includes(query.toLowerCase()))
     );
+    
+    // Appliquer les filtres actuels également
+    const currentFilters = FilterService.getFilters();
+    if (currentFilters.category || currentFilters.condition || currentFilters.sellerType) {
+      filtered = applyFiltersToProducts(filtered, currentFilters);
+    }
+    
     setFilteredProducts(filtered);
   };
 
-  const applyAdvancedFilters = () => {
-    // Mettre à jour priceRange avec les valeurs des champs de texte
-    const min = Math.max(0, parseInt(minPrice) || 0);
-    const max = Math.max(min, parseInt(maxPrice) || 1000);
-    setPriceRange([min, max]);
-    
-    // Commencer avec tous les produits ou le résultat de la recherche par texte
-    let filtered = searchQuery.trim() 
-      ? products.filter(product => 
-          product.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
-          (product.description && product.description.toLowerCase().includes(searchQuery.toLowerCase()))
-        )
-      : [...products];
+  // Nouvelle fonction pour appliquer les filtres aux produits
+  const applyFiltersToProducts = (productsToFilter: Product[], filters: Filters) => {
+    console.log("SearchScreen: Application des filtres aux produits:", filters);
+    let filtered = [...productsToFilter];
     
     // Filtrer par catégorie
-    if (selectedCategory) {
-      filtered = filtered.filter(product => product.category_id === selectedCategory);
+    if (filters.category !== null) {
+      console.log("SearchScreen: Filtrage par catégorie:", filters.category);
+      filtered = filtered.filter(product => {
+        return product.category_id === filters.category;
+      });
     }
     
     // Filtrer par sous-catégorie
-    if (selectedSubcategory) {
-      filtered = filtered.filter(product => product.subcategory_id === selectedSubcategory);
-    }
-    
-    // Filtrer par taille
-    if (selectedSize) {
-      filtered = filtered.filter(product => product.size === selectedSize);
+    if (filters.subcategory !== null) {
+      console.log("SearchScreen: Filtrage par sous-catégorie:", filters.subcategory);
+      filtered = filtered.filter(product => {
+        return product.subcategory_id === filters.subcategory;
+      });
     }
     
     // Filtrer par condition
-    if (selectedCondition) {
-      filtered = filtered.filter(product => product.condition === selectedCondition);
+    if (filters.condition !== null) {
+      console.log("SearchScreen: Filtrage par condition:", filters.condition);
+      filtered = filtered.filter(product => {
+        return product.condition === filters.condition;
+      });
     }
     
     // Filtrer par type de vendeur
-    if (sellerType) {
+    if (filters.sellerType !== null) {
+      console.log("SearchScreen: Filtrage par type de vendeur:", filters.sellerType);
       filtered = filtered.filter(product => {
-        if (sellerType === 'professional') {
+        if (filters.sellerType === 'professional') {
           return product.user_type === 'professional' || product.user?.is_professional === true;
         } else {
           return product.user_type !== 'professional' && product.user?.is_professional !== true;
@@ -514,167 +556,65 @@ export default function SearchScreen({ navigation }: any) {
     }
     
     // Filtrer par plage de prix
-    filtered = filtered.filter(product => 
-      product.price >= priceRange[0] && product.price <= priceRange[1]
-    );
+    if (typeof filters.minPrice === 'number' && typeof filters.maxPrice === 'number') {
+      console.log("SearchScreen: Filtrage par prix:", filters.minPrice, "à", filters.maxPrice);
+      filtered = filtered.filter(product => 
+        product.price >= filters.minPrice && product.price <= filters.maxPrice
+      );
+    }
     
-    setFilteredProducts(filtered);
-    setShowAdvancedSearch(false);
-    
-    // Animation de fermeture
-    Animated.timing(expandAnimation, {
-      toValue: 0,
-      duration: 300,
-      useNativeDriver: false
-    }).start();
-    
-    // Afficher des statistiques pour aider au débogage
-    console.log(`Filtres appliqués - Résultats: ${filtered.length}/${products.length} produits`);
+    console.log("SearchScreen: Résultat du filtrage:", filtered.length, "produits sur", productsToFilter.length);
+    return filtered;
   };
 
-  const resetFilters = () => {
-    setSelectedCategory(null);
-    setSelectedSubcategory(null);
-    setSelectedSize(null);
-    setSelectedCondition(null);
-    setPriceRange([0, 1000]);
-    setMinPrice('0');
-    setMaxPrice('1000');
-    setSellerType(null);
+  // Appliquer les filtres aux produits
+  const applyFilters = (filters: Filters) => {
+    console.log("SearchScreen: Appliquer les filtres:", filters);
     
-    // Appliquer juste la recherche par texte
+    // Appliquer les filtres aux produits filtrés par la recherche
+    let baseProducts = products;
     if (searchQuery.trim()) {
-      handleSearch(searchQuery);
-    } else {
-      setFilteredProducts(products);
+      baseProducts = products.filter(product => 
+        product.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
+        (product.description && product.description.toLowerCase().includes(searchQuery.toLowerCase()))
+      );
     }
     
-    setShowAdvancedSearch(false);
-    
-    // Animation de fermeture
-    Animated.timing(expandAnimation, {
-      toValue: 0,
-      duration: 300,
-      useNativeDriver: false
-    }).start();
+    const result = applyFiltersToProducts(baseProducts, filters);
+    console.log("SearchScreen: Résultat final:", result.length, "produits");
+    setFilteredProducts(result);
   };
 
-  const showSelectionModal = (type: string) => {
-    let options: any[] = [];
-    let title = '';
-
-    switch (type) {
-      case 'category':
-        options = categories.map(c => ({ id: c.id, label: c.name }));
-        title = 'Sélectionner une catégorie';
-        break;
-      case 'subcategory':
-        const selectedCat = categories.find(c => c.id === selectedCategory);
-        options = selectedCat && selectedCat.subcategories 
-          ? selectedCat.subcategories.map(sc => ({ id: sc.id, label: sc.name }))
-          : [];
-        title = 'Sélectionner une sous-catégorie';
-        break;
-      case 'size':
-        // Tailles basées sur la catégorie ou sous-catégorie sélectionnée
-        if (selectedSubcategory && SIZES_BY_CATEGORY[selectedSubcategory]) {
-          // Si une sous-catégorie est sélectionnée et qu'elle a des tailles définies
-          options = SIZES_BY_CATEGORY[selectedSubcategory].map(size => ({ id: size, label: size }));
-        } else if (selectedCategory === 4) {
-          // Catégorie vêtements générale
-          options = SIZES_BY_CATEGORY[4].map(size => ({ id: size, label: size }));
-        } else if (selectedCategory) {
-          // Vérifier si la catégorie a des tailles définies
-          const catId = selectedCategory;
-          if (SIZES_BY_CATEGORY[catId]) {
-            options = SIZES_BY_CATEGORY[catId].map(size => ({ id: size, label: size }));
-          }
-        }
-        title = 'Sélectionner une taille';
-        break;
-      case 'condition':
-        options = CONDITIONS;
-        title = 'Sélectionner un état';
-        break;
-    }
-
-    setModalOptions(options);
-    setModalTitle(title);
-    setModalVisible(type);
+  // Ouvrir l'écran des filtres avancés
+  const openAdvancedFilters = () => {
+    navigation.navigate('AdvancedFilters', {
+      categories: categories
+    });
   };
 
-  const selectModalOption = (option: any) => {
-    switch (modalVisible) {
-      case 'category':
-        setSelectedCategory(option.id);
-        setSelectedSubcategory(null); // Réinitialiser la sous-catégorie quand la catégorie change
-        setSelectedSize(null); // Réinitialiser la taille
-        break;
-      case 'subcategory':
-        setSelectedSubcategory(option.id);
-        break;
-      case 'size':
-        setSelectedSize(option.id);
-        break;
-      case 'condition':
-        setSelectedCondition(option.id);
-        break;
-    }
-    setModalVisible(null);
+  // Réinitialiser les filtres
+  const resetFilters = () => {
+    console.log("SearchScreen: Réinitialisation des filtres");
+    FilterService.resetFilters();
+    // La mise à jour des produits filtrés sera gérée par l'abonnement
   };
 
-  const renderModalContent = () => {
-    return (
-      <Modal
-        visible={!!modalVisible}
-        transparent={true}
-        animationType="slide"
-        onRequestClose={() => setModalVisible(null)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>{modalTitle}</Text>
-              <TouchableOpacity onPress={() => setModalVisible(null)}>
-                <Ionicons name="close" size={24} color="#333" />
-              </TouchableOpacity>
-            </View>
-            <Divider style={{ marginVertical: 10 }} />
-            
-            <ScrollView style={styles.modalBody}>
-              {modalOptions.map((option) => (
-                <TouchableOpacity
-                  key={option.id}
-                  style={styles.modalOption}
-                  onPress={() => selectModalOption(option)}
-                >
-                  <Text style={styles.modalOptionText}>{option.label}</Text>
-                </TouchableOpacity>
-              ))}
-              {modalOptions.length === 0 && (
-                <Text style={styles.noOptionsText}>Aucune option disponible</Text>
-              )}
-            </ScrollView>
-          </View>
-        </View>
-      </Modal>
-    );
+  // Afficher les filtres actifs
+  const hasActiveFilters = () => {
+    const filters = FilterService.getFilters();
+    return filters.category !== null || 
+           filters.subcategory !== null || 
+           filters.condition !== null || 
+           filters.sellerType !== null || 
+           filters.minPrice > 0 || 
+           filters.maxPrice < 1000;
   };
-
-  // Mise à jour pour l'animation lors de l'ouverture/fermeture des filtres avancés
-  useEffect(() => {
-    Animated.timing(expandAnimation, {
-      toValue: showAdvancedSearch ? 1 : 0,
-      duration: 300,
-      useNativeDriver: false
-    }).start();
-  }, [showAdvancedSearch]);
 
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
         <View style={styles.searchContainer}>
-          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton} activeOpacity={0.7}>
             <Ionicons name="arrow-back" size={24} color="#ff6b9b" />
           </TouchableOpacity>
           <Searchbar
@@ -685,7 +625,7 @@ export default function SearchScreen({ navigation }: any) {
             inputStyle={styles.searchInput}
             icon={() => <Ionicons name="search" size={22} color="#ff6b9b" style={styles.searchIcon} />}
             right={() => searchQuery.length > 0 ? 
-              <TouchableOpacity onPress={() => handleSearch('')}>
+              <TouchableOpacity onPress={() => handleSearch('')} activeOpacity={0.7}>
                 <Ionicons name="close-circle" size={22} color="#ff6b9b" style={styles.clearIcon} />
               </TouchableOpacity> : null
             }
@@ -693,220 +633,58 @@ export default function SearchScreen({ navigation }: any) {
         </View>
         
         <TouchableOpacity 
-          style={styles.advancedSearchButton}
-          onPress={() => setShowAdvancedSearch(!showAdvancedSearch)}
+          style={[
+            styles.advancedSearchButton,
+            hasActiveFilters() ? styles.activeFilterButton : null
+          ]}
+          onPress={openAdvancedFilters}
+          activeOpacity={0.7}
         >
-          <Text style={styles.advancedSearchText}>
-            {showAdvancedSearch ? 'Masquer les filtres' : 'Recherche avancée'}
+          <Text style={[
+            styles.advancedSearchText,
+            hasActiveFilters() ? styles.activeFilterText : null
+          ]}>
+            {hasActiveFilters() ? 'Filtres actifs' : 'Filtres avancés'}
           </Text>
-          <MaterialIcons 
-            name={showAdvancedSearch ? "keyboard-arrow-up" : "keyboard-arrow-down"} 
-            size={24} 
-            color="#6B3CE9" 
-          />
+          <MaterialIcons name="filter-list" size={24} color={hasActiveFilters() ? "#fff" : "#6B3CE9"} />
         </TouchableOpacity>
       </View>
       
-      {showAdvancedSearch && (
-        <Animated.ScrollView 
-          style={[
-            styles.filtersContainer,
-            {
-              maxHeight: expandAnimation.interpolate({
-                inputRange: [0, 1],
-                outputRange: [0, 500]
-              })
-            }
-          ]}
-        >
-          <View style={styles.filterSection}>
-            <Text style={styles.filterTitle}>Catégorie</Text>
-            <TouchableOpacity 
-              style={styles.selectorButton}
-              onPress={() => showSelectionModal('category')}
-            >
-              <Text style={selectedCategory ? styles.selectorText : styles.selectorPlaceholder}>
-                {selectedCategory 
-                  ? categories.find(c => c.id === selectedCategory)?.name || 'Sélectionner' 
-                  : 'Sélectionner'}
-              </Text>
-              <MaterialIcons name="arrow-drop-down" size={24} color="#999" />
-            </TouchableOpacity>
-          </View>
-          
-          {selectedCategory && (
-            <View style={styles.filterSection}>
-              <Text style={styles.filterTitle}>Sous-catégorie</Text>
-              <TouchableOpacity 
-                style={styles.selectorButton}
-                onPress={() => showSelectionModal('subcategory')}
-              >
-                <Text style={selectedSubcategory ? styles.selectorText : styles.selectorPlaceholder}>
-                  {selectedSubcategory 
-                    ? categories.find(c => c.id === selectedCategory)?.subcategories?.find(sc => sc.id === selectedSubcategory)?.name || 'Sélectionner'
-                    : 'Sélectionner'}
-                </Text>
-                <MaterialIcons name="arrow-drop-down" size={24} color="#999" />
-              </TouchableOpacity>
+      {isLoading ? (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#6B3CE9" />
+          <Text style={styles.loadingText}>Chargement des produits...</Text>
+        </View>
+      ) : (
+        <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollViewContent}>
+          {/* Afficher un message quand aucun produit ne correspond aux filtres */}
+          {filteredProducts.length === 0 && !isLoading ? (
+            <View style={styles.noResultsContainer}>
+              <Ionicons name="search-outline" size={48} color="#ccc" />
+              <Text style={styles.noResultsText}>Aucun produit ne correspond à vos critères</Text>
+              {hasActiveFilters() && (
+                <TouchableOpacity 
+                  style={styles.resetFiltersButton}
+                  onPress={resetFilters}
+                  activeOpacity={0.7}
+                >
+                  <Text style={styles.resetFiltersText}>Supprimer les filtres</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          ) : (
+            <View style={styles.productGrid}>
+              {filteredProducts.map((product) => (
+                <View key={product.id} style={styles.productCard}>
+                  <View style={styles.productCardInner}>
+                    <ProductItem item={product} navigation={navigation} />
+                  </View>
+                </View>
+              ))}
             </View>
           )}
-          
-          {/* Afficher le sélecteur de taille pour les vêtements et chaussures */}
-          {(selectedCategory === 4 ||
-            (selectedSubcategory !== null && 
-              ((selectedSubcategory >= 31 && selectedSubcategory <= 48) || 
-               (SIZES_BY_CATEGORY[selectedSubcategory] !== undefined)))) && (
-            <View style={styles.filterSection}>
-              <Text style={styles.filterTitle}>Taille</Text>
-              <TouchableOpacity 
-                style={styles.selectorButton}
-                onPress={() => showSelectionModal('size')}
-              >
-                <Text style={selectedSize ? styles.selectorText : styles.selectorPlaceholder}>
-                  {selectedSize || 'Sélectionner'}
-                </Text>
-                <MaterialIcons name="arrow-drop-down" size={24} color="#999" />
-              </TouchableOpacity>
-            </View>
-          )}
-          
-          <View style={styles.filterSection}>
-            <Text style={styles.filterTitle}>État</Text>
-            <TouchableOpacity 
-              style={styles.selectorButton}
-              onPress={() => showSelectionModal('condition')}
-            >
-              <Text style={selectedCondition ? styles.selectorText : styles.selectorPlaceholder}>
-                {selectedCondition 
-                  ? CONDITIONS.find(c => c.id === selectedCondition)?.label || 'Sélectionner'
-                  : 'Sélectionner'}
-              </Text>
-              <MaterialIcons name="arrow-drop-down" size={24} color="#999" />
-            </TouchableOpacity>
-          </View>
-          
-          <View style={styles.filterSection}>
-            <Text style={styles.filterTitle}>Type de vendeur</Text>
-            <View style={styles.radioContainer}>
-              <TouchableOpacity
-                style={styles.radioButton}
-                onPress={() => setSellerType(null)}
-              >
-                <RadioButton
-                  value="all"
-                  status={sellerType === null ? 'checked' : 'unchecked'}
-                  onPress={() => setSellerType(null)}
-                  color="#6B3CE9"
-                />
-                <Text style={styles.radioLabel}>Tous</Text>
-              </TouchableOpacity>
-              
-              <TouchableOpacity
-                style={styles.radioButton}
-                onPress={() => setSellerType('professional')}
-              >
-                <RadioButton
-                  value="professional"
-                  status={sellerType === 'professional' ? 'checked' : 'unchecked'}
-                  onPress={() => setSellerType('professional')}
-                  color="#6B3CE9"
-                />
-                <Text style={styles.radioLabel}>Professionnel</Text>
-              </TouchableOpacity>
-              
-              <TouchableOpacity
-                style={styles.radioButton}
-                onPress={() => setSellerType('individual')}
-              >
-                <RadioButton
-                  value="individual"
-                  status={sellerType === 'individual' ? 'checked' : 'unchecked'}
-                  onPress={() => setSellerType('individual')}
-                  color="#6B3CE9"
-                />
-                <Text style={styles.radioLabel}>Particulier</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-          
-          <View style={styles.filterSection}>
-            <Text style={styles.filterTitle}>Prix</Text>
-            <View style={styles.priceInputContainer}>
-              <View style={styles.priceInputWrapper}>
-                <Text style={styles.priceInputLabel}>Min</Text>
-                <TextInput 
-                  style={styles.priceInput}
-                  keyboardType="numeric"
-                  placeholder="0"
-                  value={minPrice}
-                  onChangeText={setMinPrice}
-                />
-                <Text style={styles.euroSymbol}>€</Text>
-              </View>
-              <View style={styles.priceInputDivider} />
-              <View style={styles.priceInputWrapper}>
-                <Text style={styles.priceInputLabel}>Max</Text>
-                <TextInput 
-                  style={styles.priceInput}
-                  keyboardType="numeric"
-                  placeholder="1000"
-                  value={maxPrice}
-                  onChangeText={setMaxPrice}
-                />
-                <Text style={styles.euroSymbol}>€</Text>
-              </View>
-            </View>
-          </View>
-          
-          <View style={styles.filterButtons}>
-            <Button 
-              mode="outlined" 
-              onPress={resetFilters}
-              style={styles.resetButton}
-            >
-              Réinitialiser
-            </Button>
-            <Button 
-              mode="contained" 
-              onPress={applyAdvancedFilters}
-              style={styles.applyButton}
-            >
-              Appliquer
-            </Button>
-          </View>
-        </Animated.ScrollView>
+        </ScrollView>
       )}
-      
-      <FlatList
-        data={filteredProducts}
-        renderItem={({ item, index }) => (
-          <View style={[
-            styles.productCardContainer,
-            // Si c'est un élément impair en fin de liste, le positionner à gauche
-            filteredProducts.length % 2 !== 0 && index === filteredProducts.length - 1 
-              ? styles.lastOddItem 
-              : null
-          ]}>
-            <ProductItem item={item} navigation={navigation} />
-          </View>
-        )}
-        keyExtractor={item => item.id.toString()}
-        numColumns={2}
-        contentContainerStyle={styles.productsGrid}
-        columnWrapperStyle={styles.productRow}
-        ListEmptyComponent={
-          <View style={styles.emptyContainer}>
-            <Ionicons name="search-outline" size={80} color="#ccc" />
-            <Text style={styles.emptyText}>
-              {searchQuery 
-                ? `Aucun résultat pour "${searchQuery}"`
-                : 'Commencez à chercher'}
-            </Text>
-          </View>
-        }
-      />
-      
-      {renderModalContent()}
     </SafeAreaView>
   );
 }
@@ -914,227 +692,115 @@ export default function SearchScreen({ navigation }: any) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#ffffff',
+    backgroundColor: '#fff',
   },
   header: {
-    padding: 10,
-    backgroundColor: '#ffffff',
+    padding: 15,
+    paddingHorizontal: 20,
     borderBottomWidth: 1,
     borderBottomColor: '#f0f0f0',
   },
   searchContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 5,
+    marginBottom: 10,
+    paddingHorizontal: 2,
   },
   backButton: {
-    padding: 10,
-    backgroundColor: 'rgba(255, 107, 155, 0.1)',
-    borderRadius: 20,
-    marginRight: 8,
+    marginRight: 10,
   },
   searchBar: {
     flex: 1,
-    marginLeft: 0,
-    borderRadius: 30,
-    height: hp('6%'),
-    backgroundColor: 'rgba(255, 255, 255, 0.95)',
-    borderWidth: 1,
-    borderColor: '#ffd4e5',
-    elevation: 4,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
+    elevation: 0,
+    backgroundColor: '#f5f5f5',
+    borderRadius: 8,
   },
   searchInput: {
-    fontSize: wp('3.8%'),
-    color: '#333',
-    marginLeft: wp('1%'),
-    fontWeight: '500',
+    fontSize: 16,
   },
   searchIcon: {
-    marginLeft: wp('2%'),
+    marginRight: 10,
   },
   clearIcon: {
-    marginRight: wp('2%'),
+    marginRight: 10,
   },
   advancedSearchButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     padding: 10,
-    marginTop: 5,
+    backgroundColor: '#f5f5f5',
+    borderRadius: 8,
+  },
+  activeFilterButton: {
+    backgroundColor: '#6B3CE9',
   },
   advancedSearchText: {
     color: '#6B3CE9',
     fontWeight: '500',
     marginRight: 5,
   },
-  filtersContainer: {
-    padding: 15,
-    backgroundColor: '#f9f9f9',
-    borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
+  activeFilterText: {
+    color: '#fff',
   },
-  filterSection: {
-    marginBottom: 15,
-  },
-  filterTitle: {
-    fontSize: 16,
-    fontWeight: '500',
-    marginBottom: 8,
-    color: '#333',
-  },
-  selectorButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: 12,
-    borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 8,
-    backgroundColor: '#fff',
-  },
-  selectorText: {
-    color: '#333',
-    fontSize: 15,
-  },
-  selectorPlaceholder: {
-    color: '#999',
-    fontSize: 15,
-  },
-  priceInputContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  priceInputWrapper: {
+  scrollView: {
     flex: 1,
+  },
+  scrollViewContent: {
+    flexGrow: 1,
+    paddingBottom: 100,
+  },
+  productGrid: {
     flexDirection: 'row',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 8,
-    padding: 10,
-    backgroundColor: '#fff',
+    flexWrap: 'wrap',
+    paddingHorizontal: 8,
+    paddingBottom: 20,
   },
-  priceInputLabel: {
-    fontSize: 14,
-    color: '#666',
-    marginRight: 5,
+  productCard: {
+    width: '50%',
+    padding: 4,
   },
-  priceInput: {
+  productCardInner: {
+    overflow: 'hidden',
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 2,
+  },
+  // Styles pour l'absence de résultats
+  noResultsContainer: {
     flex: 1,
-    fontSize: 16,
-    color: '#333',
-    textAlign: 'right',
-    padding: 0,
-  },
-  euroSymbol: {
-    fontSize: 16,
-    color: '#333',
-    marginLeft: 5,
-  },
-  priceInputDivider: {
-    width: 15,
-  },
-  filterButtons: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: 15,
-    marginBottom: 10,
-  },
-  resetButton: {
-    flex: 1,
-    marginRight: 10,
-    borderColor: '#6B3CE9',
-  },
-  applyButton: {
-    flex: 1,
-    backgroundColor: '#6B3CE9',
-  },
-  productsGrid: {
-    padding: 8,
-    paddingBottom: 40,
-  },
-  productRow: {
-    justifyContent: 'space-between',
-    width: '100%',
-    paddingHorizontal: wp('2%'),
-  },
-  emptyContainer: {
-    alignItems: 'center',
     justifyContent: 'center',
-    padding: 40,
-    marginTop: 40,
+    alignItems: 'center',
+    padding: 30,
+    marginTop: 50,
   },
-  emptyText: {
-    marginTop: 15,
+  noResultsText: {
     fontSize: 16,
     color: '#666',
     textAlign: 'center',
+    marginTop: 20,
+    marginBottom: 20,
   },
-  modalOverlay: {
+  resetFiltersButton: {
+    padding: 10,
+    borderRadius: 8,
+    backgroundColor: '#f0f0f0',
+  },
+  resetFiltersText: {
+    color: '#6B3CE9',
+    fontWeight: '500',
+  },
+  loadingContainer: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'flex-end',
-  },
-  modalContent: {
-    backgroundColor: '#fff',
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    padding: 20,
-    maxHeight: '80%',
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+    justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 10,
+    padding: 30,
   },
-  modalTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#333',
-  },
-  modalBody: {
-    maxHeight: 400,
-  },
-  modalOption: {
-    padding: 15,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
-  },
-  modalOptionText: {
+  loadingText: {
+    color: '#6B3CE9',
     fontSize: 16,
-    color: '#333',
-  },
-  noOptionsText: {
-    padding: 20,
-    textAlign: 'center',
-    color: '#999',
-  },
-  radioContainer: {
-    marginVertical: 8,
-  },
-  radioButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginVertical: 4,
-  },
-  radioLabel: {
-    marginLeft: 8,
-    fontSize: 15,
-    color: '#333',
-  },
-  productCardContainer: {
-    width: '48%',  // Légèrement moins que 50% pour permettre l'espacement
-    marginVertical: hp('1%'),
-  },
-  lastOddItem: {
-    marginLeft: 0,
-    marginRight: 'auto',  // Pousse l'élément vers la gauche
+    marginTop: 20,
   },
 }); 

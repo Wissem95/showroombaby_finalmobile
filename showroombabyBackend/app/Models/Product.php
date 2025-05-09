@@ -29,6 +29,7 @@ class Product extends Model
         'city',
         'zipCode',
         'phone',
+        'hide_phone',
         'category_id',
         'subcategory_id',
         'user_id',
@@ -45,6 +46,7 @@ class Product extends Model
         'view_count' => 'integer',
         'latitude' => 'float',
         'longitude' => 'float',
+        'hide_phone' => 'boolean',
     ];
 
     /**

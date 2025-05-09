@@ -36,7 +36,7 @@ import imageService from '../services/api/imageService';
 // API URL
 // Pour les appareils externes, utiliser votre adresse IP locale au lieu de 127.0.0.1
 const API_URL = process.env.NODE_ENV === 'development' || __DEV__ 
-  ? 'http://172.20.10.3:8000/api'  // Adresse IP locale de l'utilisateur
+  ? 'http://192.168.1.68:8000/api'  // Adresse IP locale de l'utilisateur
   : 'https://api.showroombaby.com';
 const DEFAULT_AVATAR_URL = 'https://ui-avatars.com/api/?background=ff6b9b&color=fff&name=User';
 const placeholderImage = require('../../assets/placeholder.png');
