@@ -22,6 +22,7 @@ import { widthPercentageToDP as wp, heightPercentageToDP as hp } from 'react-nat
 import { LinearGradient } from 'expo-linear-gradient';
 import { PanGestureHandler, State, PanGestureHandlerStateChangeEvent, GestureHandlerRootView } from 'react-native-gesture-handler';
 import imageService from '../services/api/imageService';
+import { globalStyles, colors } from '../theme/globalStyles';
 
 // URL de l'API
 // Pour les appareils externes, utiliser votre adresse IP locale au lieu de 127.0.0.1
@@ -253,14 +254,13 @@ export default function FavoritesScreen({ navigation }: any) {
           style={{ flex: 1 }}
           activeOpacity={0.85}
           onPress={() => navigation.navigate('ProductDetails', { 
-            productId: item.id, 
-            fullscreenMode: true 
+            productId: item.id
           })}
         >
           <View style={styles.productImageContainer}>
             {imageError ? (
               <View style={styles.imageErrorContainer}>
-                <Ionicons name="image-outline" size={24} color="#e75480" />
+                <Ionicons name="image-outline" size={24} color={colors.PRIMARY_DARK} />
                 <Text style={styles.imageErrorText}>Image indisponible</Text>
               </View>
             ) : (
@@ -281,7 +281,7 @@ export default function FavoritesScreen({ navigation }: any) {
             )}
             {imageLoading && (
               <View style={styles.imageLoadingContainer}>
-                <ActivityIndicator size="small" color="#e75480" />
+                <ActivityIndicator size="small" color={colors.PRIMARY_DARK} />
               </View>
             )}
             <TouchableOpacity 
@@ -289,7 +289,7 @@ export default function FavoritesScreen({ navigation }: any) {
               onPress={() => onRemove(item.id, item.title)}
               activeOpacity={0.8}
             >
-              <Ionicons name="heart" size={22} color="#fff" />
+              <Ionicons name="heart" size={22} color={colors.BACKGROUND_MAIN} />
             </TouchableOpacity>
             <View style={styles.priceTag}>
               <Text style={styles.priceTagText}>{formatPrice(item.price)}</Text>
@@ -302,7 +302,7 @@ export default function FavoritesScreen({ navigation }: any) {
               </Text>
               {item.location && (
                 <Text style={styles.productLocation} numberOfLines={1}>
-                  <Ionicons name="location-outline" size={14} color="#777" />
+                  <Ionicons name="location-outline" size={14} color={colors.TEXT_LIGHT} />
                   {' '}{item.location}
                 </Text>
               )}
@@ -331,7 +331,7 @@ export default function FavoritesScreen({ navigation }: any) {
     return (
       <GestureHandlerRootView style={{ flex: 1 }}>
         <View style={styles.centerContainer}>
-          <ActivityIndicator size="large" color="#e75480" />
+          <ActivityIndicator size="large" color={colors.PRIMARY_DARK} />
           <Text style={styles.loadingText}>Chargement de vos favoris...</Text>
         </View>
       </GestureHandlerRootView>
@@ -342,7 +342,7 @@ export default function FavoritesScreen({ navigation }: any) {
     return (
       <GestureHandlerRootView style={{ flex: 1 }}>
         <View style={styles.centerContainer}>
-          <Ionicons name="person-outline" size={64} color="#ccc" />
+          <Ionicons name="person-outline" size={64} color={colors.GRAY_LIGHT} />
           <Text style={styles.errorText}>{error}</Text>
           <Button 
             mode="contained" 
@@ -361,7 +361,7 @@ export default function FavoritesScreen({ navigation }: any) {
     return (
       <GestureHandlerRootView style={{ flex: 1 }}>
         <View style={styles.centerContainer}>
-          <Ionicons name="alert-circle-outline" size={64} color="#e74c3c" />
+          <Ionicons name="alert-circle-outline" size={64} color={colors.ERROR} />
           <Text style={styles.errorText}>{error}</Text>
           <Button 
             mode="contained" 
@@ -390,7 +390,7 @@ export default function FavoritesScreen({ navigation }: any) {
               resizeMode="cover"
             >
               <LinearGradient
-                colors={['rgba(0,0,0,0.3)', 'rgba(0,0,0,0.5)']}
+                colors={['colors.OVERLAY_LIGHT', 'colors.OVERLAY_DARK']}
                 style={styles.headerGradient}
               >
                 <View style={styles.headerContent}>
@@ -406,8 +406,8 @@ export default function FavoritesScreen({ navigation }: any) {
                       value={searchQuery}
                       style={styles.searchBar}
                       inputStyle={styles.searchInput}
-                      icon={() => <Ionicons name="search" size={20} color="#777" />}
-                      clearIcon={() => <Ionicons name="close" size={20} color="#777" />}
+                      icon={() => <Ionicons name="search" size={20} color={colors.TEXT_LIGHT} />}
+                      clearIcon={() => <Ionicons name="close" size={20} color={colors.TEXT_LIGHT} />}
                     />
                   </View>
                 </View>
@@ -418,7 +418,7 @@ export default function FavoritesScreen({ navigation }: any) {
           {favorites.length === 0 ? (
             <View style={styles.emptyContainer}>
               <View style={styles.emptyIconContainer}>
-                <Ionicons name="heart-outline" size={80} color="#ffcce0" />
+                <Ionicons name="heart-outline" size={80} color={colors.PRIMARY_TRANSPARENT_LIGHT} />
               </View>
               <Text style={styles.emptyText}>Vous n'avez pas encore de favoris</Text>
               <Text style={styles.emptySubtext}>
@@ -429,7 +429,7 @@ export default function FavoritesScreen({ navigation }: any) {
                 onPress={() => navigation.navigate('Home')}
                 style={styles.browseButton}
                 labelStyle={styles.buttonLabel}
-                icon={() => <Ionicons name="search" size={20} color="#fff" />}
+                                  icon={() => <Ionicons name="search" size={20} color={colors.BACKGROUND_MAIN} />}
               >
                 Parcourir les produits
               </Button>
@@ -448,14 +448,14 @@ export default function FavoritesScreen({ navigation }: any) {
                   <RefreshControl
                     refreshing={refreshing}
                     onRefresh={onRefresh}
-                    colors={['#e75480']}
-                    tintColor="#e75480"
+                    colors={['colors.PRIMARY_DARK']}
+                    tintColor={colors.PRIMARY_DARK}
                   />
                 }
                 ListEmptyComponent={
                   searchQuery ? (
                     <View style={styles.noResultsContainer}>
-                      <Ionicons name="search-outline" size={50} color="#ccc" />
+                      <Ionicons name="search-outline" size={50} color={colors.GRAY_LIGHT} />
                       <Text style={styles.noResultsText}>
                         Aucun résultat pour "{searchQuery}"
                       </Text>
@@ -477,11 +477,11 @@ const token = AsyncStorage.getItem('token');
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: colors.BACKGROUND_MAIN,
   },
   mainContent: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: colors.BACKGROUND_MAIN,
   },
   headerSection: {
     height: hp('30%'),
@@ -516,18 +516,18 @@ const styles = StyleSheet.create({
   title: {
     fontSize: wp('8.5%'),
     fontWeight: '800',
-    color: '#fff',
-    textShadowColor: 'rgba(0, 0, 0, 0.4)',
+    color: 'colors.BACKGROUND_MAIN',
+    textShadowColor: 'colors.SHADOW_TEXT_LIGHT',
     textShadowOffset: { width: 0, height: 2 },
     textShadowRadius: 4,
     letterSpacing: 0.5,
   },
   subtitle: {
     fontSize: wp('4.2%'),
-    color: '#fff',
+    color: 'colors.BACKGROUND_MAIN',
     marginTop: hp('0.5%'),
     marginBottom: hp('2.5%'),
-    textShadowColor: 'rgba(0, 0, 0, 0.4)',
+    textShadowColor: 'colors.SHADOW_TEXT_LIGHT',
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 3,
     letterSpacing: 0.3,
@@ -537,24 +537,26 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   searchBar: {
-    elevation: 4,
+    elevation: 8,
     borderRadius: 30,
     height: hp('6.5%'),
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
-    shadowRadius: 4,
-    backgroundColor: '#fff',
+    borderWidth: 1,
+    borderColor: colors.PRIMARY_TRANSPARENT_MEDIUM,
+    shadowColor: colors.PRIMARY,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 12,
+    backgroundColor: colors.WHITE_TRANSPARENT_LIGHT,
   },
   searchInput: {
     fontSize: wp('3.8%'),
-    color: '#444',
+    color: colors.TEXT_SECONDARY,
   },
   productsContainer: {
     flex: 1,
     marginTop: hp('1.8%'),
     paddingTop: 0,
-    backgroundColor: '#fff',
+    backgroundColor: colors.BACKGROUND_MAIN,
     zIndex: 0,
   },
   listContent: {
@@ -569,24 +571,24 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#f8f8fa',
+    backgroundColor: colors.BACKGROUND_SECONDARY,
     padding: wp('5%'),
   },
   loadingText: {
     marginTop: hp('2%'),
-    color: '#666',
+    color: colors.TEXT_SECONDARY,
     fontSize: wp('4%'),
   },
   errorText: {
     marginTop: 12,
     fontSize: 16,
-    color: '#666',
+    color: colors.TEXT_SECONDARY,
     textAlign: 'center',
     paddingHorizontal: wp('5%'),
   },
   loginButton: {
     marginTop: hp('2.5%'),
-    backgroundColor: '#e75480',
+    backgroundColor: colors.PRIMARY_DARK,
     borderRadius: 30,
     paddingVertical: hp('0.5%'),
     elevation: 3,
@@ -598,7 +600,7 @@ const styles = StyleSheet.create({
   },
   retryButton: {
     marginTop: hp('2.5%'),
-    backgroundColor: '#e75480',
+    backgroundColor: colors.PRIMARY_DARK,
     borderRadius: 30,
     paddingVertical: hp('0.5%'),
     elevation: 3,
@@ -607,18 +609,18 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#f8f8fa',
+    backgroundColor: colors.BACKGROUND_SECONDARY,
     padding: wp('8%'),
   },
   emptyIconContainer: {
     width: wp('28%'),
     height: wp('28%'),
     borderRadius: wp('14%'),
-    backgroundColor: 'rgba(255, 107, 155, 0.1)',
+    backgroundColor: colors.PRIMARY_TRANSPARENT_LIGHT,
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: hp('3.5%'),
-    shadowColor: '#e75480',
+    shadowColor: colors.PRIMARY_DARK,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 10,
@@ -626,26 +628,26 @@ const styles = StyleSheet.create({
   emptyText: {
     fontSize: wp('5%'),
     fontWeight: '600',
-    color: '#444',
+    color: colors.TEXT_SECONDARY,
     textAlign: 'center',
     marginBottom: hp('1.5%'),
     letterSpacing: 0.2,
   },
   emptySubtext: {
     fontSize: wp('4%'),
-    color: '#777',
+    color: colors.TEXT_LIGHT,
     textAlign: 'center',
     marginBottom: hp('3.5%'),
     lineHeight: wp('6%'),
     letterSpacing: 0.1,
   },
   browseButton: {
-    backgroundColor: '#e75480',
+    backgroundColor: colors.PRIMARY_DARK,
     borderRadius: 30,
     paddingHorizontal: wp('5%'),
     paddingVertical: hp('0.8%'),
     elevation: 3,
-    shadowColor: '#000',
+    shadowColor: colors.TEXT_DARK,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.2,
     shadowRadius: 3,
@@ -653,12 +655,12 @@ const styles = StyleSheet.create({
   productCard: {
     width: '48.5%',
     marginBottom: wp('3%'),
-    backgroundColor: '#fff',
+    backgroundColor: colors.BACKGROUND_CARD,
     borderWidth: 0,
     borderRadius: wp('3%'),
     ...Platform.select({
       ios: {
-        shadowColor: '#000',
+        shadowColor: colors.TEXT_DARK,
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.08,
         shadowRadius: 3,
@@ -673,7 +675,7 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: wp('3%'),
     borderTopRightRadius: wp('3%'),
     height: wp('58%'),
-    backgroundColor: '#fff',
+    backgroundColor: colors.BACKGROUND_MAIN,
   },
   productImage: {
     height: wp('58%'),
@@ -683,7 +685,7 @@ const styles = StyleSheet.create({
   cardContent: {
     padding: wp('3%'),
     paddingTop: wp('2.5%'),
-    backgroundColor: '#fff',
+    backgroundColor: colors.BACKGROUND_MAIN,
   },
   productInfo: {
     flex: 1,
@@ -692,32 +694,32 @@ const styles = StyleSheet.create({
     fontSize: wp('4.2%'),
     fontWeight: '600',
     marginBottom: hp('0.8%'),
-    color: '#222',
+    color: colors.TEXT_PRIMARY,
     letterSpacing: 0.2,
   },
   productLocation: {
     fontSize: wp('3.3%'),
-    color: '#666',
+    color: colors.TEXT_SECONDARY,
     marginBottom: hp('0.6%'),
     letterSpacing: 0.1,
   },
   productDate: {
     fontSize: wp('3.1%'),
-    color: '#999',
+    color: colors.TEXT_MUTED,
     letterSpacing: 0.1,
   },
   removeButton: {
     position: 'absolute',
     top: wp('3%'),
     right: wp('3%'),
-    backgroundColor: 'rgba(231, 84, 128, 0.85)',
+    backgroundColor: colors.PRIMARY_DARK + 'D9',
     borderRadius: wp('6%'),
     width: wp('11%'),
     height: wp('11%'),
     justifyContent: 'center',
     alignItems: 'center',
     zIndex: 5,
-    shadowColor: '#000',
+    shadowColor: colors.TEXT_DARK,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.3,
     shadowRadius: 3,
@@ -726,12 +728,12 @@ const styles = StyleSheet.create({
     position: 'absolute',
     bottom: wp('3%'),
     left: wp('3%'),
-    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    backgroundColor: colors.WHITE_TRANSPARENT_HEAVY,
     borderRadius: 20,
     paddingHorizontal: wp('3.5%'),
     paddingVertical: hp('0.7%'),
     zIndex: 5,
-    shadowColor: '#000',
+    shadowColor: colors.TEXT_DARK,
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.15,
     shadowRadius: 2,
@@ -739,7 +741,7 @@ const styles = StyleSheet.create({
   priceTagText: {
     fontSize: wp('3.8%'),
     fontWeight: 'bold',
-    color: '#e75480',
+    color: colors.PRIMARY_DARK,
     letterSpacing: 0.2,
   },
   noResultsContainer: {
@@ -749,7 +751,7 @@ const styles = StyleSheet.create({
   },
   noResultsText: {
     fontSize: wp('4%'),
-    color: '#777',
+    color: colors.TEXT_LIGHT,
     textAlign: 'center',
     marginTop: hp('2%'),
   },
@@ -757,11 +759,11 @@ const styles = StyleSheet.create({
     height: wp('58%'),
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#f8f8f8',
+    backgroundColor: colors.BACKGROUND_LIGHT,
   },
   imageErrorText: {
     fontSize: wp('3.2%'),
-    color: '#e75480',
+    color: colors.PRIMARY_DARK,
     marginTop: hp('1%'),
     letterSpacing: 0.1,
   },
@@ -773,6 +775,6 @@ const styles = StyleSheet.create({
     bottom: 0,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.3)',
+    backgroundColor: colors.WHITE_TRANSPARENT_LIGHT,
   },
 });

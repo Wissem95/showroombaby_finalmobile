@@ -10,11 +10,10 @@ import { widthPercentageToDP as wp, heightPercentageToDP as hp } from 'react-nat
 import MapView, { Marker } from 'react-native-maps';
 import Geolocation from '@react-native-community/geolocation';
 import Carousel from 'react-native-reanimated-carousel';
-import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import { PanGestureHandler, State } from 'react-native-gesture-handler';
 import imageService from '../services/api/imageService';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Icons3DModel from '../components/Icons3DModel';
+import { globalStyles, colors } from '../theme/globalStyles';
 
 // URL de l'API
 // Pour les appareils externes, utiliser votre adresse IP locale au lieu de 127.0.0.1
@@ -91,112 +90,67 @@ interface ImageType {
   url?: string;
 }
 
-// Styles pour le carrousel d'images
+// Styles pour le carrousel d'images intégré
 const carouselStyles = StyleSheet.create({
-  container: {
-    width: '100%',
-    height: '100%',
-    backgroundColor: 'black',
-    position: 'relative',
+  carouselContainer: {
+    height: wp('75%'),
+    borderRadius: 15,
     overflow: 'hidden',
-    zIndex: 1,
+    marginHorizontal: 15,
+    marginTop: 15,
+    marginBottom: 10,
   },
-  item: {
+  carouselItem: {
     width: '100%',
     height: '100%',
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.8)',
-    overflow: 'hidden',
-    zIndex: 1,
   },
-  image: {
+  carouselImage: {
     width: '100%',
-    height: 300,
+    height: '100%',
     resizeMode: 'cover',
-  },
-  overlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0,0,0,0.1)',
-    zIndex: 3,
-  },
-  headerBar: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    height: 60,
-    paddingTop: 0,
-    zIndex: 30,
-    flexDirection: 'row',
-    paddingHorizontal: 15,
-    alignItems: 'center',
-  },
-  backButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(0,0,0,0.3)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 10,
   },
   pagination: {
     position: 'absolute',
-    bottom: 20,
+    bottom: 15,
     left: 0,
     right: 0,
     flexDirection: 'row',
     justifyContent: 'center',
-    zIndex: 20,
+    zIndex: 10,
   },
   paginationDot: {
     width: 8,
     height: 8,
     borderRadius: 4,
     marginHorizontal: 4,
-    backgroundColor: 'rgba(255,255,255,0.4)',
+    backgroundColor: colors.WHITE_TRANSPARENT_LIGHT,
   },
   paginationDotActive: {
-    backgroundColor: '#ffffff',
+    backgroundColor: colors.WHITE_TRANSPARENT_HEAVY,
     width: 10,
     height: 10,
   },
-  favoriteButton: {
+  actionButtons: {
     position: 'absolute',
-    top: 60,
+    top: 15,
     right: 15,
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    backgroundColor: 'rgba(255,255,255,0.9)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    zIndex: 20,
-    elevation: 3,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 3,
-    padding: 0,
+    zIndex: 10,
   },
-  shareButton: {
-    position: 'absolute',
-    top: 115,
-    right: 15,
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    backgroundColor: 'rgba(255,255,255,0.9)',
+  actionButton: {
+    width: 45,
+    height: 45,
+    borderRadius: 22.5,
+    backgroundColor: colors.WHITE_TRANSPARENT_HEAVY,
     justifyContent: 'center',
     alignItems: 'center',
-    zIndex: 20,
-    elevation: 3,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
+    marginBottom: 10,
+    elevation: 2,
+    shadowColor: colors.TEXT_DARK,
+    shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.2,
-    shadowRadius: 3,
-    padding: 0,
+    shadowRadius: 2,
   },
   productInfoOverlay: {
     position: 'absolute',
@@ -205,38 +159,38 @@ const carouselStyles = StyleSheet.create({
     right: 0,
     padding: 20,
     zIndex: 20,
-    backgroundColor: 'rgba(0,0,0,0.3)',
+    backgroundColor: colors.OVERLAY_LIGHT,
   },
   productInfoContainer: {
-    backgroundColor: 'rgba(255,255,255,0.2)',
+    backgroundColor: colors.WHITE_TRANSPARENT_LIGHT,
     borderRadius: 15,
     padding: 15,
   },
   productTitle: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#fff',
+    color: colors.BACKGROUND_MAIN,
     marginBottom: 5,
-    textShadowColor: 'rgba(0,0,0,0.3)',
+    textShadowColor: colors.OVERLAY_LIGHT,
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 3,
   },
   productPrice: {
     fontSize: 22,
     fontWeight: 'bold',
-    color: '#fff',
+    color: colors.BACKGROUND_MAIN,
     marginBottom: 10,
   },
   imageLoadingContainer: {
     ...StyleSheet.absoluteFillObject,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    backgroundColor: colors.OVERLAY_DARK,
     zIndex: 4,
   },
   publishDate: {
     fontSize: 14,
-    color: '#fff',
+    color: colors.BACKGROUND_MAIN,
     marginBottom: 10,
   },
   swipeIndicator: {
@@ -247,7 +201,7 @@ const carouselStyles = StyleSheet.create({
     width: '100%',
   },
   swipeText: {
-    color: '#fff',
+    color: colors.BACKGROUND_MAIN,
     fontSize: 16,
     marginTop: 5,
     fontWeight: '500',
@@ -260,12 +214,12 @@ const carouselStyles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-around',
     alignItems: 'center',
-    backgroundColor: '#ffffff',
+    backgroundColor: colors.BACKGROUND_MAIN,
     height: 70,
     borderTopWidth: 1,
-    borderTopColor: '#f0f0f0',
+    borderTopColor: colors.BORDER_LIGHT,
     elevation: 10,
-    shadowColor: '#000',
+    shadowColor: colors.TEXT_DARK,
     shadowOffset: { width: 0, height: -2 },
     shadowOpacity: 0.1,
     shadowRadius: 2,
@@ -289,7 +243,7 @@ const carouselStyles = StyleSheet.create({
     padding: 10,
   },
   carouselActionButtonActive: {
-    backgroundColor: '#ff6b9b',
+    backgroundColor: colors.PRIMARY,
   },
   carouselImage: {
     width: '100%',
@@ -539,7 +493,7 @@ const ImageCarousel = ({ images, navigation, product, formatPrice, getProductIma
             <View style={[carouselStyles.overlay, { zIndex: 2 }]} />
             {imageLoading[imageUrl] && (
               <View style={[carouselStyles.imageLoadingContainer, { zIndex: 10 }]}>
-                <ActivityIndicator size="large" color="#fff" />
+                <ActivityIndicator size="large" color={colors.BACKGROUND_MAIN} />
               </View>
             )}
           </>
@@ -608,7 +562,7 @@ const ImageCarousel = ({ images, navigation, product, formatPrice, getProductIma
                 }
               }}
             >
-              <Ionicons name="chevron-back" size={32} color="#fff" />
+              <Ionicons name="chevron-back" size={32} color={colors.BACKGROUND_MAIN} />
             </TouchableOpacity>
           </View>
           
@@ -639,7 +593,7 @@ const ImageCarousel = ({ images, navigation, product, formatPrice, getProductIma
               onPress={animateTransition}
             >
               <Animated.View style={{ transform: [{ translateY: swipeAnim }] }}>
-                <Ionicons name="chevron-down" size={24} color="#fff" />
+                <Ionicons name="chevron-down" size={24} color={colors.BACKGROUND_MAIN} />
               </Animated.View>
               <Text style={carouselStyles.swipeText}>Appuyer pour voir plus de détails</Text>
             </TouchableOpacity>
@@ -673,7 +627,7 @@ const ImageCarousel = ({ images, navigation, product, formatPrice, getProductIma
           >
             <View style={carouselStyles.absoluteButtonInner}>
               <View style={{ transform: [{ scale: 0.8 }] }}>
-                <Ionicons name="share-social-outline" size={38} color="#777" />
+                <Ionicons name="share-social-outline" size={38} color={colors.TEXT_LIGHT} />
               </View>
             </View>
           </TouchableOpacity>
@@ -773,7 +727,7 @@ const ImageCarousel = ({ images, navigation, product, formatPrice, getProductIma
               onPress={handleShare}
             >
               <View style={{ transform: [{ scale: 0.8 }] }}>
-                <Ionicons name="share-social-outline" size={38} color="#777" />
+                <Ionicons name="share-social-outline" size={38} color={colors.TEXT_LIGHT} />
               </View>
             </TouchableOpacity>
           </View>
@@ -1320,17 +1274,17 @@ export default function ProductDetailsScreen({ route, navigation }: any) {
   if (route.params?.fullscreenMode) {
     if (loading) {
       return (
-        <View style={[styles.loadingContainer, { backgroundColor: '#3e4652' }]}>
-          <ActivityIndicator size="large" color="#fff" />
-          <Text style={[styles.loadingText, { color: '#fff' }]}>Chargement...</Text>
+        <View style={[styles.loadingContainer, { backgroundColor: colors.TEXT_PRIMARY }]}>
+          <ActivityIndicator size="large" color={colors.BACKGROUND_MAIN} />
+          <Text style={[styles.loadingText, { color: colors.BACKGROUND_MAIN }]}>Chargement...</Text>
         </View>
       );
     }
 
     if (error || !product) {
       return (
-        <View style={[styles.errorContainer, { backgroundColor: '#3e4652' }]}>
-          <Text style={[styles.errorText, { color: '#fff' }]}>{error || 'Produit non disponible'}</Text>
+        <View style={[styles.errorContainer, { backgroundColor: colors.TEXT_PRIMARY }]}>
+          <Text style={[styles.errorText, { color: colors.BACKGROUND_MAIN }]}>{error || 'Produit non disponible'}</Text>
           <Button 
             mode="contained" 
             onPress={() => navigation.goBack()}
@@ -1361,7 +1315,7 @@ export default function ProductDetailsScreen({ route, navigation }: any) {
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#6200ee" />
+        <ActivityIndicator size="large" color={colors.INFO} />
         <Text style={styles.loadingText}>Chargement des détails...</Text>
       </View>
     );
@@ -1438,7 +1392,7 @@ export default function ProductDetailsScreen({ route, navigation }: any) {
             <View style={styles.actions}>
               <IconButton
                 icon={isFavorite ? "heart" : "heart-outline"}
-                iconColor={isProductOwner ? "#aaa" : (isFavorite ? "#e74c3c" : "#000")}
+                iconColor={isProductOwner ? colors.ICON_DARK : (isFavorite ? colors.ERROR : colors.TEXT_DARK)}
                 size={28}
                 onPress={handleFavorite}
                 disabled={isProductOwner}
@@ -1513,7 +1467,7 @@ export default function ProductDetailsScreen({ route, navigation }: any) {
             <View style={styles.detailItem}>
               <Text style={styles.detailLabel}>Localisation</Text>
               <Text style={styles.detailValue}>
-                <Ionicons name="location-outline" size={16} color="#666" />
+                <Ionicons name="location-outline" size={16} color={colors.TEXT_SECONDARY} />
                 {' '}
                 {getFullAddress()}
               </Text>
@@ -1699,7 +1653,7 @@ export default function ProductDetailsScreen({ route, navigation }: any) {
           }
         }}
       >
-        <Ionicons name="chevron-back" size={32} color="#fff" />
+        <Ionicons name="chevron-back" size={32} color={colors.BACKGROUND_MAIN} />
       </TouchableOpacity>
     </Animated.View>
   );
@@ -1708,17 +1662,17 @@ export default function ProductDetailsScreen({ route, navigation }: any) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: colors.BACKGROUND_GRAY,
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#f8f9fa',
+    backgroundColor: colors.BACKGROUND_SECONDARY,
   },
   loadingText: {
     marginTop: 12,
-    color: '#666',
+    color: colors.TEXT_SECONDARY,
     fontSize: 16,
   },
   errorContainer: {
@@ -1726,11 +1680,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     padding: 20,
-    backgroundColor: '#f8f9fa',
+    backgroundColor: colors.BACKGROUND_SECONDARY,
   },
   errorText: {
     fontSize: 16,
-    color: '#ff4444',
+    color: colors.ERROR_LIGHT,
     textAlign: 'center',
     marginBottom: 20,
   },
@@ -1749,12 +1703,12 @@ const styles = StyleSheet.create({
   },
   header: {
     padding: 16,
-    backgroundColor: '#fff',
+    backgroundColor: colors.BACKGROUND_MAIN,
     borderRadius: 20,
     marginHorizontal: 15,
     marginTop: 15,
     marginBottom: 10,
-    shadowColor: '#000',
+    shadowColor: colors.TEXT_DARK,
     shadowOffset: {
       width: 0,
       height: 2,
@@ -1766,7 +1720,7 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 24,
     fontWeight: '600',
-    color: '#000',
+    color: colors.TEXT_DARK,
     marginBottom: 12,
   },
   priceRow: {
@@ -1780,7 +1734,7 @@ const styles = StyleSheet.create({
   price: {
     fontSize: 26,
     fontWeight: 'bold',
-    color: '#ff6b9b',
+    color: colors.PRIMARY,
     flex: 1,
   },
   actions: {
@@ -1791,15 +1745,15 @@ const styles = StyleSheet.create({
   divider: {
     marginVertical: 12,
     height: 1,
-    backgroundColor: '#f0f0f0',
+    backgroundColor: colors.BORDER_LIGHT,
   },
   section: {
-    backgroundColor: '#fff',
+    backgroundColor: colors.BACKGROUND_MAIN,
     borderRadius: 20,
     marginHorizontal: 15,
     marginVertical: 8,
     padding: 16,
-    shadowColor: '#000',
+    shadowColor: colors.TEXT_DARK,
     shadowOffset: {
       width: 0,
       height: 2,
@@ -1811,13 +1765,13 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 20,
     fontWeight: '600',
-    color: '#000',
+    color: colors.TEXT_DARK,
     marginBottom: 12,
   },
   description: {
     fontSize: 16,
     lineHeight: 24,
-    color: '#666',
+    color: colors.TEXT_SECONDARY,
   },
   detailsGrid: {
     flexDirection: 'row',
@@ -1827,11 +1781,11 @@ const styles = StyleSheet.create({
   },
   detailItem: {
     width: '47%',
-    backgroundColor: '#fff',
+    backgroundColor: colors.BACKGROUND_MAIN,
     padding: 12,
     borderRadius: 15,
     marginBottom: 10,
-    shadowColor: '#000',
+    shadowColor: colors.TEXT_DARK,
     shadowOffset: {
       width: 0,
       height: 1,
@@ -1842,22 +1796,22 @@ const styles = StyleSheet.create({
   },
   detailLabel: {
     fontSize: 14,
-    color: '#999',
+    color: colors.TEXT_MUTED,
     marginBottom: 4,
   },
   detailValue: {
     fontSize: 16,
-    color: '#333',
+    color: colors.TEXT_PRIMARY,
     fontWeight: '500',
   },
   sellerContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     marginTop: 10,
-    backgroundColor: '#fff',
+    backgroundColor: colors.BACKGROUND_MAIN,
     padding: 15,
     borderRadius: 12,
-    shadowColor: '#000',
+    shadowColor: colors.TEXT_DARK,
     shadowOffset: {
       width: 0,
       height: 2,
@@ -1872,12 +1826,12 @@ const styles = StyleSheet.create({
     borderRadius: 25,
   },
   sellerAvatarPlaceholder: {
-    backgroundColor: '#ff6b9b',
+    backgroundColor: colors.PRIMARY,
     justifyContent: 'center',
     alignItems: 'center',
   },
   sellerAvatarText: {
-    color: 'white',
+    color: colors.TEXT_WHITE,
     fontSize: 24,
     fontWeight: 'bold',
   },
@@ -1888,7 +1842,7 @@ const styles = StyleSheet.create({
   sellerName: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#000',
+    color: colors.TEXT_DARK,
   },
   ratingContainer: {
     flexDirection: 'row',
@@ -1901,7 +1855,7 @@ const styles = StyleSheet.create({
   ratingText: {
     marginLeft: 5,
     fontSize: 14,
-    color: '#666',
+    color: 'colors.TEXT_SECONDARY',
   },
   actionButtons: {
     flexDirection: 'column',
@@ -1912,13 +1866,13 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   contactButton: {
-    backgroundColor: '#ff6b9b',
-    borderColor: '#ff6b9b',
+    backgroundColor: colors.PRIMARY,
+    borderColor: colors.PRIMARY,
     paddingVertical: 10,
     paddingHorizontal: 15,
     borderRadius: 25,
     elevation: 4,
-    shadowColor: "#ff6b9b",
+    shadowColor: colors.PRIMARY,
     shadowOffset: {
       width: 0,
       height: 2,
@@ -1928,7 +1882,7 @@ const styles = StyleSheet.create({
     minHeight: 60,
   },
   favoriteActionButton: {
-    borderColor: '#ff6b9b',
+    borderColor: colors.PRIMARY,
     borderWidth: 1.5,
     paddingVertical: 10,
     paddingHorizontal: 15,
@@ -1936,11 +1890,11 @@ const styles = StyleSheet.create({
     minHeight: 60,
   },
   favoriteButtonLabel: {
-    color: '#ff6b9b',
+    color: colors.PRIMARY,
   },
   disabledButton: {
-    backgroundColor: '#f0f0f0',
-    borderColor: '#ddd',
+    backgroundColor: 'colors.BORDER_LIGHT',
+    borderColor: 'colors.BORDER_DARK',
     opacity: 0.7,
     paddingVertical: 10,
     borderRadius: 25,
@@ -1951,7 +1905,7 @@ const styles = StyleSheet.create({
     borderRadius: 0,
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: '#f0f0f0',
+    borderColor: colors.BORDER_LIGHT,
   },
   mapContainer: {
     flex: 1,
@@ -1981,7 +1935,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: 'rgba(0,0,0,0.2)',
+    backgroundColor: colors.SHADOW_MEDIUM,
   },
   imagePagination: {
     position: 'absolute',
@@ -2002,10 +1956,10 @@ const styles = StyleSheet.create({
     height: 8,
     borderRadius: 4,
     marginHorizontal: 4,
-    backgroundColor: 'rgba(255,255,255,0.4)',
+    backgroundColor: colors.WHITE_TRANSPARENT_LIGHT,
   },
   paginationDotActive: {
-    backgroundColor: '#ffffff',
+          backgroundColor: colors.BACKGROUND_MAIN,
     width: 10,
     height: 10,
   },
@@ -2018,8 +1972,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     borderRadius: 25,
-    backgroundColor: 'rgba(0,0,0,0.8)',
-    shadowColor: '#000',
+    backgroundColor: colors.OVERLAY_HEAVY,
+    shadowColor: colors.TEXT_DARK,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.5,
     shadowRadius: 4,

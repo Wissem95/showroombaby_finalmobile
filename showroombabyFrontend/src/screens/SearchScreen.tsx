@@ -11,6 +11,7 @@ import { Animated } from 'react-native';
 import imageService from '../services/api/imageService';
 import { SERVER_IP } from '../config/ip';
 import FilterService, { Filters } from '../services/FilterService';
+import { globalStyles, colors } from '../theme/globalStyles';
 
 // URL de l'API
 // Pour les appareils externes, utiliser votre adresse IP locale au lieu de 127.0.0.1
@@ -615,7 +616,7 @@ export default function SearchScreen({ navigation, route }: any) {
       <View style={styles.header}>
         <View style={styles.searchContainer}>
           <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton} activeOpacity={0.7}>
-            <Ionicons name="arrow-back" size={24} color="#ff6b9b" />
+                          <Ionicons name="arrow-back" size={24} color={colors.PRIMARY} />
           </TouchableOpacity>
           <Searchbar
             placeholder="Rechercher un produit..."
@@ -623,10 +624,10 @@ export default function SearchScreen({ navigation, route }: any) {
             value={searchQuery}
             style={styles.searchBar}
             inputStyle={styles.searchInput}
-            icon={() => <Ionicons name="search" size={22} color="#ff6b9b" style={styles.searchIcon} />}
+                          icon={() => <Ionicons name="search" size={22} color={colors.PRIMARY} style={styles.searchIcon} />}
             right={() => searchQuery.length > 0 ? 
               <TouchableOpacity onPress={() => handleSearch('')} activeOpacity={0.7}>
-                <Ionicons name="close-circle" size={22} color="#ff6b9b" style={styles.clearIcon} />
+                                  <Ionicons name="close-circle" size={22} color={colors.PRIMARY} style={styles.clearIcon} />
               </TouchableOpacity> : null
             }
           />
@@ -646,13 +647,13 @@ export default function SearchScreen({ navigation, route }: any) {
           ]}>
             {hasActiveFilters() ? 'Filtres actifs' : 'Filtres avancés'}
           </Text>
-          <MaterialIcons name="filter-list" size={24} color={hasActiveFilters() ? "#fff" : "#6B3CE9"} />
+          <MaterialIcons name="filter-list" size={24} color={hasActiveFilters() ? "colors.BACKGROUND_MAIN" : "colors.INFO"} />
         </TouchableOpacity>
       </View>
       
       {isLoading ? (
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#6B3CE9" />
+          <ActivityIndicator size="large" color="colors.INFO" />
           <Text style={styles.loadingText}>Chargement des produits...</Text>
         </View>
       ) : (
@@ -660,7 +661,7 @@ export default function SearchScreen({ navigation, route }: any) {
           {/* Afficher un message quand aucun produit ne correspond aux filtres */}
           {filteredProducts.length === 0 && !isLoading ? (
             <View style={styles.noResultsContainer}>
-              <Ionicons name="search-outline" size={48} color="#ccc" />
+              <Ionicons name="search-outline" size={48} color="colors.GRAY_LIGHT" />
               <Text style={styles.noResultsText}>Aucun produit ne correspond à vos critères</Text>
               {hasActiveFilters() && (
                 <TouchableOpacity 
@@ -692,13 +693,13 @@ export default function SearchScreen({ navigation, route }: any) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: colors.BACKGROUND_MAIN,
   },
   header: {
     padding: 15,
     paddingHorizontal: 20,
     borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
+    borderBottomColor: 'colors.BORDER_LIGHT',
   },
   searchContainer: {
     flexDirection: 'row',
@@ -711,14 +712,21 @@ const styles = StyleSheet.create({
   },
   searchBar: {
     flex: 1,
-    elevation: 0,
-    backgroundColor: '#f5f5f5',
-    borderRadius: 8,
-    height: hp('6%'),
+    elevation: 6,
+    backgroundColor: 'colors.WHITE_TRANSPARENT_LIGHT',
+    borderRadius: 25,
+    height: hp('6.5%'),
+    borderWidth: 1,
+    borderColor: 'colors.PRIMARY_TRANSPARENT_MEDIUM',
+    shadowColor: colors.PRIMARY,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.15,
+    shadowRadius: 10,
   },
   searchInput: {
     fontSize: 16,
-    height: hp('6%'),
+    height: hp('6.5%'),
+    color: 'colors.TEXT_TRANSPARENT_MEDIUM',
   },
   searchIcon: {
     marginRight: 10,
@@ -730,20 +738,30 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 10,
-    backgroundColor: '#f5f5f5',
-    borderRadius: 8,
+    padding: 12,
+    backgroundColor: 'colors.WHITE_TRANSPARENT_LIGHT',
+    borderRadius: 20,
+    borderWidth: 0,
+    elevation: 3,
+    shadowColor: 'colors.INFO',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 6,
   },
   activeFilterButton: {
-    backgroundColor: '#6B3CE9',
+    backgroundColor: 'colors.INFO + "BF"',
+    borderWidth: 0,
+    elevation: 5,
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
   },
   advancedSearchText: {
-    color: '#6B3CE9',
-    fontWeight: '500',
-    marginRight: 5,
+    color: 'colors.INFO + "D9"',
+    fontWeight: '600',
+    marginRight: 6,
   },
   activeFilterText: {
-    color: '#fff',
+    color: 'colors.BACKGROUND_MAIN',
   },
   scrollView: {
     flex: 1,
@@ -765,7 +783,7 @@ const styles = StyleSheet.create({
   productCardInner: {
     overflow: 'hidden',
     elevation: 2,
-    shadowColor: '#000',
+    shadowColor: 'colors.TEXT_DARK',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.2,
     shadowRadius: 2,
@@ -780,7 +798,7 @@ const styles = StyleSheet.create({
   },
   noResultsText: {
     fontSize: 16,
-    color: '#666',
+    color: colors.TEXT_SECONDARY,
     textAlign: 'center',
     marginTop: 20,
     marginBottom: 20,
@@ -788,10 +806,10 @@ const styles = StyleSheet.create({
   resetFiltersButton: {
     padding: 10,
     borderRadius: 8,
-    backgroundColor: '#f0f0f0',
+    backgroundColor: 'colors.BORDER_LIGHT',
   },
   resetFiltersText: {
-    color: '#6B3CE9',
+    color: 'colors.INFO',
     fontWeight: '500',
   },
   loadingContainer: {
@@ -801,7 +819,7 @@ const styles = StyleSheet.create({
     padding: 30,
   },
   loadingText: {
-    color: '#6B3CE9',
+    color: 'colors.INFO',
     fontSize: 16,
     marginTop: 20,
   },

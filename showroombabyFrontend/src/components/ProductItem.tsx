@@ -5,6 +5,7 @@ import { widthPercentageToDP as wp } from 'react-native-responsive-screen';
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
 import { SERVER_IP } from '../config/ip';
 import imageService from '../services/api/imageService';
+import { globalStyles, colors } from '../theme/globalStyles';
 
 // Image placeholder
 const placeholderImage = require('../../assets/placeholder.png');
@@ -139,7 +140,7 @@ const ProductItem: React.FC<ProductItemProps> = ({ item, navigation }) => {
             <View style={styles.footer}>
               {item.city && (
                 <View style={styles.locationContainer}>
-                  <Ionicons name="location-outline" size={12} color="#888" />
+                  <Ionicons name="location-outline" size={12} color={colors.ICON_MEDIUM} />
                   <Text style={styles.locationText} numberOfLines={1}>
                     {item.city}
                   </Text>
@@ -172,7 +173,7 @@ const styles = StyleSheet.create({
   image: {
     width: '100%',
     height: '100%',
-    backgroundColor: '#f0f0f0',
+    backgroundColor: colors.BORDER_LIGHT,
   },
   contentContainer: {
     padding: 10,
@@ -180,13 +181,13 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 14,
     marginBottom: 5,
-    color: '#333',
+    color: colors.TEXT_PRIMARY,
   },
   price: {
     fontSize: 16,
     fontWeight: 'bold',
     marginBottom: 5,
-    color: '#000',
+    color: colors.TEXT_PRIMARY,
   },
   footer: {
     flexDirection: 'row',
@@ -201,13 +202,13 @@ const styles = StyleSheet.create({
   },
   locationText: {
     fontSize: 12,
-    color: '#888',
+    color: colors.ICON_MEDIUM,
     marginLeft: 2,
     flex: 1,
   },
   dateText: {
     fontSize: 12,
-    color: '#888',
+    color: colors.ICON_MEDIUM,
   },
   conditionBadge: {
     position: 'absolute',
@@ -220,19 +221,19 @@ const styles = StyleSheet.create({
   conditionText: {
     fontSize: 10,
     fontWeight: '500',
-    color: '#fff',
+    color: colors.TEXT_WHITE,
   },
   conditionNew: {
-    backgroundColor: '#4CAF50',
+    backgroundColor: colors.SUCCESS,
   },
   conditionLikeNew: {
-    backgroundColor: '#8BC34A',
+    backgroundColor: colors.SUCCESS,
   },
   conditionGood: {
-    backgroundColor: '#FFC107',
+    backgroundColor: colors.WARNING,
   },
   conditionFair: {
-    backgroundColor: '#FF9800',
+    backgroundColor: colors.WARNING,
   },
   // Styles pour les badges vendeur Pro/Particulier
   sellerBadge: {
@@ -242,18 +243,18 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: 4,
-    backgroundColor: '#fff',
+    backgroundColor: colors.BACKGROUND_CARD,
   },
   proBadge: {
-    backgroundColor: '#6B3CE9',
+    backgroundColor: colors.INFO,
   },
   particulierBadge: {
-    backgroundColor: '#607D8B',
+    backgroundColor: colors.GRAY_MEDIUM,
   },
   sellerBadgeText: {
     fontSize: 10,
     fontWeight: 'bold',
-    color: '#fff',
+    color: colors.TEXT_WHITE,
   },
 });
 

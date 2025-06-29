@@ -9,6 +9,7 @@ import { widthPercentageToDP as wp, heightPercentageToDP as hp } from 'react-nat
 import { useFocusEffect } from '@react-navigation/native';
 import { SERVER_IP } from '../config/ip';
 import imageService from '../services/api/imageService';
+import { globalStyles, colors } from '../theme/globalStyles';
 
 type Props = NativeStackScreenProps<any, 'Home'>;
 
@@ -230,7 +231,7 @@ const ProductItem = React.memo(({ item, navigation }: { item: Product; navigatio
   return (
     <Card
       style={styles.productCard}
-      onPress={() => navigation.navigate('ProductDetails', { productId: item.id, fullscreenMode: true })}
+      onPress={() => navigation.navigate('ProductDetails', { productId: item.id })}
     >
       <View style={styles.productImageContainer}>
         <TouchableOpacity 
@@ -238,14 +239,14 @@ const ProductItem = React.memo(({ item, navigation }: { item: Product; navigatio
           onPress={handleFavorite}
         >
           <Ionicons 
-            name={isFavorite ? 'heart' : 'heart-outline'} 
-            size={24} 
-            color={isFavorite ? '#ff6b9b' : '#ffffff'} 
+                          name={isFavorite ? 'heart' : 'heart-outline'} 
+              size={24} 
+              color={isFavorite ? colors.PRIMARY : colors.TEXT_WHITE} 
           />
         </TouchableOpacity>
         {imageLoading && (
           <View style={styles.imageLoadingContainer}>
-            <ActivityIndicator size="small" color="#ff6b9b" />
+            <ActivityIndicator size="small" color={colors.PRIMARY} />
           </View>
         )}
         <Image 
@@ -268,7 +269,7 @@ const ProductItem = React.memo(({ item, navigation }: { item: Product; navigatio
         />
         {imageError && (
           <View style={styles.imageErrorContainer}>
-            <Ionicons name="image-outline" size={24} color="#ff6b9b" />
+            <Ionicons name="image-outline" size={24} color={colors.PRIMARY} />
             <Text style={styles.imageErrorText}>Image indisponible</Text>
           </View>
         )}
@@ -402,7 +403,7 @@ export default function HomeScreen({ navigation }: Props) {
     if (isLoading) {
       return (
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#ff6b9b" />
+          <ActivityIndicator size="large" color={colors.PRIMARY} />
           <Text style={styles.loadingText}>Chargement des produits...</Text>
         </View>
       );
@@ -472,7 +473,8 @@ export default function HomeScreen({ navigation }: Props) {
       <ScrollView 
         horizontal 
         showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.categoriesContainer}
+        style={styles.categoriesContainer}
+        contentContainerStyle={styles.categoriesContent}
       >
         {categories.map(category => (
           <Chip
@@ -518,14 +520,15 @@ export default function HomeScreen({ navigation }: Props) {
             onPress={() => navigation.navigate('Search')}
           >
             <Searchbar
-              placeholder="Rechercher un produit..."
+              placeholder="Que recherchez-vous ? ✨"
               style={styles.searchBar}
               inputStyle={styles.searchInput}
               value={searchQuery}
               editable={false}
               pointerEvents="none"
-              icon={() => <Ionicons name="search" size={22} color="#ff6b9b" style={styles.searchIcon} />}
-              right={() => <Ionicons name="arrow-forward" size={20} color="#ff6b9b" style={styles.searchArrow} />}
+                          placeholderTextColor={colors.TEXT_TRANSPARENT_LIGHT}
+            icon={() => <Ionicons name="search" size={22} color={colors.PRIMARY_TRANSPARENT_HEAVY} style={styles.searchIcon} />}
+            right={() => <Ionicons name="arrow-forward" size={20} color={colors.PRIMARY_TRANSPARENT_HEAVY} style={styles.searchArrow} />}
             />
           </TouchableOpacity>
         </View>
@@ -573,93 +576,100 @@ export default function HomeScreen({ navigation }: Props) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#ffffff',
+    backgroundColor: colors.BACKGROUND_LIGHT,
   },
   headerSection: {
-    height: hp('28%'),
+    height: hp('32%'),
     backgroundColor: 'transparent',
+    marginBottom: hp('0.5%'),
   },
   backgroundImage: {
     position: 'absolute',
     width: '100%',
-    height: '120%',
-    top: -hp('7%'),
+    height: '115%',
+    top: -hp('6%'),
   },
   searchBarContainer: {
     paddingHorizontal: wp('5%'),
-    marginTop: hp('4%'),
+    marginTop: hp('6%'),
     alignItems: 'center',
     justifyContent: 'center',
     zIndex: 10,
   },
   searchBar: {
-    borderRadius: 8,
-    height: hp('6%'),
-    backgroundColor: 'rgba(255, 255, 255, 0.95)',
-    borderWidth: 1,
-    borderColor: '#ffd4e5',
-    elevation: 4,
-    shadowColor: '#000',
+    borderRadius: 25,
+    height: hp('6.5%'),
+    backgroundColor: colors.WHITE_TRANSPARENT_LIGHT,
+    borderWidth: 0,
+    elevation: 3,
+    shadowColor: colors.PRIMARY,
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
+    shadowOpacity: 0.12,
+    shadowRadius: 8,
     width: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   searchInput: {
     fontSize: wp('3.8%'),
-    color: '#333',
+    color: colors.TEXT_TRANSPARENT_MEDIUM,
     marginLeft: wp('1%'),
     fontWeight: '500',
   },
   searchIcon: {
     marginLeft: wp('2%'),
+    opacity: 0.7,
   },
   searchArrow: {
     marginRight: wp('2%'),
+    opacity: 0.7,
   },
   categoriesContainer: {
-    marginTop: hp('1%'),
+    marginTop: hp('1.5%'),
   },
   categoriesContent: {
-    paddingHorizontal: wp('4%'),
-    gap: wp('2%'),
+    paddingHorizontal: wp('5%'),
+    paddingVertical: hp('0.5%'),
   },
   mainContent: {
     flex: 1,
-    backgroundColor: '#ffffff',
+    backgroundColor: colors.BACKGROUND_MAIN,
     borderTopLeftRadius: 0,
     borderTopRightRadius: 0,
-    marginTop: -hp('2%'),
+    marginTop: -hp('3%'),
+    paddingTop: hp('1%'),
   },
   bannerText: {
-    fontSize: wp('5%'),
+    fontSize: wp('4.5%'),
     fontWeight: '600',
     textAlign: 'center',
-    color: '#333',
-    marginTop: hp('2%'),
-    marginBottom: hp('1%'),
+    color: colors.TEXT_TRANSPARENT_MEDIUM,
+    marginTop: hp('1%'),
+    marginBottom: hp('1.5%'),
+    paddingHorizontal: wp('5%'),
   },
   sectionTitle: {
     fontSize: wp('5%'),
     fontWeight: '600',
     textAlign: 'center',
     marginBottom: hp('1%'),
-    color: '#333',
+    color: colors.TEXT_PRIMARY,
   },
   productsGrid: {
-    paddingHorizontal: wp('2%'),
+    paddingHorizontal: wp('3%'),
+    paddingTop: hp('0.5%'),
   },
   productCard: {
     width: wp('44%'),
     margin: wp('2%'),
-    backgroundColor: '#ffffff',
+    backgroundColor: colors.BACKGROUND_CARD,
     elevation: 2,
     borderRadius: 0,
     overflow: 'hidden',
   },
   productImageContainer: {
     height: wp('44%'),
-    backgroundColor: '#f5f5f5',
+    backgroundColor: colors.BACKGROUND_GRAY,
   },
   productImage: {
     height: '100%',
@@ -671,17 +681,17 @@ const styles = StyleSheet.create({
   productTitle: {
     fontSize: wp('3.5%'),
     fontWeight: '500',
-    color: '#333',
+    color: colors.TEXT_PRIMARY,
     marginBottom: hp('0.5%'),
   },
   productPrice: {
     fontSize: wp('4%'),
     fontWeight: 'bold',
-    color: '#ff6b9b',
+    color: colors.PRIMARY,
   },
   productLocation: {
     fontSize: wp('3%'),
-    color: '#666',
+    color: colors.TEXT_SECONDARY,
     marginTop: hp('0.5%'),
   },
   badgeContainer: {
@@ -695,15 +705,15 @@ const styles = StyleSheet.create({
     marginRight: 6,
   },
   trendingBadge: {
-    backgroundColor: '#ffcce0',
+    backgroundColor: colors.PRIMARY_TRANSPARENT_LIGHT,
   },
   featuredBadge: {
-    backgroundColor: '#e0f7ff',
+    backgroundColor: colors.INFO + '20', // Ajout de transparence
   },
   badgeText: {
     fontSize: 10,
     fontWeight: 'bold',
-    color: '#ff6b9b',
+    color: colors.PRIMARY,
     marginTop: 2,
   },
   // États de chargement et d'erreur
@@ -713,25 +723,25 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     marginTop: 10,
-    color: '#666',
+    color: colors.TEXT_SECONDARY,
   },
   errorContainer: {
     padding: 20,
     alignItems: 'center',
   },
   errorText: {
-    color: '#ff3b30',
+    color: colors.WARNING,
     textAlign: 'center',
     marginBottom: 20,
   },
   retryButton: {
-    backgroundColor: '#ff6b9b',
+    backgroundColor: colors.PRIMARY,
     paddingVertical: 10,
     paddingHorizontal: 20,
     borderRadius: 20,
   },
   retryButtonText: {
-    color: '#ffffff',
+    color: colors.TEXT_WHITE,
     fontWeight: 'bold',
   },
   emptyContainer: {
@@ -741,7 +751,7 @@ const styles = StyleSheet.create({
     height: 200,
   },
   emptyText: {
-    color: '#666',
+    color: colors.TEXT_SECONDARY,
     fontSize: 16,
     textAlign: 'center',
   },
@@ -753,7 +763,7 @@ const styles = StyleSheet.create({
     bottom: 0,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: 'rgba(245, 245, 245, 0.7)',
+    backgroundColor: colors.WHITE_TRANSPARENT_MEDIUM,
   },
   imageErrorContainer: {
     position: 'absolute',
@@ -763,12 +773,12 @@ const styles = StyleSheet.create({
     bottom: 0,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: 'rgba(245, 245, 245, 0.9)',
+    backgroundColor: colors.WHITE_TRANSPARENT_HEAVY,
   },
-  imageErrorText: {
-    color: '#ff6b9b',
-    marginTop: 5,
-    fontSize: 12,
+      imageErrorText: {
+      color: colors.PRIMARY,
+      marginTop: 5,
+      fontSize: 12,
     fontWeight: 'bold',
   },
   favoriteButton: {
@@ -776,7 +786,7 @@ const styles = StyleSheet.create({
     top: wp('2%'),
     right: wp('2%'),
     zIndex: 2,
-    backgroundColor: 'rgba(255,255,255,0.9)',
+    backgroundColor: colors.WHITE_TRANSPARENT_HEAVY,
     borderRadius: wp('6%'),
     padding: wp('2%'),
   },
@@ -797,23 +807,46 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
-    backgroundColor: 'rgba(255, 255, 255, 0.85)',
+    backgroundColor: colors.WHITE_TRANSPARENT_HEAVY,
     padding: 1,
   },
   categoryChip: {
-    backgroundColor: 'rgba(255, 255, 255, 0.9)',
-    borderRadius: 8,
-    height: hp('4%'),
+    backgroundColor: colors.WHITE_TRANSPARENT_MEDIUM,
+    borderRadius: 25,
+    height: hp('4.5%'),
     marginRight: wp('2%'),
+    marginBottom: hp('0.5%'),
+          borderWidth: 0,
+      elevation: 2,
+      shadowColor: colors.PRIMARY,
+      shadowOffset: { width: 0, height: 1 },
+      shadowOpacity: 0.08,
+    shadowRadius: 4,
+    paddingHorizontal: wp('3.5%'),
+    justifyContent: 'center',
+    alignItems: 'center',
+    minWidth: wp('18%'),
   },
-  categoryText: {
-    fontSize: wp('3.2%'),
-    color: '#666',
-  },
-  selectedCategoryChip: {
-    backgroundColor: '#ff6b9b',
+      categoryText: {
+      fontSize: wp('3.4%'),
+      color: colors.TEXT_TRANSPARENT_MEDIUM,
+      fontWeight: '500',
+      textAlign: 'center',
+    includeFontPadding: false,
+    textAlignVertical: 'center',
+      },
+    selectedCategoryChip: {
+      backgroundColor: colors.PRIMARY_TRANSPARENT_HEAVY,
+      borderWidth: 0,
+      elevation: 3,
+    shadowOpacity: 0.15,
+    shadowRadius: 6,
   },
   selectedCategoryText: {
-    color: '#ffffff',
+    color: colors.WHITE_TRANSPARENT_HEAVY,
+    fontWeight: '600',
+    textAlign: 'center',
+    includeFontPadding: false,
+    textAlignVertical: 'center',
   },
 }); 

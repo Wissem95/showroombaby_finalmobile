@@ -32,6 +32,7 @@ import Animated, {
 import { useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import imageService from '../services/api/imageService';
+import { globalStyles, colors } from '../theme/globalStyles';
 
 // API URL
 // Pour les appareils externes, utiliser votre adresse IP locale au lieu de 127.0.0.1
@@ -110,10 +111,10 @@ const ErrorToast = ({ message, onDismiss }: { message: string, onDismiss: () => 
       exiting={FadeOut.duration(300)}
     >
       <Surface style={styles.errorToastContent}>
-        <Ionicons name="alert-circle" size={20} color="#fff" />
+        <Ionicons name="alert-circle" size={20} color={colors.BACKGROUND_MAIN} />
         <Text style={styles.errorToastText}>{message}</Text>
         <TouchableOpacity onPress={onDismiss}>
-          <Ionicons name="close" size={20} color="#fff" />
+          <Ionicons name="close" size={20} color={colors.BACKGROUND_MAIN} />
         </TouchableOpacity>
       </Surface>
     </Animated.View>
@@ -583,7 +584,7 @@ export default function ChatScreen({ route, navigation }: Props) {
 
   const handleViewProduct = () => {
     if (product && product.id && product.id > 0) {
-      navigation.navigate('ProductDetails', { productId: product.id, fullscreenMode: true });
+      navigation.navigate('ProductDetails', { productId: product.id });
     } else {
       showErrorToast('Détails du produit non disponibles');
     }
@@ -645,8 +646,8 @@ export default function ChatScreen({ route, navigation }: Props) {
               size={32} 
               label={(otherUser?.username?.[0] || seller?.username?.[0] || 'U').toUpperCase()}
               style={styles.messageAvatar}
-              color="#fff"
-              theme={{ colors: { primary: '#ff6b9b' } }}
+              color={colors.BACKGROUND_MAIN}
+              theme={{ colors: { primary: colors.PRIMARY } }}
             />
           )}
           
@@ -672,7 +673,7 @@ export default function ChatScreen({ route, navigation }: Props) {
                 <Ionicons 
                   name={item.read ? "checkmark-done" : "checkmark"} 
                   size={12} 
-                  color="rgba(255,255,255,0.8)" 
+                  color={colors.WHITE_TRANSPARENT_HEAVY} 
                   style={{marginLeft: 2}}
                 />
               )}
@@ -689,7 +690,7 @@ export default function ChatScreen({ route, navigation }: Props) {
     return (
       <View style={styles.emptyChatWrapper}>
         <View style={styles.emptyChatContainer}>
-          <Ionicons name="chatbubble-ellipses-outline" size={80} color="#ddd" />
+          <Ionicons name="chatbubble-ellipses-outline" size={80} color={colors.BORDER_DARK} />
           <Text style={styles.emptyChatTitle}>Aucun message</Text>
           <Text style={styles.emptyChatText}>
             Commencez la conversation en envoyant un message à propos de {productName}!
@@ -697,7 +698,7 @@ export default function ChatScreen({ route, navigation }: Props) {
           <View style={{ marginTop: 20 }}>
             <Button 
               mode="contained" 
-              style={{ backgroundColor: '#ff6b9b', borderRadius: 20 }}
+              style={{ backgroundColor: colors.PRIMARY, borderRadius: 20 }}
               icon="send"
               onPress={() => inputRef.current?.focus()}
             >
@@ -738,7 +739,7 @@ export default function ChatScreen({ route, navigation }: Props) {
             }]
           }}
         >
-          <Ionicons name="chatbubble-ellipses-outline" size={50} color="#ff6b9b" />
+          <Ionicons name="chatbubble-ellipses-outline" size={50} color={colors.PRIMARY} />
         </RNAnimated.View>
         <Text style={styles.loadingText}>Chargement de la conversation...</Text>
       </View>
@@ -748,13 +749,13 @@ export default function ChatScreen({ route, navigation }: Props) {
   if (error) {
     return (
       <View style={[styles.errorContainer, { paddingTop: insets.top }]}>
-        <Ionicons name="alert-circle-outline" size={60} color="#ff6b6b" />
+        <Ionicons name="alert-circle-outline" size={60} color={colors.PRIMARY} />
         <Text style={styles.errorText}>{error}</Text>
         <Button 
           mode="contained" 
           onPress={loadInitialData}
           style={styles.retryButton}
-          buttonColor="#ff6b9b"
+          buttonColor={colors.PRIMARY}
         >
           Réessayer
         </Button>
@@ -773,7 +774,7 @@ export default function ChatScreen({ route, navigation }: Props) {
     >
       <Appbar.Header style={styles.header}>
         <Appbar.BackAction 
-          color="#ff6b9b" 
+          color={colors.PRIMARY} 
           size={28}
           onPress={() => {
             if (navigation.canGoBack()) {
@@ -805,8 +806,8 @@ export default function ChatScreen({ route, navigation }: Props) {
                 size={26} 
                 label={(seller?.username?.[0] || 'U').toUpperCase()} 
                 style={styles.headerAvatar}
-                color="#fff"
-                theme={{ colors: { primary: '#ff6b9b' } }}
+                color={colors.BACKGROUND_MAIN}
+                theme={{ colors: { primary: colors.PRIMARY } }}
               />
             )}
             <Text style={styles.headerTitle} numberOfLines={1}>
@@ -824,7 +825,7 @@ export default function ChatScreen({ route, navigation }: Props) {
             style={styles.headerAction}
             onPress={handleViewProduct}
           >
-            <Ionicons name="information-circle-outline" size={24} color="#666" />
+                            <Ionicons name="information-circle-outline" size={24} color={colors.TEXT_SECONDARY} />
           </TouchableOpacity>
         )}
       </Appbar.Header>
@@ -856,7 +857,7 @@ export default function ChatScreen({ route, navigation }: Props) {
                   />
                 ) : (
                   <View style={styles.placeholderImageContainer}>
-                    <Ionicons name="image-outline" size={24} color="#bbb" />
+                    <Ionicons name="image-outline" size={24} color={colors.ICON_LIGHT} />
                   </View>
                 )}
               </Animated.View>
@@ -887,7 +888,7 @@ export default function ChatScreen({ route, navigation }: Props) {
                   <IconButton
                     icon="chevron-right"
                     size={20}
-                    iconColor="#666"
+                    iconColor={colors.TEXT_SECONDARY}
                     onPress={handleViewProduct}
                   />
                 </Animated.View>
@@ -912,8 +913,8 @@ export default function ChatScreen({ route, navigation }: Props) {
             <RefreshControl
               refreshing={refreshing}
               onRefresh={onRefresh}
-              colors={['#ff6b9b']}
-              tintColor="#ff6b9b"
+                              colors={[colors.PRIMARY]}
+                tintColor={colors.PRIMARY}
             />
           }
           initialNumToRender={15}
@@ -935,7 +936,7 @@ export default function ChatScreen({ route, navigation }: Props) {
             value={newMessage}
             onChangeText={setNewMessage}
             placeholder="Écrire un message..."
-            placeholderTextColor="#999"
+            placeholderTextColor={colors.TEXT_MUTED}
             style={styles.input}
             multiline
             maxLength={500}
@@ -956,10 +957,10 @@ export default function ChatScreen({ route, navigation }: Props) {
               disabled={!newMessage.trim() || sending}
             >
               {sending ? (
-                <ActivityIndicator size={26} color="#fff" />
+                <ActivityIndicator size={26} color={colors.BACKGROUND_MAIN} />
               ) : (
                 <View style={styles.sendIconContainer}>
-                  <Ionicons name="paper-plane" size={22} color="#fff" />
+                  <Ionicons name="paper-plane" size={22} color={colors.BACKGROUND_MAIN} />
                 </View>
               )}
             </TouchableOpacity>
@@ -979,19 +980,19 @@ const styles = StyleSheet.create({
   // Conteneur principal pour tout l'écran de chat
   container: {
     flex: 1,
-    backgroundColor: '#f8f9fa',
+    backgroundColor: 'colors.BACKGROUND_SECONDARY',
   },
   // Conteneur affiché pendant le chargement des messages
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#f8f9fa',
+    backgroundColor: 'colors.BACKGROUND_SECONDARY',
   },
   // Texte affiché pendant le chargement
   loadingText: {
     marginTop: 8,
-    color: '#666',
+          color: colors.TEXT_SECONDARY,
     fontSize: 14,
     fontWeight: '500',
   },
@@ -1001,12 +1002,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     padding: 20,
-    backgroundColor: '#f8f9fa',
+    backgroundColor: 'colors.BACKGROUND_SECONDARY',
   },
   // Style du texte d'erreur
   errorText: {
     fontSize: 16,
-    color: '#ff4444',
+    color: 'colors.ERROR_LIGHT',
     textAlign: 'center',
     marginTop: 8,
     marginBottom: 16,
@@ -1017,24 +1018,24 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
     borderRadius: 25,
     elevation: 4,
-    shadowColor: '#ff6b9b',
+    shadowColor: colors.PRIMARY,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.3,
     shadowRadius: 3,
   },
   // Barre d'en-tête contenant les informations du vendeur et du produit
   header: {
-    backgroundColor: '#ffffff',
+    backgroundColor: colors.BACKGROUND_MAIN,
     elevation: 4,
     height: 55,
-    shadowColor: '#000',
+    shadowColor: 'colors.TEXT_DARK',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.15,
     shadowRadius: 3,
     paddingTop: 0,
     paddingBottom: 0,
     borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
+    borderBottomColor: 'colors.BORDER_LIGHT',
   },
   // Partie principale de l'en-tête contenant les infos
   headerContent: {
@@ -1055,20 +1056,20 @@ const styles = StyleSheet.create({
     marginRight: 6,
     marginTop: 0,
     borderWidth: 1,
-    borderColor: '#f0f0f0',
+    borderColor: 'colors.BORDER_LIGHT',
   },
   // Titre dans l'en-tête (nom du vendeur)
   headerTitle: {
     fontSize: 15,
     fontWeight: '700',
-    color: '#333',
+    color: colors.TEXT_PRIMARY,
     paddingTop: 0,
     marginTop: 0,
   },
   // Sous-titre dans l'en-tête (titre du produit)
   headerSubtitle: {
     fontSize: 13,
-    color: '#6B3CE9',
+    color: 'colors.INFO',
     fontWeight: '500',
     marginLeft: 34,
     marginTop: -2,
@@ -1083,22 +1084,22 @@ const styles = StyleSheet.create({
     overflow: 'visible',
     paddingHorizontal: 12,
     paddingVertical: 8,
-    backgroundColor: '#f8f9fa',
+    backgroundColor: 'colors.BACKGROUND_SECONDARY',
     zIndex: 10,
   },
   // Conteneur principal des informations du produit
   productInfoContainer: {
-    backgroundColor: '#fff',
+    backgroundColor: colors.BACKGROUND_MAIN,
     paddingVertical: 10,
     paddingHorizontal: 12,
     elevation: 4,
     borderRadius: 12,
-    shadowColor: '#000',
+    shadowColor: 'colors.TEXT_DARK',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.2,
     shadowRadius: 5,
     borderWidth: 1,
-    borderColor: '#f0f0f0',
+    borderColor: 'colors.BORDER_LIGHT',
   },
   // Disposition du contenu des informations du produit
   productInfoContent: {
@@ -1113,11 +1114,11 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: '#f0f0f0',
+    borderColor: 'colors.BORDER_LIGHT',
     marginRight: 12,
-    backgroundColor: '#fff',
+    backgroundColor: colors.BACKGROUND_MAIN,
     elevation: 2,
-    shadowColor: '#000',
+    shadowColor: 'colors.TEXT_DARK',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.1,
     shadowRadius: 2,
@@ -1126,7 +1127,7 @@ const styles = StyleSheet.create({
   placeholderImageContainer: {
     width: 60, 
     height: 60,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: 'colors.BACKGROUND_GRAY',
     justifyContent: 'center', 
     alignItems: 'center',
     borderRadius: 10,
@@ -1146,7 +1147,7 @@ const styles = StyleSheet.create({
   productTitle: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#333',
+    color: colors.TEXT_PRIMARY,
     marginBottom: 6,
   },
   // Conteneur du prix et autres infos
@@ -1156,24 +1157,24 @@ const styles = StyleSheet.create({
   },
   // Badge visuel pour le prix
   priceTag: {
-    backgroundColor: 'rgba(255,107,155,0.15)',
+    backgroundColor: 'colors.PRIMARY_TRANSPARENT_LIGHT',
     paddingVertical: 4,
     paddingHorizontal: 8,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: 'rgba(255,107,155,0.15)',
+    borderColor: 'colors.PRIMARY_TRANSPARENT_LIGHT',
     marginRight: 10,
   },
   // Style du texte du prix
   productPrice: {
     fontSize: 14,
     fontWeight: '700',
-    color: '#ff6b9b',
+    color: colors.PRIMARY,
   },
   // Texte "Voir l'annonce" cliquable
   viewProductText: {
     fontSize: 12,
-    color: '#6B3CE9',
+    color: 'colors.INFO',
     textDecorationLine: 'underline',
     fontWeight: '500',
   },
@@ -1202,7 +1203,7 @@ const styles = StyleSheet.create({
   emptyChatTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#555',
+    color: 'colors.GRAY_DARK',
     marginTop: 12,
     marginBottom: 8,
     transform: [],
@@ -1210,7 +1211,7 @@ const styles = StyleSheet.create({
   // Texte explicatif pour le chat vide
   emptyChatText: {
     fontSize: 14,
-    color: '#999',
+    color: 'colors.TEXT_MUTED',
     textAlign: 'center',
     lineHeight: 20,
     transform: [],
@@ -1227,7 +1228,7 @@ const styles = StyleSheet.create({
     alignSelf: 'flex-end',
     marginBottom: 2,
     borderWidth: 1,
-    borderColor: '#f0f0f0',
+    borderColor: 'colors.BORDER_LIGHT',
   },
   // Style pour les messages envoyés (alignés à droite)
   sentMessage: {
@@ -1251,25 +1252,25 @@ const styles = StyleSheet.create({
   },
   // Style spécifique pour le contenu des messages envoyés
   sentMessageContent: {
-    backgroundColor: '#ff6b9b',
+    backgroundColor: colors.PRIMARY,
     borderBottomRightRadius: 4,
     elevation: 2,
-    shadowColor: '#ff3b7b',
+    shadowColor: 'colors.PRIMARY_SHADOW',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.2,
     shadowRadius: 2,
   },
   // Style spécifique pour le contenu des messages reçus
   receivedMessageContent: {
-    backgroundColor: '#fff',
+    backgroundColor: colors.BACKGROUND_MAIN,
     borderBottomLeftRadius: 4,
     elevation: 2,
-    shadowColor: '#000',
+    shadowColor: 'colors.TEXT_DARK',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.1,
     shadowRadius: 2,
     borderWidth: 1,
-    borderColor: '#f0f0f0',
+    borderColor: 'colors.BORDER_LIGHT',
   },
   // Style pour les messages consécutifs du même expéditeur
   consecutiveMessage: {
@@ -1282,12 +1283,12 @@ const styles = StyleSheet.create({
   },
   // Style du texte pour les messages envoyés
   sentMessageText: {
-    color: '#fff',
+    color: 'colors.BACKGROUND_MAIN',
     fontWeight: '400',
   },
   // Style du texte pour les messages reçus
   receivedMessageText: {
-    color: '#333',
+    color: colors.TEXT_PRIMARY,
     fontWeight: '400',
   },
   // Style de l'heure du message
@@ -1304,11 +1305,11 @@ const styles = StyleSheet.create({
   },
   // Style de l'heure pour les messages envoyés
   sentMessageTime: {
-    color: 'rgba(255, 255, 255, 0.8)',
+    color: 'colors.WHITE_TRANSPARENT_HEAVY',
   },
   // Style de l'heure pour les messages reçus
   receivedMessageTime: {
-    color: '#999',
+    color: 'colors.TEXT_MUTED',
   },
   // Conteneur pour la date séparant les messages
   dateContainer: {
@@ -1318,8 +1319,8 @@ const styles = StyleSheet.create({
   // Style du texte de la date
   dateText: {
     fontSize: 12,
-    color: '#888',
-    backgroundColor: 'rgba(0, 0, 0, 0.05)',
+    color: 'colors.GRAY_MEDIUM',
+    backgroundColor: 'colors.SHADOW_LIGHT',
     paddingHorizontal: 10,
     paddingVertical: 3,
     borderRadius: 12,
@@ -1330,11 +1331,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     padding: 10,
-    backgroundColor: '#fff',
+    backgroundColor: 'colors.BACKGROUND_MAIN',
     borderTopWidth: 1,
-    borderTopColor: '#f0f0f0',
+    borderTopColor: 'colors.BORDER_LIGHT',
     elevation: 6,
-    shadowColor: '#000',
+    shadowColor: 'colors.TEXT_DARK',
     shadowOffset: { width: 0, height: -2 },
     shadowOpacity: 0.12,
     shadowRadius: 4,
@@ -1345,39 +1346,39 @@ const styles = StyleSheet.create({
   // Champ de saisie du message
   input: {
     flex: 1,
-    backgroundColor: '#f8f9fa',
+    backgroundColor: 'colors.BACKGROUND_SECONDARY',
     paddingHorizontal: 20,
     paddingVertical: 12,
     borderRadius: 24,
     marginRight: 10,
     fontSize: 16,
     maxHeight: 100,
-    color: '#333',
+    color: 'colors.TEXT_PRIMARY',
     borderWidth: 1,
-    borderColor: '#ececec',
+    borderColor: 'colors.BORDER_MEDIUM',
     elevation: 2,
-    shadowColor: '#000',
+    shadowColor: 'colors.TEXT_DARK',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.08,
     shadowRadius: 2,
   },
   // Bouton d'envoi du message
   sendButton: {
-    backgroundColor: '#ff6b9b',
+    backgroundColor: 'colors.PRIMARY',
     width: 50,
     height: 50,
     borderRadius: 25,
     justifyContent: 'center',
     alignItems: 'center',
     elevation: 5,
-    shadowColor: '#ff3b7b',
+    shadowColor: 'colors.PRIMARY_SHADOW',
     shadowOffset: { width: 0, height: 3 },
     shadowOpacity: 0.5,
     shadowRadius: 6,
   },
   // Style du bouton d'envoi désactivé
   sendButtonDisabled: {
-    backgroundColor: '#ffb3cb',
+    backgroundColor: 'colors.PRIMARY_LIGHT',
     elevation: 2,
     shadowOpacity: 0.2,
   },
@@ -1407,17 +1408,17 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     elevation: 6,
-    shadowColor: '#000',
+    shadowColor: 'colors.TEXT_DARK',
     shadowOffset: { width: 0, height: 3 },
     shadowOpacity: 0.3,
     shadowRadius: 5,
     maxWidth: '90%',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.2)',
+    borderColor: 'colors.WHITE_TRANSPARENT_LIGHT',
   },
   // Texte du toast d'erreur
   errorToastText: {
-    color: '#fff',
+    color: 'colors.BACKGROUND_MAIN',
     fontSize: 14,
     fontWeight: '500',
     marginHorizontal: 10,
@@ -1428,7 +1429,7 @@ const styles = StyleSheet.create({
     marginRight: 6,
     marginLeft: 2,
     padding: 8,
-    backgroundColor: 'rgba(255, 107, 155, 0.1)',
+    backgroundColor: 'colors.PRIMARY_TRANSPARENT_LIGHT',
     borderRadius: 20,
   },
 }); 

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ScrollView, View, StyleSheet, TouchableOpacity, RefreshControl, Alert, ActivityIndicator, Image, Modal, SafeAreaView, StatusBar } from 'react-native';
+import { ScrollView, View, StyleSheet, TouchableOpacity, RefreshControl, Alert, ActivityIndicator, Image, Modal, SafeAreaView, StatusBar, Keyboard } from 'react-native';
 import { Avatar, Text, Divider, List, Button, Card, TextInput, Surface, Portal, Provider, IconButton, Dialog } from 'react-native-paper';
 import AuthService from '../services/auth';
 import { Props } from '../types/navigation';
@@ -12,6 +12,7 @@ import { widthPercentageToDP as wp, heightPercentageToDP as hp } from 'react-nat
 import { useIsFocused } from '@react-navigation/native';
 import { SERVER_IP } from '../config/ip';
 import imageService from '../services/api/imageService';
+import { globalStyles, colors } from '../theme/globalStyles';
 
 // URL de l'API
 // Pour les appareils externes, utiliser votre adresse IP locale au lieu de 127.0.0.1
@@ -305,19 +306,19 @@ export default function ProfileScreen({ navigation }: Props) {
     return (
       <Card style={styles.productCard} key={product.id}>
         <TouchableOpacity 
-          onPress={() => navigation.navigate('ProductDetails', { productId: product.id, fullscreenMode: true })}
+          onPress={() => navigation.navigate('ProductDetails', { productId: product.id })}
         >
           <View style={styles.productImageContainer}>
             {imageLoading && (
               <ActivityIndicator 
                 size="small" 
-                color="#E75A7C" 
+                color="colors.PRIMARY_DARK" 
                 style={styles.imageLoader} 
               />
             )}
             {imageError && (
               <View style={styles.imageErrorContainer}>
-                <Ionicons name="image-outline" size={24} color="#E75A7C" />
+                <Ionicons name="image-outline" size={24} color="colors.PRIMARY_DARK" />
                 <Text style={styles.imageErrorText}>Image indisponible</Text>
               </View>
             )}
@@ -337,7 +338,7 @@ export default function ProfileScreen({ navigation }: Props) {
             <Text style={styles.productPrice}>{formatPrice(product.price)}</Text>
             {product.location && (
               <Text style={styles.productLocation} numberOfLines={1}>
-                <Ionicons name="location-outline" size={14} color="#666" /> {product.location}
+                <Ionicons name="location-outline" size={14} color="colors.TEXT_SECONDARY" /> {product.location}
               </Text>
             )}
           </Card.Content>
@@ -620,13 +621,15 @@ export default function ProfileScreen({ navigation }: Props) {
       <ScrollView 
         style={styles.container}
         contentContainerStyle={styles.contentContainer}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
         refreshControl={
           <RefreshControl 
             refreshing={refreshing} 
             onRefresh={onRefresh}
-            colors={['#E75A7C']}
-            tintColor="#E75A7C"
-            progressBackgroundColor="#ffffff"
+            colors={['colors.PRIMARY_DARK']}
+            tintColor="colors.PRIMARY_DARK"
+                            progressBackgroundColor={colors.BACKGROUND_MAIN}
           />
         }
       >
@@ -635,7 +638,7 @@ export default function ProfileScreen({ navigation }: Props) {
           style={styles.headerBackground}
         >
           <LinearGradient
-            colors={['rgba(231,90,140,0.7)', 'rgba(231,90,140,0.9)']}
+            colors={['colors.PRIMARY_DARK + "B3"', 'colors.PRIMARY_DARK + "E6"']}
             style={styles.headerGradient}
           >
             <SafeAreaView style={styles.header}>
@@ -651,7 +654,7 @@ export default function ProfileScreen({ navigation }: Props) {
                 style={styles.editButton}
                 onPress={() => setEditProfileVisible(true)}
               >
-                <Ionicons name="pencil" size={18} color="#fff" />
+                <Ionicons name="pencil" size={18} color="colors.BACKGROUND_MAIN" />
                 <Text style={styles.editButtonText}>Modifier le profil</Text>
               </TouchableOpacity>
             </SafeAreaView>
@@ -680,7 +683,7 @@ export default function ProfileScreen({ navigation }: Props) {
           <List.Item
             title="Informations personnelles"
             description="Modifier vos informations de base"
-            left={props => <List.Icon {...props} icon="account-edit" color="#E75A7C" />}
+            left={props => <List.Icon {...props} icon="account-edit" color="colors.PRIMARY_DARK" />}
             right={props => <List.Icon {...props} icon="chevron-right" />}
             onPress={() => setEditProfileVisible(true)}
             style={styles.listItem}
@@ -688,7 +691,7 @@ export default function ProfileScreen({ navigation }: Props) {
           <List.Item
             title="Changer de mot de passe"
             description="Mettre à jour votre mot de passe"
-            left={props => <List.Icon {...props} icon="lock-reset" color="#E75A7C" />}
+            left={props => <List.Icon {...props} icon="lock-reset" color="colors.PRIMARY_DARK" />}
             right={props => <List.Icon {...props} icon="chevron-right" />}
             onPress={() => setChangePasswordVisible(true)}
             style={styles.listItem}
@@ -696,7 +699,7 @@ export default function ProfileScreen({ navigation }: Props) {
           <List.Item
             title="Adresses de livraison"
             description="Gérer vos adresses de livraison"
-            left={props => <List.Icon {...props} icon="map-marker" color="#E75A7C" />}
+            left={props => <List.Icon {...props} icon="map-marker" color="colors.PRIMARY_DARK" />}
             right={props => <List.Icon {...props} icon="chevron-right" />}
             onPress={() => setEditAddressVisible(true)}
             style={styles.listItem}
@@ -720,12 +723,12 @@ export default function ProfileScreen({ navigation }: Props) {
           <View style={styles.productsContainer}>
             {loading ? (
               <View style={styles.loadingContainer}>
-                <ActivityIndicator size="large" color="#E75A7C" />
+                <ActivityIndicator size="large" color="colors.PRIMARY_DARK" />
                 <Text style={styles.loadingText}>Chargement de vos annonces...</Text>
               </View>
             ) : userProducts.length === 0 ? (
               <View style={styles.emptyStateContainer}>
-                <Ionicons name="basket-outline" size={50} color="#E75A7C" />
+                <Ionicons name="basket-outline" size={50} color="colors.PRIMARY_DARK" />
                 <Text style={styles.emptyStateText}>
                   Vous n'avez pas encore publié d'annonces
                 </Text>
@@ -750,7 +753,7 @@ export default function ProfileScreen({ navigation }: Props) {
           <List.Item
             title="Mes favoris"
             description="Voir tous les articles que vous avez aimés"
-            left={props => <List.Icon {...props} icon="heart" color="#E75A7C" />}
+            left={props => <List.Icon {...props} icon="heart" color="colors.PRIMARY_DARK" />}
             right={props => <List.Icon {...props} icon="chevron-right" />}
             onPress={() => navigation.navigate('Favoris')}
             style={styles.listItem}
@@ -758,7 +761,7 @@ export default function ProfileScreen({ navigation }: Props) {
           <List.Item
             title="Messages"
             description="Voir vos conversations avec les vendeurs"
-            left={props => <List.Icon {...props} icon="chat" color="#E75A7C" />}
+            left={props => <List.Icon {...props} icon="chat" color="colors.PRIMARY_DARK" />}
             right={props => <List.Icon {...props} icon="chevron-right" />}
             onPress={() => navigation.navigate('Messages')}
             style={styles.listItem}
@@ -769,7 +772,7 @@ export default function ProfileScreen({ navigation }: Props) {
           <Button 
             mode="outlined" 
             onPress={handleLogout} 
-            textColor="#E75A7C"
+            textColor="colors.PRIMARY_DARK"
             style={styles.logoutButton}
             icon="logout"
           >
@@ -789,7 +792,7 @@ export default function ProfileScreen({ navigation }: Props) {
               size={24}
               onPress={() => setEditProfileVisible(false)}
               style={styles.closeButton}
-              color="#E75A7C"
+              color="colors.PRIMARY_DARK"
             />
             
             <Dialog.Title style={styles.dialogTitle}>Informations personnelles</Dialog.Title>
@@ -806,10 +809,13 @@ export default function ProfileScreen({ navigation }: Props) {
                   onChangeText={setName}
                   mode="outlined"
                   style={styles.input}
-                  outlineColor="#E75A7C"
-                  activeOutlineColor="#E75A7C"
-                  left={<TextInput.Icon icon="account" color="#E75A7C" />}
+                  outlineColor="colors.PRIMARY_DARK"
+                  activeOutlineColor="colors.PRIMARY_DARK"
+                  left={<TextInput.Icon icon="account" color="colors.PRIMARY_DARK" />}
                   placeholder="Votre nom"
+                  returnKeyType="done"
+                  onSubmitEditing={() => Keyboard.dismiss()}
+                  blurOnSubmit={true}
                 />
               </View>
               
@@ -821,10 +827,13 @@ export default function ProfileScreen({ navigation }: Props) {
                   mode="outlined"
                   style={styles.input}
                   keyboardType="email-address"
-                  outlineColor="#E75A7C"
-                  activeOutlineColor="#E75A7C"
-                  left={<TextInput.Icon icon="email" color="#E75A7C" />}
+                  outlineColor="colors.PRIMARY_DARK"
+                  activeOutlineColor="colors.PRIMARY_DARK"
+                  left={<TextInput.Icon icon="email" color="colors.PRIMARY_DARK" />}
                   placeholder="exemple@mail.com"
+                  returnKeyType="done"
+                  onSubmitEditing={() => Keyboard.dismiss()}
+                  blurOnSubmit={true}
                 />
               </View>
               
@@ -836,10 +845,13 @@ export default function ProfileScreen({ navigation }: Props) {
                   mode="outlined"
                   style={styles.input}
                   keyboardType="phone-pad"
-                  outlineColor="#E75A7C"
-                  activeOutlineColor="#E75A7C"
-                  left={<TextInput.Icon icon="phone" color="#E75A7C" />}
+                  outlineColor="colors.PRIMARY_DARK"
+                  activeOutlineColor="colors.PRIMARY_DARK"
+                  left={<TextInput.Icon icon="phone" color="colors.PRIMARY_DARK" />}
                   placeholder="06 XX XX XX XX"
+                  returnKeyType="done"
+                  onSubmitEditing={() => Keyboard.dismiss()}
+                  blurOnSubmit={true}
                 />
               </View>
             </Dialog.Content>
@@ -876,7 +888,7 @@ export default function ProfileScreen({ navigation }: Props) {
               size={24}
               onPress={() => setEditAddressVisible(false)}
               style={styles.closeButton}
-              color="#E75A7C"
+              color="colors.PRIMARY_DARK"
             />
             
             <Dialog.Title style={styles.dialogTitle}>Adresse de livraison</Dialog.Title>
@@ -893,10 +905,13 @@ export default function ProfileScreen({ navigation }: Props) {
                   onChangeText={setStreet}
                   mode="outlined"
                   style={styles.input}
-                  outlineColor="#E75A7C"
-                  activeOutlineColor="#E75A7C"
-                  left={<TextInput.Icon icon="home" color="#E75A7C" />}
+                  outlineColor="colors.PRIMARY_DARK"
+                  activeOutlineColor="colors.PRIMARY_DARK"
+                  left={<TextInput.Icon icon="home" color="colors.PRIMARY_DARK" />}
                   placeholder="12 rue des Lilas"
+                  returnKeyType="done"
+                  onSubmitEditing={() => Keyboard.dismiss()}
+                  blurOnSubmit={true}
                 />
               </View>
               
@@ -907,10 +922,13 @@ export default function ProfileScreen({ navigation }: Props) {
                   onChangeText={setCity}
                   mode="outlined"
                   style={styles.input}
-                  outlineColor="#E75A7C"
-                  activeOutlineColor="#E75A7C"
-                  left={<TextInput.Icon icon="city" color="#E75A7C" />}
+                  outlineColor="colors.PRIMARY_DARK"
+                  activeOutlineColor="colors.PRIMARY_DARK"
+                  left={<TextInput.Icon icon="city" color="colors.PRIMARY_DARK" />}
                   placeholder="Paris"
+                  returnKeyType="done"
+                  onSubmitEditing={() => Keyboard.dismiss()}
+                  blurOnSubmit={true}
                 />
               </View>
               
@@ -922,9 +940,12 @@ export default function ProfileScreen({ navigation }: Props) {
                   mode="outlined"
                   style={styles.input}
                   keyboardType="numeric"
-                  outlineColor="#E75A7C"
-                  activeOutlineColor="#E75A7C"
-                  left={<TextInput.Icon icon="numeric" color="#E75A7C" />}
+                  returnKeyType="done"
+                  onSubmitEditing={() => Keyboard.dismiss()}
+                  blurOnSubmit={true}
+                  outlineColor="colors.PRIMARY_DARK"
+                  activeOutlineColor="colors.PRIMARY_DARK"
+                  left={<TextInput.Icon icon="numeric" color="colors.PRIMARY_DARK" />}
                   placeholder="75001"
                 />
               </View>
@@ -962,7 +983,7 @@ export default function ProfileScreen({ navigation }: Props) {
               size={24}
               onPress={() => setChangePasswordVisible(false)}
               style={styles.closeButton}
-              color="#E75A7C"
+              color="colors.PRIMARY_DARK"
             />
             
             <Dialog.Title style={styles.dialogTitle}>Sécurité du compte</Dialog.Title>
@@ -980,15 +1001,18 @@ export default function ProfileScreen({ navigation }: Props) {
                   mode="outlined"
                   style={styles.input}
                   secureTextEntry={!currentPasswordVisible}
-                  outlineColor="#E75A7C"
-                  activeOutlineColor="#E75A7C"
-                  left={<TextInput.Icon icon="lock" color="#E75A7C" />}
+                  outlineColor="colors.PRIMARY_DARK"
+                  activeOutlineColor="colors.PRIMARY_DARK"
+                  left={<TextInput.Icon icon="lock" color="colors.PRIMARY_DARK" />}
                   right={<TextInput.Icon 
                     icon={currentPasswordVisible ? "eye-off" : "eye"} 
-                    color="#E75A7C" 
+                    color="colors.PRIMARY_DARK" 
                     onPress={() => setCurrentPasswordVisible(!currentPasswordVisible)} 
                   />}
                   placeholder="••••••••"
+                  returnKeyType="done"
+                  onSubmitEditing={() => Keyboard.dismiss()}
+                  blurOnSubmit={true}
                 />
               </View>
               
@@ -1000,15 +1024,18 @@ export default function ProfileScreen({ navigation }: Props) {
                   mode="outlined"
                   style={styles.input}
                   secureTextEntry={!newPasswordVisible}
-                  outlineColor="#E75A7C"
-                  activeOutlineColor="#E75A7C"
-                  left={<TextInput.Icon icon="lock-open" color="#E75A7C" />}
+                  outlineColor="colors.PRIMARY_DARK"
+                  activeOutlineColor="colors.PRIMARY_DARK"
+                  left={<TextInput.Icon icon="lock-open" color="colors.PRIMARY_DARK" />}
                   right={<TextInput.Icon 
                     icon={newPasswordVisible ? "eye-off" : "eye"} 
-                    color="#E75A7C" 
+                    color="colors.PRIMARY_DARK" 
                     onPress={() => setNewPasswordVisible(!newPasswordVisible)} 
                   />}
                   placeholder="••••••••"
+                  returnKeyType="done"
+                  onSubmitEditing={() => Keyboard.dismiss()}
+                  blurOnSubmit={true}
                 />
                 <Text style={styles.fieldHelperText}>Au moins 8 caractères</Text>
               </View>
@@ -1021,15 +1048,18 @@ export default function ProfileScreen({ navigation }: Props) {
                   mode="outlined"
                   style={styles.input}
                   secureTextEntry={!confirmPasswordVisible}
-                  outlineColor="#E75A7C"
-                  activeOutlineColor="#E75A7C"
-                  left={<TextInput.Icon icon="lock-check" color="#E75A7C" />}
+                  outlineColor="colors.PRIMARY_DARK"
+                  activeOutlineColor="colors.PRIMARY_DARK"
+                  left={<TextInput.Icon icon="lock-check" color="colors.PRIMARY_DARK" />}
                   right={<TextInput.Icon 
                     icon={confirmPasswordVisible ? "eye-off" : "eye"} 
-                    color="#E75A7C" 
+                    color="colors.PRIMARY_DARK" 
                     onPress={() => setConfirmPasswordVisible(!confirmPasswordVisible)} 
                   />}
                   placeholder="••••••••"
+                  returnKeyType="done"
+                  onSubmitEditing={() => Keyboard.dismiss()}
+                  blurOnSubmit={true}
                 />
               </View>
             </Dialog.Content>
@@ -1062,7 +1092,7 @@ const styles = StyleSheet.create({
   container: {
     top: -65,
     flex: 1,
-    backgroundColor: '#f8f9fa',
+    backgroundColor: 'colors.BACKGROUND_SECONDARY',
     zIndex: 10,
   },
   contentContainer: {
@@ -1085,11 +1115,11 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   avatar: {
-    backgroundColor: '#E75A7C',
+    backgroundColor: 'colors.PRIMARY_DARK',
     marginBottom: 0,
     borderWidth: 0,
     alignSelf: 'center',
-    shadowColor: '#000',
+    shadowColor: 'colors.TEXT_DARK',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.3,
     shadowRadius: 4,
@@ -1098,17 +1128,17 @@ const styles = StyleSheet.create({
   name: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#fff',
+    color: 'colors.BACKGROUND_MAIN',
     marginTop: 10,
   },
   email: {
     fontSize: 16,
-    color: '#eee',
+    color: 'colors.GRAY_BACKGROUND',
     marginTop: 5,
   },
   editButton: {
     marginTop: 15,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    backgroundColor: 'colors.WHITE_TRANSPARENT_LIGHT',
     paddingVertical: 8,
     paddingHorizontal: 15,
     borderRadius: 20,
@@ -1116,7 +1146,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   editButtonText: {
-    color: '#fff',
+    color: 'colors.BACKGROUND_MAIN',
     marginLeft: 5,
     fontWeight: '500',
   },
@@ -1127,7 +1157,7 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     elevation: 3,
     padding: 15,
-    backgroundColor: '#fff',
+    backgroundColor: colors.BACKGROUND_MAIN,
   },
   statItem: {
     flex: 1,
@@ -1136,16 +1166,16 @@ const styles = StyleSheet.create({
   statValue: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: '#E75A7C',
+    color: 'colors.PRIMARY_DARK',
   },
   statLabel: {
     fontSize: 14,
-    color: '#666',
+    color: 'colors.TEXT_SECONDARY',
     marginTop: 5,
   },
   statDivider: {
     width: 1,
-    backgroundColor: '#eee',
+    backgroundColor: 'colors.GRAY_BACKGROUND',
   },
   divider: {
     marginVertical: 10,
@@ -1156,7 +1186,7 @@ const styles = StyleSheet.create({
     color: '#444',
   },
   listItem: {
-    backgroundColor: '#fff',
+    backgroundColor: colors.BACKGROUND_MAIN,
     marginVertical: 2,
     borderRadius: 5,
     marginHorizontal: 15,
@@ -1173,24 +1203,24 @@ const styles = StyleSheet.create({
   loadingText: {
     textAlign: 'center',
     marginTop: 10,
-    color: '#666',
+    color: 'colors.TEXT_SECONDARY',
   },
   emptyStateContainer: {
     alignItems: 'center',
     padding: 30,
-    backgroundColor: '#fff',
+    backgroundColor: colors.BACKGROUND_MAIN,
     borderRadius: 10,
     marginTop: 15,
   },
   emptyStateText: {
     fontSize: 16,
-    color: '#666',
+    color: 'colors.TEXT_SECONDARY',
     marginTop: 15,
     textAlign: 'center',
   },
   addButton: {
     margin: 15,
-    backgroundColor: '#E75A7C',
+    backgroundColor: 'colors.PRIMARY_DARK',
   },
   logoutContainer: {
     padding: 20,
@@ -1198,7 +1228,7 @@ const styles = StyleSheet.create({
     marginBottom: 100,
   },
   logoutButton: {
-    borderColor: '#E75A7C',
+    borderColor: 'colors.PRIMARY_DARK',
     width: '80%',
   },
   dialogContainer: {
@@ -1212,18 +1242,18 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   dialogIcon: {
-    backgroundColor: '#E75A7C',
+    backgroundColor: 'colors.PRIMARY_DARK',
   },
   dialogTitle: {
     fontSize: 20,
     fontWeight: 'bold',
     marginBottom: 20,
-    color: '#E75A7C',
+    color: 'colors.PRIMARY_DARK',
     textAlign: 'center',
   },
   dialogSubtitle: {
     fontSize: 16,
-    color: '#666',
+    color: 'colors.TEXT_SECONDARY',
     marginBottom: 20,
     textAlign: 'center',
   },
@@ -1233,7 +1263,7 @@ const styles = StyleSheet.create({
   fieldLabel: {
     fontSize: 14,
     fontWeight: 'bold',
-    color: '#666',
+    color: 'colors.TEXT_SECONDARY',
   },
   input: {
     marginBottom: 15,
@@ -1250,7 +1280,7 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: 'white',
     borderWidth: 2,
-    borderColor: '#E75A7C',
+    borderColor: 'colors.PRIMARY_DARK',
     borderRadius: 10,
     paddingVertical: 15,
     marginHorizontal: 10,
@@ -1260,9 +1290,9 @@ const styles = StyleSheet.create({
   },
   customConfirmButton: {
     flex: 1,
-    backgroundColor: '#E75A7C',
+    backgroundColor: 'colors.PRIMARY_DARK',
     borderWidth: 2,
-    borderColor: '#E75A7C',
+    borderColor: 'colors.PRIMARY_DARK',
     borderRadius: 10,
     paddingVertical: 15, 
     marginHorizontal: 10,
@@ -1271,7 +1301,7 @@ const styles = StyleSheet.create({
     minHeight: 55,
   },
   customCancelButtonText: {
-    color: '#E75A7C',
+    color: 'colors.PRIMARY_DARK',
     fontSize: 16,
     fontWeight: 'bold',
     textAlign: 'center',
@@ -1291,11 +1321,11 @@ const styles = StyleSheet.create({
   productCard: {
     marginBottom: 16,
     elevation: 3,
-    backgroundColor: '#fff',
+    backgroundColor: colors.BACKGROUND_MAIN,
     borderRadius: 10,
     width: '92%',
     alignSelf: 'center',
-    shadowColor: '#000',
+    shadowColor: 'colors.TEXT_DARK',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.1,
     shadowRadius: 3,
@@ -1326,7 +1356,7 @@ const styles = StyleSheet.create({
     bottom: 0,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.4)',
+    backgroundColor: 'colors.WHITE_TRANSPARENT_LIGHT',
     zIndex: 1,
   },
   imageErrorContainer: {
@@ -1337,12 +1367,12 @@ const styles = StyleSheet.create({
     bottom: 0,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.7)',
+    backgroundColor: 'colors.WHITE_TRANSPARENT_MEDIUM',
     zIndex: 1,
   },
   imageErrorText: {
     fontSize: 14,
-    color: '#E75A7C',
+    color: 'colors.PRIMARY_DARK',
     marginTop: 8,
   },
   productContent: {
@@ -1352,17 +1382,17 @@ const styles = StyleSheet.create({
     fontSize: 17,
     fontWeight: '600',
     marginBottom: 6,
-    color: '#333',
+    color: colors.TEXT_PRIMARY,
   },
   productPrice: {
     fontSize: 19,
     fontWeight: 'bold',
-    color: '#E75A7C',
+    color: 'colors.PRIMARY_DARK',
     marginBottom: 6,
   },
   productLocation: {
     fontSize: 14,
-    color: '#666',
+    color: 'colors.TEXT_SECONDARY',
     marginBottom: 4,
   },
   productActions: {
@@ -1372,7 +1402,7 @@ const styles = StyleSheet.create({
   },
   fieldHelperText: {
     fontSize: 12,
-    color: '#666',
+    color: 'colors.TEXT_SECONDARY',
     marginTop: 5,
   },
   statusBarBackground: {
@@ -1381,7 +1411,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     height: StatusBar.currentHeight || 0,
-    backgroundColor: '#E75A7C',
+    backgroundColor: 'colors.PRIMARY_DARK',
     zIndex: 999,
   },
   bottomCover: {
@@ -1390,7 +1420,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     height: 120,
-    backgroundColor: '#f8f9fa',
+    backgroundColor: 'colors.BACKGROUND_SECONDARY',
     zIndex: -1,
   },
 }); 

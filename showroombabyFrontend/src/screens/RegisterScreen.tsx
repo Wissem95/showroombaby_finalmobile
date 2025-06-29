@@ -6,6 +6,7 @@ import { BlurView } from 'expo-blur';
 import AuthService from '../services/auth';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import axios from 'axios';
+import { globalStyles, colors } from '../theme/globalStyles';
 
 // URL de l'API
 // Pour les appareils externes, utiliser votre adresse IP locale au lieu de 127.0.0.1
@@ -132,7 +133,7 @@ export default function RegisterScreen({ navigation }: Props) {
             value={name}
             onChangeText={setName}
             style={styles.input}
-            theme={{ colors: { primary: '#ff6b9b' }, roundness: 10 }}
+            theme={{ colors: { primary: colors.PRIMARY }, roundness: 10 }}
           />
 
           {userType === 'professionnel' && (
@@ -142,7 +143,7 @@ export default function RegisterScreen({ navigation }: Props) {
               value={siret}
               onChangeText={setSiret}
               style={styles.input}
-              theme={{ colors: { primary: '#ff6b9b' }, roundness: 10 }}
+              theme={{ colors: { primary: 'colors.PRIMARY' }, roundness: 10 }}
             />
           )}
 
@@ -152,7 +153,7 @@ export default function RegisterScreen({ navigation }: Props) {
             value={email}
             onChangeText={setEmail}
             style={styles.input}
-            theme={{ colors: { primary: '#ff6b9b' }, roundness: 10 }}
+            theme={{ colors: { primary: 'colors.PRIMARY' }, roundness: 10 }}
             keyboardType="email-address"
             autoCapitalize="none"
           />
@@ -164,7 +165,7 @@ export default function RegisterScreen({ navigation }: Props) {
             onChangeText={setPassword}
             secureTextEntry
             style={styles.input}
-            theme={{ colors: { primary: '#ff6b9b' }, roundness: 10 }}
+            theme={{ colors: { primary: 'colors.PRIMARY' }, roundness: 10 }}
           />
 
           <TextInput
@@ -174,7 +175,7 @@ export default function RegisterScreen({ navigation }: Props) {
             onChangeText={setPasswordConfirmation}
             secureTextEntry
             style={styles.input}
-            theme={{ colors: { primary: '#ff6b9b' }, roundness: 10 }}
+            theme={{ colors: { primary: 'colors.PRIMARY' }, roundness: 10 }}
           />
 
           <Button
@@ -214,7 +215,7 @@ const styles = StyleSheet.create({
   },
   container: {
     flex: 1,
-    backgroundColor: 'rgba(255,255,255,0.7)',
+    backgroundColor: 'colors.WHITE_TRANSPARENT_MEDIUM',
   },
   content: {
     flex: 1,
@@ -225,12 +226,12 @@ const styles = StyleSheet.create({
     fontSize: wp('8%'),
     fontWeight: '600',
     textAlign: 'center',
-    color: '#333',
+    color: colors.TEXT_PRIMARY,
   },
   subtitle: {
     fontSize: wp('4%'),
     textAlign: 'center',
-    color: '#666',
+    color: 'colors.TEXT_SECONDARY',
     marginBottom: hp('5%'),
   },
   tabs: {
@@ -242,22 +243,22 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     paddingVertical: hp('1%'),
     fontSize: wp('4%'),
-    color: '#666',
+    color: 'colors.TEXT_SECONDARY',
   },
   activeTab: {
-    color: '#ff6b9b',
+    color: colors.PRIMARY,
     borderBottomWidth: 2,
-    borderBottomColor: '#ff6b9b',
+    borderBottomColor: colors.PRIMARY,
   },
   segmentedButton: {
     marginBottom: hp('3%'),
   },
   input: {
     marginBottom: hp('2%'),
-    backgroundColor: 'rgba(255,255,255,0.8)',
+    backgroundColor: 'colors.WHITE_TRANSPARENT_HEAVY',
   },
   button: {
-    backgroundColor: '#ff6b9b',
+    backgroundColor: colors.PRIMARY,
     borderRadius: 25,
     marginBottom: hp('2%'),
   },
@@ -266,7 +267,7 @@ const styles = StyleSheet.create({
   },
   orText: {
     textAlign: 'center',
-    color: '#666',
+    color: 'colors.TEXT_SECONDARY',
     marginVertical: hp('2%'),
   },
   socialButtons: {
@@ -286,6 +287,6 @@ const styles = StyleSheet.create({
     top: hp('2%'),
     left: wp('2%'),
     zIndex: 1,
-    backgroundColor: 'rgba(255, 255, 255, 0.8)',
+    backgroundColor: 'colors.WHITE_TRANSPARENT_HEAVY',
   },
 }); 

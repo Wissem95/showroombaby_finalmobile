@@ -7,6 +7,7 @@ import AuthService from '../services/auth';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { CommonActions } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { globalStyles, colors } from '../theme/globalStyles';
 
 type Props = NativeStackScreenProps<any, 'Login'>;
 
@@ -118,7 +119,7 @@ export default function LoginScreen({ navigation }: Props) {
             onChangeText={setEmail}
             style={styles.input}
             theme={{
-              colors: { primary: '#ff6b9b' },
+              colors: { primary: colors.PRIMARY },
               roundness: 10,
             }}
           />
@@ -131,7 +132,7 @@ export default function LoginScreen({ navigation }: Props) {
             secureTextEntry={!showPassword}
             style={styles.input}
             theme={{
-              colors: { primary: '#ff6b9b' },
+              colors: { primary: colors.PRIMARY },
               roundness: 10,
             }}
             right={
@@ -234,7 +235,7 @@ const styles = StyleSheet.create({
   },
   container: {
     flex: 1,
-    backgroundColor: 'rgba(255,255,255,0.7)',
+    backgroundColor: 'i',
   },
   content: {
     flex: 1,
@@ -245,12 +246,12 @@ const styles = StyleSheet.create({
     fontSize: wp('8%'),
     fontWeight: '600',
     textAlign: 'center',
-    color: '#333',
+    color: colors.TEXT_PRIMARY,
   },
   subtitle: {
     fontSize: wp('4%'),
     textAlign: 'center',
-    color: '#666',
+    color: 'colors.TEXT_SECONDARY',
     marginBottom: hp('5%'),
   },
   tabs: {
@@ -262,25 +263,25 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     paddingVertical: hp('1%'),
     fontSize: wp('4%'),
-    color: '#666',
+    color: 'colors.TEXT_SECONDARY',
     paddingHorizontal: wp('10%'),
   },
   activeTab: {
-    color: '#ff6b9b',
+    color: colors.PRIMARY,
     borderBottomWidth: 2,
-    borderBottomColor: '#ff6b9b',
+    borderBottomColor: colors.PRIMARY,
   },
   input: {
     marginBottom: hp('2%'),
-    backgroundColor: 'rgba(255,255,255,0.8)',
+    backgroundColor: 'colors.WHITE_TRANSPARENT_HEAVY',
   },
   forgotPassword: {
     textAlign: 'right',
-    color: '#666',
+    color: 'colors.TEXT_SECONDARY',
     marginBottom: hp('3%'),
   },
   button: {
-    backgroundColor: '#ff6b9b',
+    backgroundColor: colors.PRIMARY,
     borderRadius: 25,
     marginBottom: hp('2%'),
   },
@@ -289,7 +290,7 @@ const styles = StyleSheet.create({
   },
   orText: {
     textAlign: 'center',
-    color: '#666',
+    color: 'colors.TEXT_SECONDARY',
     marginVertical: hp('2%'),
   },
   socialButtons: {
@@ -310,7 +311,7 @@ const styles = StyleSheet.create({
   debugContainer: {
     marginTop: 30,
     padding: 10,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: 'colors.BACKGROUND_GRAY',
     borderRadius: 5,
   },
   debugTitle: {
@@ -329,7 +330,7 @@ const styles = StyleSheet.create({
     bottom: 0,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.7)',
+    backgroundColor: 'colors.WHITE_TRANSPARENT_MEDIUM',
   },
   loadingText: {
     marginTop: 10,
@@ -339,14 +340,14 @@ const styles = StyleSheet.create({
     top: hp('2%'),
     left: wp('2%'),
     zIndex: 1,
-    backgroundColor: 'rgba(255, 255, 255, 0.8)',
+    backgroundColor: 'colors.WHITE_TRANSPARENT_HEAVY',
   },
   formContainer: {
     marginBottom: hp('2%'),
   },
   registerButton: {
     backgroundColor: 'white',
-    borderColor: '#ff6b9b',
+    borderColor: colors.PRIMARY,
     borderWidth: 2,
   },
   homeButton: {

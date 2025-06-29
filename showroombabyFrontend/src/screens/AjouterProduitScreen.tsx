@@ -10,6 +10,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { StatusBar } from 'expo-status-bar';
 import { useFocusEffect, CommonActions } from '@react-navigation/native';
 import AddressAutocomplete from '../components/AddressAutocomplete';
+import { globalStyles, colors } from '../theme/globalStyles';
 
 // URL de l'API
 // Pour les appareils externes, utiliser votre adresse IP locale au lieu de 127.0.0.1
@@ -356,7 +357,7 @@ export default function AjouterProduitScreen({ navigation, route }: any) {
           }}
           style={styles.closeButton}
         >
-          <Ionicons name="close" size={24} color="#000" />
+          <Ionicons name="close" size={24} color="colors.TEXT_DARK" />
         </TouchableOpacity>
       ),
       headerTitle: 'Ajouter un produit',
@@ -1209,7 +1210,7 @@ export default function AjouterProduitScreen({ navigation, route }: any) {
             onPress={pickImage}
             activeOpacity={0.7}
           >
-            <Ionicons name="camera-outline" size={40} color="#888" />
+            <Ionicons name="camera-outline" size={40} color="colors.GRAY_MEDIUM" />
             <Text style={styles.addPhotoText}>Ajouter</Text>
           </TouchableOpacity>
         )}
@@ -1304,7 +1305,7 @@ export default function AjouterProduitScreen({ navigation, route }: any) {
             termsAccepted && styles.termsCheckboxChecked
           ]}>
             {termsAccepted && (
-              <Ionicons name="checkmark" size={20} color="#fff" />
+              <Ionicons name="checkmark" size={20} color="colors.BACKGROUND_MAIN" />
             )}
           </View>
           <Text style={[
@@ -1386,7 +1387,7 @@ export default function AjouterProduitScreen({ navigation, route }: any) {
               categories.find(c => c.id === productData.category_id)?.name || 'Sélectionnez une catégorie' : 
               'Sélectionnez une catégorie'}
           </Text>
-          <MaterialIcons name="arrow-drop-down" size={24} color="#999" />
+          <MaterialIcons name="arrow-drop-down" size={24} color="colors.TEXT_MUTED" />
         </TouchableOpacity>
         {errors.category && <Text style={styles.errorText}>{errors.category}</Text>}
         
@@ -1402,7 +1403,7 @@ export default function AjouterProduitScreen({ navigation, route }: any) {
                   categories.find(c => c.id === productData.category_id)?.subcategories?.find(sc => sc.id === productData.subcategory_id)?.name || 'Sélectionnez une sous-catégorie' : 
                   'Sélectionnez une sous-catégorie'}
               </Text>
-              <MaterialIcons name="arrow-drop-down" size={24} color="#999" />
+              <MaterialIcons name="arrow-drop-down" size={24} color="colors.TEXT_MUTED" />
             </TouchableOpacity>
           </>
         )}
@@ -1497,7 +1498,7 @@ export default function AjouterProduitScreen({ navigation, route }: any) {
               CONDITIONS.find(c => c.id === productData.condition)?.label || 'État du produit' : 
               'État du produit (obligatoire)'}
           </Text>
-          <MaterialIcons name="arrow-drop-down" size={24} color="#999" />
+          <MaterialIcons name="arrow-drop-down" size={24} color="colors.TEXT_MUTED" />
         </TouchableOpacity>
         {errors.condition && <Text style={styles.errorText}>{errors.condition}</Text>}
         {productData.condition && (
@@ -1556,7 +1557,6 @@ export default function AjouterProduitScreen({ navigation, route }: any) {
             name: 'ProductDetails', 
             params: { 
               productId: publishedProductId,
-              fullscreenMode: true,
               fromSuccess: true // Ajouter ce paramètre
             }
           }
@@ -1580,11 +1580,11 @@ export default function AjouterProduitScreen({ navigation, route }: any) {
           onPress={handleGoHome}
           activeOpacity={0.7}
         >
-          <Ionicons name="close" size={24} color="#333" />
+          <Ionicons name="close" size={24} color={colors.TEXT_PRIMARY} />
         </TouchableOpacity>
 
         <View style={styles.successIconContainer}>
-          <AntDesign name="checkcircle" size={80} color="#4CAF50" />
+          <AntDesign name="checkcircle" size={80} color="colors.SUCCESS" />
         </View>
         <Text style={styles.successTitle}>Félicitations !</Text>
         <Text style={styles.successMessage}>Votre annonce a été publiée avec succès.</Text>
@@ -1651,7 +1651,7 @@ export default function AjouterProduitScreen({ navigation, route }: any) {
           onPress={handleBackPress}
           hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
         >
-          <Ionicons name="arrow-back" size={24} color="#333" />
+          <Ionicons name="arrow-back" size={24} color={colors.TEXT_PRIMARY} />
         </TouchableOpacity>
         
         <Text style={styles.headerTitle}>
@@ -1668,7 +1668,7 @@ export default function AjouterProduitScreen({ navigation, route }: any) {
           onPress={handleClosePress}
           hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
         >
-          <Ionicons name="close" size={24} color="#333" />
+          <Ionicons name="close" size={24} color={colors.TEXT_PRIMARY} />
         </TouchableOpacity>
       </View>
       
@@ -1726,7 +1726,7 @@ export default function AjouterProduitScreen({ navigation, route }: any) {
 
       {isLoading && (
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#E75A7C" />
+          <ActivityIndicator size="large" color="colors.PRIMARY_DARK" />
         </View>
       )}
     </KeyboardAvoidingView>
@@ -1736,7 +1736,7 @@ export default function AjouterProduitScreen({ navigation, route }: any) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: colors.BACKGROUND_MAIN,
   },
   scrollView: {
     flex: 1,
@@ -1753,10 +1753,10 @@ const styles = StyleSheet.create({
     paddingTop: Platform.OS === 'ios' ? 50 : 16,
     paddingBottom: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#eee',
-    backgroundColor: '#fff',
+    borderBottomColor: 'colors.GRAY_BACKGROUND',
+    backgroundColor: colors.BACKGROUND_MAIN,
     elevation: 2,
-    shadowColor: '#000',
+    shadowColor: 'colors.TEXT_DARK',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 2,
@@ -1775,17 +1775,17 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#000',
+    color: 'colors.TEXT_DARK',
     flex: 1,
     textAlign: 'center',
     marginHorizontal: 8,
   },
   stepContainer: {
-    backgroundColor: '#fff',
+    backgroundColor: 'colors.BACKGROUND_MAIN',
     marginBottom: 16,
   },
   pageContainer: {
-    backgroundColor: '#fff',
+    backgroundColor: 'colors.BACKGROUND_MAIN',
     marginBottom: 16,
     paddingVertical: 10,
     minHeight: '70%',
@@ -1794,11 +1794,11 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: 'bold',
     marginBottom: 12,
-    color: '#333',
+    color: colors.TEXT_PRIMARY,
   },
   stepDescription: {
     fontSize: 16,
-    color: '#666',
+    color: 'colors.TEXT_SECONDARY',
     marginBottom: 24,
     lineHeight: 22,
   },
@@ -1819,13 +1819,13 @@ const styles = StyleSheet.create({
     height: '100%',
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: '#ddd',
+    borderColor: 'colors.BORDER_DARK',
   },
   removePhotoButton: {
     position: 'absolute',
     top: 4,
     right: 4,
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    backgroundColor: 'colors.OVERLAY_DARK',
     borderRadius: 12,
     width: 24,
     height: 24,
@@ -1837,7 +1837,7 @@ const styles = StyleSheet.create({
     aspectRatio: 1,
     padding: 8,
     borderWidth: 1,
-    borderColor: '#ddd',
+    borderColor: 'colors.BORDER_DARK',
     borderRadius: 8,
     borderStyle: 'dashed',
     alignItems: 'center',
@@ -1845,7 +1845,7 @@ const styles = StyleSheet.create({
     margin: 8,
   },
   addPhotoText: {
-    color: '#888',
+    color: 'colors.GRAY_MEDIUM',
     marginTop: 4,
   },
   mapPreview: {
@@ -1854,31 +1854,31 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     borderRadius: 8,
     overflow: 'hidden',
-    backgroundColor: '#f5f5f5',
+    backgroundColor: 'colors.BACKGROUND_GRAY',
     borderWidth: 1,
-    borderColor: '#ddd',
+    borderColor: 'colors.BORDER_DARK',
   },
   mapPlaceholder: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#eee',
+    backgroundColor: 'colors.GRAY_BACKGROUND',
   },
   inputLabel: {
     fontSize: 16,
     fontWeight: '600',
     marginTop: 16,
     marginBottom: 8,
-    color: '#333',
+    color: 'colors.TEXT_PRIMARY',
   },
   input: {
     height: 50,
     borderWidth: 1,
-    borderColor: '#ddd',
+    borderColor: 'colors.BORDER_DARK',
     borderRadius: 8,
     paddingHorizontal: 12,
     fontSize: 16,
-    backgroundColor: '#fff',
+    backgroundColor: colors.BACKGROUND_MAIN,
   },
   textArea: {
     height: 120,
@@ -1895,7 +1895,7 @@ const styles = StyleSheet.create({
   },
   switchLabel: {
     fontSize: 16,
-    color: '#333',
+    color: colors.TEXT_PRIMARY,
   },
   dropdown: {
     position: 'relative',
@@ -1906,7 +1906,7 @@ const styles = StyleSheet.create({
     top: 13,
   },
   errorText: {
-    color: '#FF5252',
+    color: 'colors.BORDER_ERROR',
     fontSize: 12,
     marginTop: 4,
   },
@@ -1917,7 +1917,7 @@ const styles = StyleSheet.create({
     padding: 16,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: '#E75A7C',
+    borderColor: 'colors.PRIMARY_DARK',
   },
   termsCheckboxContainer: {
     flexDirection: 'row',
@@ -1928,23 +1928,23 @@ const styles = StyleSheet.create({
     height: 24,
     borderRadius: 4,
     borderWidth: 2,
-    borderColor: '#E75A7C',
+    borderColor: 'colors.PRIMARY_DARK',
     marginRight: 12,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#fff',
+    backgroundColor: 'colors.BACKGROUND_MAIN',
   },
   termsCheckboxChecked: {
-    backgroundColor: '#E75A7C',
+    backgroundColor: 'colors.PRIMARY_DARK',
   },
   termsText: {
     flex: 1,
     fontSize: 14,
-    color: '#333',
+    color: 'colors.TEXT_PRIMARY',
     lineHeight: 20,
   },
   termsTextRequired: {
-    color: '#E75A7C',
+    color: 'colors.PRIMARY_DARK',
   },
   buttonContainer: {
     marginTop: 24,
@@ -1960,30 +1960,30 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     elevation: 2,
-    shadowColor: '#000',
+    shadowColor: 'colors.TEXT_DARK',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.1,
     shadowRadius: 1,
     transform: [{ scale: 1 }], // Pour l'animation
   },
   primaryButton: {
-    backgroundColor: '#E75A7C',
+    backgroundColor: 'colors.PRIMARY_DARK',
   },
   buttonText: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: '#fff',
+    color: 'colors.BACKGROUND_MAIN',
   },
   loadingContainer: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(255,255,255,0.7)',
+    backgroundColor: 'colors.WHITE_TRANSPARENT_MEDIUM',
     justifyContent: 'center',
     alignItems: 'center',
     zIndex: 999,
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    backgroundColor: 'colors.OVERLAY_DARK',
     justifyContent: 'flex-end',
   },
   modalContent: {
@@ -1998,7 +1998,7 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     textAlign: 'center',
     marginBottom: 15,
-    color: '#333',
+    color: 'colors.TEXT_PRIMARY',
   },
   modalList: {
     maxHeight: 400,
@@ -2006,11 +2006,11 @@ const styles = StyleSheet.create({
   modalItem: {
     padding: 15,
     borderBottomWidth: 1,
-    borderBottomColor: '#eee',
+    borderBottomColor: 'colors.GRAY_BACKGROUND',
   },
   modalItemText: {
     fontSize: 16,
-    color: '#333',
+    color: 'colors.TEXT_PRIMARY',
   },
   modalCancelButton: {
     marginTop: 10,
@@ -2018,35 +2018,35 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   disabledInput: {
-    backgroundColor: '#f5f5f5',
-    color: '#aaa',
+    backgroundColor: 'colors.BACKGROUND_GRAY',
+    color: 'colors.ICON_DARK',
   },
   inputHint: {
     fontSize: 12,
-    color: '#777',
+    color: 'colors.TEXT_LIGHT',
     marginTop: 4,
     marginBottom: 8,
     fontStyle: 'italic',
   },
   warningText: {
     fontSize: 14,
-    color: '#E75A7C',
+    color: 'colors.PRIMARY_DARK',
     marginTop: 8,
     textAlign: 'center',
     backgroundColor: '#FFF0F0',
     padding: 10,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: '#E75A7C',
+    borderColor: 'colors.PRIMARY_DARK',
   },
   progressBar: {
     height: 4,
-    backgroundColor: '#eee',
+    backgroundColor: 'colors.GRAY_BACKGROUND',
     marginBottom: 16,
   },
   progressIndicator: {
     height: '100%',
-    backgroundColor: '#E75A7C',
+    backgroundColor: 'colors.PRIMARY_DARK',
   },
   stepIndicatorContainer: {
     flexDirection: 'row',
@@ -2057,11 +2057,11 @@ const styles = StyleSheet.create({
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: '#ddd',
+    backgroundColor: 'colors.BORDER_DARK',
     marginHorizontal: 4,
   },
   activeStepIndicator: {
-    backgroundColor: '#E75A7C',
+    backgroundColor: 'colors.PRIMARY_DARK',
     width: 24,
   },
   successPageContainer: {
@@ -2069,7 +2069,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     padding: 20,
-    backgroundColor: '#fff',
+    backgroundColor: 'colors.BACKGROUND_MAIN',
   },
   successIconContainer: {
     marginBottom: 25,
@@ -2078,17 +2078,17 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: 'bold',
     marginBottom: 10,
-    color: '#333',
+    color: 'colors.TEXT_PRIMARY',
   },
   successMessage: {
     fontSize: 18,
-    color: '#555',
+    color: 'colors.GRAY_DARK',
     marginBottom: 20,
     textAlign: 'center',
   },
   successDescription: {
     fontSize: 14,
-    color: '#777',
+    color: 'colors.TEXT_LIGHT',
     textAlign: 'center',
     marginBottom: 30,
   },
@@ -2106,10 +2106,10 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   viewProductButton: {
-    backgroundColor: '#E75A7C',
+    backgroundColor: 'colors.PRIMARY_DARK',
   },
   viewProductButtonText: {
-    color: '#fff',
+    color: 'colors.BACKGROUND_MAIN',
     fontSize: 16,
     fontWeight: 'bold',
   },
@@ -2117,7 +2117,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#f1f1f1',
   },
   goHomeButtonText: {
-    color: '#333',
+    color: 'colors.TEXT_PRIMARY',
     fontSize: 16,
     fontWeight: 'bold',
   },
@@ -2127,48 +2127,48 @@ const styles = StyleSheet.create({
   },
   stepContent: {
     padding: 16,
-    backgroundColor: '#fff',
+    backgroundColor: 'colors.BACKGROUND_MAIN',
   },
   selectButton: {
     position: 'relative',
   },
   selectText: {
     fontSize: 16,
-    color: '#333',
+    color: 'colors.TEXT_PRIMARY',
   },
   selectPlaceholder: {
     fontSize: 16,
-    color: '#999',
+    color: 'colors.TEXT_MUTED',
   },
   inputError: {
-    borderColor: '#FF5252',
+    borderColor: 'colors.BORDER_ERROR',
   },
   helpText: {
     fontSize: 14,
-    color: '#777',
+    color: 'colors.TEXT_LIGHT',
     marginTop: 10,
     marginBottom: 20,
     textAlign: 'center',
   },
   disabledButton: {
     opacity: 0.5,
-    backgroundColor: '#ccc',
+    backgroundColor: 'colors.GRAY_LIGHT',
   },
   disabledButtonText: {
-    color: '#aaa',
+    color: 'colors.ICON_DARK',
   },
   conditionSelectorContainer: {
     marginBottom: 16,
   },
   highlightedButton: {
-    backgroundColor: '#f0f0f0',
+    backgroundColor: 'colors.BORDER_LIGHT',
   },
   selectedButton: {
-    backgroundColor: '#f0f0f0',
+    backgroundColor: 'colors.BORDER_LIGHT',
   },
   successText: {
     fontSize: 14,
-    color: '#4CAF50',
+    color: 'colors.SUCCESS',
     marginTop: 10,
     marginBottom: 20,
     textAlign: 'center',
@@ -2185,10 +2185,10 @@ const styles = StyleSheet.create({
     backgroundColor: 'white',
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: '#ddd',
+    borderColor: 'colors.BORDER_DARK',
     maxHeight: 200,
     elevation: 3,
-    shadowColor: '#000',
+    shadowColor: 'colors.TEXT_DARK',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.25,
     shadowRadius: 3.84,
@@ -2199,11 +2199,11 @@ const styles = StyleSheet.create({
   brandSuggestionItem: {
     padding: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#eee',
+    borderBottomColor: 'colors.GRAY_BACKGROUND',
   },
   brandSuggestionText: {
     fontSize: 16,
-    color: '#333',
+    color: 'colors.TEXT_PRIMARY',
   },
   closeSuccessButton: {
     position: 'absolute',

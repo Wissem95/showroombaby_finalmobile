@@ -15,6 +15,7 @@ import ConversationService from '../services/conversation';
 import Toast from 'react-native-toast-message';
 import { EventRegister } from 'react-native-event-listeners';
 import imageService from '../services/api/imageService';
+import { globalStyles, colors } from '../theme/globalStyles';
 
 // Ignorer les avertissements non critiques
 LogBox.ignoreLogs([
@@ -73,7 +74,7 @@ interface ImageType {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#ffffff',
+    backgroundColor: colors.BACKGROUND_MAIN,
   },
   headerContainer: {
     flexDirection: 'row',
@@ -82,10 +83,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: wp('5%'),
     paddingVertical: hp('2%'),
     borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
-    backgroundColor: '#ffffff',
+    borderBottomColor: 'colors.BORDER_LIGHT',
+    backgroundColor: colors.BACKGROUND_MAIN,
     elevation: 4,
-    shadowColor: '#000',
+    shadowColor: 'colors.TEXT_DARK',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
@@ -93,19 +94,19 @@ const styles = StyleSheet.create({
   mainHeaderTitle: {
     fontSize: wp('7%'),
     fontWeight: '700',
-    color: '#333',
-    textShadowColor: 'rgba(0, 0, 0, 0.05)',
+    color: colors.TEXT_PRIMARY,
+    textShadowColor: 'colors.SHADOW_LIGHT',
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 2,
   },
   header: {
-    backgroundColor: '#fff',
+    backgroundColor: colors.BACKGROUND_MAIN,
     paddingHorizontal: wp('5%'),
     paddingBottom: hp('2%'),
     paddingTop: hp('2%'),
     borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
-    shadowColor: '#000',
+    borderBottomColor: 'colors.BORDER_LIGHT',
+    shadowColor: 'colors.TEXT_DARK',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
@@ -115,12 +116,12 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: wp('5.5%'),
     fontWeight: '700',
-    color: '#333',
+    color: colors.TEXT_PRIMARY,
     marginBottom: hp('1%'),
   },
   headerSubtitle: {
     fontSize: wp('3.5%'),
-    color: '#777',
+    color: 'colors.TEXT_LIGHT',
   },
   searchContainer: {
     marginHorizontal: wp('4%'),
@@ -130,27 +131,27 @@ const styles = StyleSheet.create({
   searchBar: {
     borderRadius: 10,
     height: hp('5.5%'),
-    backgroundColor: '#fff',
+    backgroundColor: colors.BACKGROUND_MAIN,
     elevation: 2,
-    shadowColor: '#000',
+    shadowColor: 'colors.TEXT_DARK',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.1,
     shadowRadius: 2,
     borderWidth: 1,
-    borderColor: '#f0f0f0',
+    borderColor: 'colors.BORDER_LIGHT',
   },
   searchInput: {
     fontSize: wp('3.8%'),
   },
   conversationItem: {
     flexDirection: 'row',
-    backgroundColor: '#fff',
+    backgroundColor: colors.BACKGROUND_MAIN,
     marginHorizontal: wp('3%'),
     marginVertical: hp('0.7%'),
     padding: wp('4%'),
     borderRadius: 12,
     elevation: 2,
-    shadowColor: '#000',
+    shadowColor: 'colors.TEXT_DARK',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.1,
     shadowRadius: 3,
@@ -160,7 +161,7 @@ const styles = StyleSheet.create({
   unreadConversationItem: {
     backgroundColor: '#f9f9f9',
     borderLeftWidth: 3,
-    borderLeftColor: '#ff6b9b',
+    borderLeftColor: colors.PRIMARY,
   },
   userAvatar: {
     width: wp('14%'),
@@ -171,15 +172,15 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#f0f0f0',
+    borderColor: 'colors.BORDER_LIGHT',
     elevation: 3,
-    shadowColor: '#000',
+    shadowColor: 'colors.TEXT_DARK',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.15,
     shadowRadius: 3,
   },
   unreadUserAvatar: {
-    borderColor: '#ff6b9b',
+    borderColor: colors.PRIMARY,
     borderWidth: 2,
   },
   avatarImage: {
@@ -193,12 +194,12 @@ const styles = StyleSheet.create({
     borderRadius: wp('7%'),
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#ff6b9b',
+    backgroundColor: colors.PRIMARY,
   },
   avatarText: {
     fontSize: wp('6%'),
     fontWeight: 'bold',
-    color: '#fff',
+    color: 'colors.BACKGROUND_MAIN',
   },
   messageContent: {
     flex: 1,
@@ -213,7 +214,7 @@ const styles = StyleSheet.create({
   userName: {
     fontSize: wp('4.2%'),
     fontWeight: '500',
-    color: '#333',
+    color: colors.TEXT_PRIMARY,
     flex: 1,
   },
   unreadUserName: {
@@ -222,23 +223,23 @@ const styles = StyleSheet.create({
   },
   messageTime: {
     fontSize: wp('3%'),
-    color: '#888',
+    color: 'colors.GRAY_MEDIUM',
     marginLeft: wp('2%'),
     fontWeight: '400',
   },
   unreadMessageTime: {
-    color: '#666',
+    color: 'colors.TEXT_SECONDARY',
     fontWeight: '500',
   },
   messageText: {
     fontSize: wp('3.5%'),
-    color: '#777',
+    color: 'colors.TEXT_LIGHT',
     marginTop: hp('0.5%'),
     lineHeight: wp('5%'),
   },
   unreadMessageText: {
     fontWeight: '500',
-    color: '#555',
+    color: 'colors.GRAY_DARK',
   },
   unreadBadge: {
     position: 'absolute',
@@ -247,26 +248,26 @@ const styles = StyleSheet.create({
     minWidth: wp('5%'),
     height: wp('5%'),
     borderRadius: wp('2.5%'),
-    backgroundColor: '#ff6b9b',
+    backgroundColor: colors.PRIMARY,
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: 4,
     elevation: 4,
-    shadowColor: '#ff3b7b',
+    shadowColor: 'colors.PRIMARY_SHADOW',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.3,
     shadowRadius: 4,
   },
   unreadBadgeText: {
     fontSize: wp('2.8%'),
-    color: '#fff',
+    color: 'colors.BACKGROUND_MAIN',
     fontWeight: '700',
   },
   productPreview: {
     flexDirection: 'row',
     alignItems: 'center',
     marginVertical: hp('0.8%'),
-    backgroundColor: 'rgba(244, 245, 255, 0.5)',
+    backgroundColor: 'colors.INFO + "80"',
     padding: wp('2%'),
     borderRadius: 8,
     borderWidth: 0,
@@ -278,10 +279,10 @@ const styles = StyleSheet.create({
     marginRight: wp('2%'),
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: '#f0f0f0',
-    backgroundColor: '#fff',
+    borderColor: 'colors.BORDER_LIGHT',
+    backgroundColor: colors.BACKGROUND_MAIN,
     elevation: 1,
-    shadowColor: '#000',
+    shadowColor: 'colors.TEXT_DARK',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.1,
     shadowRadius: 1,
@@ -296,14 +297,14 @@ const styles = StyleSheet.create({
     height: '100%',
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#f5f5f5',
+    backgroundColor: 'colors.BACKGROUND_GRAY',
   },
   productTitle: {
     fontSize: wp('3.6%'),
-    color: '#6B3CE9',
+    color: 'colors.INFO',
     fontWeight: '500',
     marginBottom: hp('0.3%'),
-    textShadowColor: 'rgba(107, 60, 233, 0.1)',
+    textShadowColor: 'colors.INFO + "1A"',
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 1,
   },
@@ -312,7 +313,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     padding: wp('10%'),
-    backgroundColor: '#ffffff',
+    backgroundColor: colors.BACKGROUND_MAIN,
   },
   emptyStateImage: {
     width: wp('40%'),
@@ -323,30 +324,30 @@ const styles = StyleSheet.create({
   emptyStateTitle: {
     fontSize: wp('5.5%'),
     fontWeight: 'bold',
-    color: '#333',
+    color: colors.TEXT_PRIMARY,
     marginBottom: hp('1.5%'),
     textAlign: 'center',
   },
   emptyStateText: {
     fontSize: wp('4.2%'),
-    color: '#666',
+    color: 'colors.TEXT_SECONDARY',
     textAlign: 'center',
     marginBottom: hp('3.5%'),
     lineHeight: wp('6.5%'),
   },
   emptyStateButton: {
-    backgroundColor: '#ff6b9b',
+    backgroundColor: colors.PRIMARY,
     paddingHorizontal: wp('8%'),
     paddingVertical: hp('1.5%'),
     borderRadius: 30,
     elevation: 4,
-    shadowColor: '#ff6b9b',
+    shadowColor: 'colors.PRIMARY',
     shadowOffset: { width: 0, height: 3 },
     shadowOpacity: 0.3,
     shadowRadius: 5,
   },
   emptyStateButtonText: {
-    color: '#fff',
+    color: 'colors.BACKGROUND_MAIN',
     fontSize: wp('4%'),
     fontWeight: 'bold',
   },
@@ -356,7 +357,7 @@ const styles = StyleSheet.create({
     marginBottom: hp('2%'),
   },
   loadMoreButton: {
-    backgroundColor: 'rgba(107, 60, 233, 0.12)',
+    backgroundColor: 'colors.INFO + "1F"',
     paddingVertical: hp('1.2%'),
     paddingHorizontal: wp('6%'),
     borderRadius: 25,
@@ -364,13 +365,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     elevation: 2,
-    shadowColor: '#6B3CE9',
+    shadowColor: 'colors.INFO',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.2,
     shadowRadius: 3,
   },
   loadMoreText: {
-    color: '#6B3CE9',
+    color: 'colors.INFO',
     fontWeight: '600',
     fontSize: wp('3.5%'),
     marginLeft: wp('2%'),
@@ -380,11 +381,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     paddingTop: hp('10%'),
-    backgroundColor: '#ffffff',
+    backgroundColor: 'colors.BACKGROUND_MAINfff',
   },
   loadingText: {
     fontSize: wp('4%'),
-    color: '#777',
+    color: 'colors.TEXT_LIGHT',
     marginTop: hp('2%'),
     fontWeight: '500',
   },
@@ -393,11 +394,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     padding: wp('10%'),
-    backgroundColor: '#ffffff',
+    backgroundColor: colors.BACKGROUND_MAIN,
   },
   errorText: {
     fontSize: wp('4%'),
-    color: '#777',
+    color: 'colors.TEXT_LIGHT',
     textAlign: 'center',
     marginTop: hp('2%'),
   },
@@ -406,19 +407,19 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     padding: wp('10%'),
-    backgroundColor: '#ffffff',
+    backgroundColor: 'colors.BACKGROUND_MAINfff',
   },
   emptyText: {
     fontSize: wp('5.5%'),
     fontWeight: 'bold',
-    color: '#333',
+    color: 'colors.TEXT_PRIMARY',
     marginTop: hp('3%'),
     marginBottom: hp('1.5%'),
     textAlign: 'center',
   },
   emptySubText: {
     fontSize: wp('4.2%'),
-    color: '#666',
+    color: 'colors.TEXT_SECONDARY',
     textAlign: 'center',
     lineHeight: wp('6.5%'),
   },
@@ -430,7 +431,7 @@ const styles = StyleSheet.create({
     height: hp('10%'),
   },
   unreadCountContainer: {
-    backgroundColor: '#ff6b9b',
+    backgroundColor: 'colors.PRIMARY',
     borderRadius: 18,
     paddingHorizontal: wp('2.5%'),
     paddingVertical: hp('0.6%'),
@@ -438,14 +439,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     elevation: 3,
-    shadowColor: '#ff3b7b',
+    shadowColor: 'colors.PRIMARY_SHADOW',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.3,
     shadowRadius: 3,
     marginLeft: 10,
   },
   unreadCountText: {
-    color: '#fff',
+    color: 'colors.BACKGROUND_MAIN',
     fontSize: wp('3.2%'),
     fontWeight: '700',
   },
@@ -458,7 +459,7 @@ const styles = StyleSheet.create({
   },
   divider: {
     height: 1,
-    backgroundColor: '#f0f0f0',
+    backgroundColor: 'colors.BORDER_LIGHT',
     marginVertical: hp('0.5%'),
     marginHorizontal: wp('4%'),
     opacity: 0.5,
@@ -470,30 +471,30 @@ const styles = StyleSheet.create({
   },
   exploreButton: {
     marginTop: 20,
-    borderColor: '#ff6b9b',
+    borderColor: 'colors.PRIMARY',
     borderRadius: 25,
     paddingHorizontal: 20,
     borderWidth: 1.5,
     elevation: 2,
-    shadowColor: '#ff6b9b',
+    shadowColor: 'colors.PRIMARY',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.2,
     shadowRadius: 3,
   },
   loginButton: {
     marginTop: 20,
-    backgroundColor: '#ff6b9b',
+    backgroundColor: 'colors.PRIMARY',
     borderRadius: 25,
     paddingHorizontal: 20,
     elevation: 4,
-    shadowColor: '#ff3b7b',
+    shadowColor: 'colors.PRIMARY_SHADOW',
     shadowOffset: { width: 0, height: 3 },
     shadowOpacity: 0.3,
     shadowRadius: 5,
   },
   backButton: {
     marginTop: 12,
-    borderColor: '#ff6b9b',
+    borderColor: 'colors.PRIMARY',
     borderRadius: 25,
     paddingHorizontal: 20,
     borderWidth: 1.5,
@@ -507,7 +508,7 @@ const EmptyConversationsList = ({ navigation, isAuthenticated }: { navigation: a
       style={styles.emptyContainer}
     >
       <Animated.View entering={ZoomIn.duration(800).delay(400)}>
-        <Ionicons name="chatbubble-ellipses-outline" size={wp('25%')} color="#ddd" />
+        <Ionicons name="chatbubble-ellipses-outline" size={wp('25%')} color="colors.BORDER_DARK" />
       </Animated.View>
       
       <Animated.Text 
@@ -544,7 +545,7 @@ const EmptyConversationsList = ({ navigation, isAuthenticated }: { navigation: a
             mode="outlined" 
             onPress={() => navigation.navigate('Home')}
             style={styles.backButton}
-            textColor="#ff6b9b"
+            textColor="colors.PRIMARY"
             icon="home"
           >
             Retour à l'accueil
@@ -556,7 +557,7 @@ const EmptyConversationsList = ({ navigation, isAuthenticated }: { navigation: a
             mode="outlined" 
             onPress={() => navigation.navigate('Home')}
             style={styles.exploreButton}
-            textColor="#ff6b9b"
+            textColor="colors.PRIMARY"
             icon="shopping"
           >
             Explorer des produits
@@ -1227,14 +1228,14 @@ export default function MessagesScreen({ navigation, route }: MessagesScreenProp
             {/* Affichage du produit et du message sur deux lignes distinctes sans onglets */}
             {hasProduct && item.product && (
               <View style={{ 
-                backgroundColor: isUnread ? 'rgba(107, 60, 233, 0.1)' : 'rgba(107, 60, 233, 0.07)', 
+                backgroundColor: isUnread ? 'colors.INFO + "1A"' : 'colors.INFO + "12"', 
                 padding: wp('2%'), 
                 borderRadius: 10, 
                 marginBottom: hp('0.5%'), 
                 flexDirection: 'row', 
                 alignItems: 'center',
                 elevation: 1,
-                shadowColor: '#6B3CE9',
+                shadowColor: 'colors.INFO',
                 shadowOffset: { width: 0, height: 1 },
                 shadowOpacity: 0.1,
                 shadowRadius: 2,
@@ -1247,9 +1248,9 @@ export default function MessagesScreen({ navigation, route }: MessagesScreenProp
                   marginRight: wp('2%'), 
                   overflow: 'hidden',
                   borderWidth: 1,
-                  borderColor: '#f0f0f0',
+                  borderColor: 'colors.BORDER_LIGHT',
                   elevation: 2,
-                  shadowColor: '#000',
+                  shadowColor: 'colors.TEXT_DARK',
                   shadowOffset: { width: 0, height: 1 },
                   shadowOpacity: 0.1,
                   shadowRadius: 1,
@@ -1261,8 +1262,8 @@ export default function MessagesScreen({ navigation, route }: MessagesScreenProp
                       defaultSource={placeholderImage}
                     />
                   ) : (
-                    <View style={{ width: '100%', height: '100%', justifyContent: 'center', alignItems: 'center', backgroundColor: '#f0f0f0' }}>
-                      <Ionicons name="image-outline" size={16} color="#ccc" />
+                    <View style={{ width: '100%', height: '100%', justifyContent: 'center', alignItems: 'center', backgroundColor: 'colors.BORDER_LIGHT' }}>
+                      <Ionicons name="image-outline" size={16} color="colors.GRAY_LIGHT" />
                     </View>
                   )}
                 </View>
@@ -1326,7 +1327,7 @@ export default function MessagesScreen({ navigation, route }: MessagesScreenProp
           loading={loadingMore}
           style={styles.loadMoreButton}
           labelStyle={styles.loadMoreText}
-          color="#6B3CE9"
+          color="colors.INFO"
           icon={loadingMore ? undefined : "chevron-down"}
         >
           {loadingMore ? 'Chargement...' : 'Voir plus de conversations'}
@@ -1365,8 +1366,8 @@ export default function MessagesScreen({ navigation, route }: MessagesScreenProp
       <Animated.View 
         style={[styles.headerContainer, { 
           borderBottomWidth: 1, 
-          borderBottomColor: '#e0e0e0',
-          backgroundColor: '#fff'
+          borderBottomColor: 'colors.BORDER_MEDIUM',
+          backgroundColor: colors.BACKGROUND_MAIN
         }]}
         entering={FadeIn.duration(500)}
       >
@@ -1384,7 +1385,7 @@ export default function MessagesScreen({ navigation, route }: MessagesScreenProp
       {/* Zone des messages - style amélioré */}
       <View style={{ 
         flex: 1, 
-        backgroundColor: '#f8f9fa' 
+        backgroundColor: 'colors.BACKGROUND_SECONDARY' 
       }}>
         {loading ? (
           <View style={styles.loadingContainer}>
@@ -1398,7 +1399,7 @@ export default function MessagesScreen({ navigation, route }: MessagesScreenProp
                 }]
               }}
             >
-              <Ionicons name="chatbubble-ellipses-outline" size={50} color="#ff6b9b" />
+              <Ionicons name="chatbubble-ellipses-outline" size={50} color={colors.PRIMARY} />
             </RNAnimated.View>
             <Text style={styles.loadingText}>Chargement des conversations...</Text>
           </View>
@@ -1417,9 +1418,9 @@ export default function MessagesScreen({ navigation, route }: MessagesScreenProp
               <RefreshControl
                 refreshing={refreshing}
                 onRefresh={onRefresh}
-                colors={['#ff6b9b']}
-                tintColor="#ff6b9b"
-                progressBackgroundColor="#ffffff"
+                colors={[colors.PRIMARY]}
+                tintColor={colors.PRIMARY}
+                progressBackgroundColor={colors.BACKGROUND_MAIN}
               />
             }
             showsVerticalScrollIndicator={false}

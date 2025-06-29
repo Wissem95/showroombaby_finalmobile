@@ -4,6 +4,7 @@ import { Text, Button, RadioButton } from 'react-native-paper';
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import FilterService, { Filters } from '../services/FilterService';
+import { globalStyles, colors } from '../theme/globalStyles';
 
 // Types
 interface Category {
@@ -90,7 +91,7 @@ export default function AdvancedFiltersScreen({ navigation, route }: any) {
               onPress={() => setShowCategoryModal(false)}
               activeOpacity={0.7}
             >
-              <Ionicons name="close" size={24} color="#333" />
+              <Ionicons name="close" size={24} color={colors.TEXT_PRIMARY} />
             </TouchableOpacity>
           </View>
           <ScrollView style={styles.modalList}>
@@ -107,7 +108,7 @@ export default function AdvancedFiltersScreen({ navigation, route }: any) {
               >
                 <Text style={styles.modalItemText}>{cat.name}</Text>
                 {selectedCategory === cat.id && (
-                  <Ionicons name="checkmark" size={20} color="#6B3CE9" />
+                  <Ionicons name="checkmark" size={20} color={colors.PRIMARY} />
                 )}
               </TouchableOpacity>
             ))}
@@ -131,7 +132,7 @@ export default function AdvancedFiltersScreen({ navigation, route }: any) {
               onPress={() => setShowSubcategoryModal(false)}
               activeOpacity={0.7}
             >
-              <Ionicons name="close" size={24} color="#333" />
+              <Ionicons name="close" size={24} color={colors.TEXT_PRIMARY} />
             </TouchableOpacity>
           </View>
           <ScrollView style={styles.modalList}>
@@ -147,7 +148,7 @@ export default function AdvancedFiltersScreen({ navigation, route }: any) {
               >
                 <Text style={styles.modalItemText}>{subcat.name}</Text>
                 {selectedSubcategory === subcat.id && (
-                  <Ionicons name="checkmark" size={20} color="#6B3CE9" />
+                  <Ionicons name="checkmark" size={20} color={colors.PRIMARY} />
                 )}
               </TouchableOpacity>
             ))}
@@ -169,7 +170,7 @@ export default function AdvancedFiltersScreen({ navigation, route }: any) {
               onPress={() => setShowConditionModal(false)}
               activeOpacity={0.7}
             >
-              <Ionicons name="close" size={24} color="#333" />
+              <Ionicons name="close" size={24} color={colors.TEXT_PRIMARY} />
             </TouchableOpacity>
           </View>
           <ScrollView style={styles.modalList}>
@@ -185,7 +186,7 @@ export default function AdvancedFiltersScreen({ navigation, route }: any) {
               >
                 <Text style={styles.modalItemText}>{condition.label}</Text>
                 {selectedCondition === condition.id && (
-                  <Ionicons name="checkmark" size={20} color="#6B3CE9" />
+                  <Ionicons name="checkmark" size={20} color={colors.PRIMARY} />
                 )}
               </TouchableOpacity>
             ))}
@@ -207,7 +208,7 @@ export default function AdvancedFiltersScreen({ navigation, route }: any) {
             style={styles.backButton}
             activeOpacity={0.7}
           >
-            <Ionicons name="arrow-back" size={24} color="#ff6b9b" />
+            <Ionicons name="arrow-back" size={24} color={colors.PRIMARY} />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Filtres avancés</Text>
         </View>
@@ -225,7 +226,7 @@ export default function AdvancedFiltersScreen({ navigation, route }: any) {
                   ? categories?.find((c: Category) => c.id === selectedCategory)?.name || 'Sélectionner' 
                   : 'Sélectionner'}
               </Text>
-              <MaterialIcons name="arrow-drop-down" size={24} color="#999" />
+              <MaterialIcons name="arrow-drop-down" size={24} color="colors.TEXT_MUTED" />
             </TouchableOpacity>
           </View>
           
@@ -242,7 +243,7 @@ export default function AdvancedFiltersScreen({ navigation, route }: any) {
                     ? categories?.find((c: Category) => c.id === selectedCategory)?.subcategories?.find(sc => sc.id === selectedSubcategory)?.name || 'Sélectionner'
                     : 'Sélectionner'}
                 </Text>
-                <MaterialIcons name="arrow-drop-down" size={24} color="#999" />
+                <MaterialIcons name="arrow-drop-down" size={24} color="colors.TEXT_MUTED" />
               </TouchableOpacity>
             </View>
           )}
@@ -259,7 +260,7 @@ export default function AdvancedFiltersScreen({ navigation, route }: any) {
                   ? CONDITIONS.find(c => c.id === selectedCondition)?.label || 'Sélectionner'
                   : 'Sélectionner'}
               </Text>
-              <MaterialIcons name="arrow-drop-down" size={24} color="#999" />
+              <MaterialIcons name="arrow-drop-down" size={24} color="colors.TEXT_MUTED" />
             </TouchableOpacity>
           </View>
           
@@ -275,7 +276,7 @@ export default function AdvancedFiltersScreen({ navigation, route }: any) {
                   value="all"
                   status={sellerType === null ? 'checked' : 'unchecked'}
                   onPress={() => setSellerType(null)}
-                  color="#6B3CE9"
+                  color={colors.PRIMARY}
                 />
                 <Text style={styles.radioLabel}>Tous</Text>
               </TouchableOpacity>
@@ -289,7 +290,7 @@ export default function AdvancedFiltersScreen({ navigation, route }: any) {
                   value="professional"
                   status={sellerType === 'professional' ? 'checked' : 'unchecked'}
                   onPress={() => setSellerType('professional')}
-                  color="#6B3CE9"
+                  color={colors.PRIMARY}
                 />
                 <Text style={styles.radioLabel}>Professionnel</Text>
               </TouchableOpacity>
@@ -303,7 +304,7 @@ export default function AdvancedFiltersScreen({ navigation, route }: any) {
                   value="individual"
                   status={sellerType === 'individual' ? 'checked' : 'unchecked'}
                   onPress={() => setSellerType('individual')}
-                  color="#6B3CE9"
+                  color={colors.PRIMARY}
                 />
                 <Text style={styles.radioLabel}>Particulier</Text>
               </TouchableOpacity>
@@ -368,14 +369,14 @@ export default function AdvancedFiltersScreen({ navigation, route }: any) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: colors.BACKGROUND_MAIN,
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     padding: 15,
     borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
+    borderBottomColor: 'colors.BORDER_LIGHT',
   },
   backButton: {
     padding: 8,
@@ -383,7 +384,7 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#333',
+    color: colors.TEXT_PRIMARY,
     marginLeft: 10,
   },
   content: {
@@ -397,7 +398,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '500',
     marginBottom: 10,
-    color: '#333',
+    color: colors.TEXT_PRIMARY,
   },
   selectorButton: {
     flexDirection: 'row',
@@ -405,16 +406,16 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     padding: 14,
     borderWidth: 1,
-    borderColor: '#e0e0e0',
+    borderColor: 'colors.BORDER_MEDIUM',
     borderRadius: 10,
-    backgroundColor: '#fff',
+    backgroundColor: colors.BACKGROUND_MAIN,
   },
   selectorText: {
-    color: '#333',
+    color: colors.TEXT_PRIMARY,
     fontSize: 15,
   },
   selectorPlaceholder: {
-    color: '#999',
+    color: 'colors.TEXT_MUTED',
     fontSize: 15,
   },
   radioContainer: {
@@ -425,15 +426,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginVertical: 4,
     padding: 12,
-    backgroundColor: '#fff',
+    backgroundColor: colors.BACKGROUND_MAIN,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: '#f0f0f0',
+    borderColor: 'colors.BORDER_LIGHT',
   },
   radioLabel: {
     marginLeft: 8,
     fontSize: 15,
-    color: '#333',
+    color: colors.TEXT_PRIMARY,
   },
   priceInputContainer: {
     flexDirection: 'row',
@@ -445,26 +446,26 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#ddd',
+    borderColor: 'colors.BORDER_DARK',
     borderRadius: 8,
     padding: 10,
-    backgroundColor: '#fff',
+    backgroundColor: colors.BACKGROUND_MAIN,
   },
   priceInputLabel: {
     fontSize: 14,
-    color: '#666',
+    color: 'colors.TEXT_SECONDARY',
     marginRight: 5,
   },
   priceInput: {
     flex: 1,
     fontSize: 16,
-    color: '#333',
+    color: colors.TEXT_PRIMARY,
     textAlign: 'right',
     padding: 0,
   },
   euroSymbol: {
     fontSize: 16,
-    color: '#333',
+    color: colors.TEXT_PRIMARY,
     marginLeft: 5,
   },
   priceInputDivider: {
@@ -475,19 +476,19 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     padding: 15,
     borderTopWidth: 1,
-    borderTopColor: '#f0f0f0',
-    backgroundColor: '#fff',
+    borderTopColor: 'colors.BORDER_LIGHT',
+    backgroundColor: colors.BACKGROUND_MAIN,
   },
   resetButton: {
     flex: 1,
     marginRight: 10,
-    borderColor: '#6B3CE9',
+    borderColor: colors.PRIMARY,
     height: 50,
     justifyContent: 'center',
   },
   applyButton: {
     flex: 1,
-    backgroundColor: '#6B3CE9',
+    backgroundColor: colors.PRIMARY,
     height: 50,
     justifyContent: 'center',
   },
@@ -498,7 +499,7 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: 'colors.OVERLAY_DARK',
     justifyContent: 'center',
     alignItems: 'center',
     zIndex: 1000,
@@ -506,7 +507,7 @@ const styles = StyleSheet.create({
   modalContent: {
     width: '85%',
     maxHeight: '70%',
-    backgroundColor: '#fff',
+    backgroundColor: colors.BACKGROUND_MAIN,
     borderRadius: 12,
     overflow: 'hidden',
   },
@@ -516,12 +517,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
+    borderBottomColor: 'colors.BORDER_LIGHT',
   },
   modalTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#333',
+    color: colors.TEXT_PRIMARY,
   },
   modalList: {
     padding: 8,
@@ -532,10 +533,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
+    borderBottomColor: 'colors.BORDER_LIGHT',
   },
   modalItemText: {
     fontSize: 16,
-    color: '#333',
+    color: colors.TEXT_PRIMARY,
   },
 }); 

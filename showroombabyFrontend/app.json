@@ -1,28 +1,52 @@
 {
   "expo": {
-    "name": "showroombabyFrontend",
-    "slug": "showroombabyFrontend",
+    "name": "ShowroomBaby",
+    "slug": "ShowroomBaby",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/icon.png",
-    "userInterfaceStyle": "light",
+    "icon": "./assets/IMG_3048.png",
+    "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
+    "plugins": [
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#000000",
+          "image": "./assets/IMG_3048.png",
+          "resizeMode": "contain",
+          "dark": {
+            "backgroundColor": "#000000"
+          },
+          "ios": {
+            "backgroundColor": "#000000",
+            "image": "./assets/IMG_3048.png",
+            "resizeMode": "contain"
+          }
+        }
+      ]
+    ],
     "splash": {
-      "image": "./assets/splash-icon.png",
+      "image": "./assets/IMG_3048.png",
       "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
+      "backgroundColor": "#000000"
     },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "splash": {
+        "image": "./assets/IMG_3048.png",
+        "resizeMode": "contain",
+        "backgroundColor": "#000000"
+      },
+      "bundleIdentifier": "com.wissem95.ShowroomBaby"
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#ffffff"
+        "foregroundImage": "./assets/IMG_3048.png",
+        "backgroundColor": "#000000"
       }
     },
     "web": {
-      "favicon": "./assets/favicon.png"
+      "favicon": "./assets/IMG_3048.png"
     },
     "hostUri": "172.20.10.3:8081",
     "extra": {
