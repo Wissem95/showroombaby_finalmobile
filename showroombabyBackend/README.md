@@ -1,66 +1,361 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# 🍼 ShowroomBaby - Marketplace d'articles de bébé d'occasion
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+## 📋 Description du projet
 
-## About Laravel
+ShowroomBaby est une marketplace mobile dédiée à la vente d'articles de bébé d'occasion. L'application permet aux parents de vendre et acheter des produits pour bébé en toute sécurité.
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+### 🏗️ Architecture du projet
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+```
+showroombabyBackend/
+├── backend/                 # API Laravel (PHP)
+├── showroombaby_mobile/     # Application mobile Flutter
+└── README.md               # Ce fichier
+```
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+## 🚀 Installation rapide
 
-## Learning Laravel
+### Option 1: Script automatique (Recommandé)
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
+```bash
+chmod +x setup.sh
+./setup.sh
+```
 
-You may also try the [Laravel Bootcamp](https://bootcamp.laravel.com), where you will be guided through building a modern Laravel application from scratch.
+### Option 2: Installation manuelle
 
-If you don't feel like reading, [Laracasts](https://laracasts.com) can help. Laracasts contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+Suivez les étapes détaillées ci-dessous.
 
-## Laravel Sponsors
+---
 
-We would like to extend our thanks to the following sponsors for funding Laravel development. If you are interested in becoming a sponsor, please visit the [Laravel Partners program](https://partners.laravel.com).
+## 🛠️ Prérequis
 
-### Premium Partners
+### Système
 
-- **[Vehikl](https://vehikl.com/)**
-- **[Tighten Co.](https://tighten.co)**
-- **[WebReinvent](https://webreinvent.com/)**
-- **[Kirschbaum Development Group](https://kirschbaumdevelopment.com)**
-- **[64 Robots](https://64robots.com)**
-- **[Curotec](https://www.curotec.com/services/technologies/laravel/)**
-- **[Cyber-Duck](https://cyber-duck.co.uk)**
-- **[DevSquad](https://devsquad.com/hire-laravel-developers)**
-- **[Jump24](https://jump24.co.uk)**
-- **[Redberry](https://redberry.international/laravel/)**
-- **[Active Logic](https://activelogic.com)**
-- **[byte5](https://byte5.de)**
-- **[OP.GG](https://op.gg)**
+- **macOS** (testé sur macOS 14.x)
+- **Git** installé
+- **Homebrew** installé
 
-## Contributing
+### Technologies requises
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+- **PHP** 8.1+ avec Composer
+- **Flutter** 3.6+
+- **Node.js** 18+ (optionnel)
+- **Xcode** pour iOS (si développement iOS)
 
-## Code of Conduct
+---
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+## 📦 Installation détaillée
 
-## Security Vulnerabilities
+### 1. Cloner le projet
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+```bash
+git clone https://github.com/Wissem95/Showroombaby_final.git
+cd Showroombaby_final
+```
 
-## License
+### 2. Installation du Backend Laravel
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+#### a) Installation de PHP et Composer
+
+```bash
+# Installer PHP via Homebrew
+brew install php@8.1
+brew link php@8.1 --force
+
+# Installer Composer
+curl -sS https://getcomposer.org/installer | php
+sudo mv composer.phar /usr/local/bin/composer
+```
+
+#### b) Configuration du Backend
+
+```bash
+cd backend
+
+# Installer les dépendances PHP
+composer install
+
+# Copier le fichier d'environnement
+cp .env.example .env
+
+# Générer la clé d'application
+php artisan key:generate
+
+# Configurer la base de données (SQLite par défaut)
+touch database/database.sqlite
+
+# Lancer les migrations
+php artisan migrate --seed
+
+# Créer le lien symbolique pour les fichiers
+php artisan storage:link
+```
+
+### 3. Installation de l'application Flutter
+
+#### a) Installation de Flutter
+
+```bash
+# Télécharger Flutter
+git clone https://github.com/flutter/flutter.git -b stable
+export PATH="$PATH:`pwd`/flutter/bin"
+
+# Ou via Homebrew
+brew install --cask flutter
+```
+
+#### b) Configuration de l'application mobile
+
+```bash
+cd ../showroombaby_mobile
+
+# Installer les dépendances Dart
+flutter pub get
+
+# Générer le code (Riverpod, Freezed, etc.)
+flutter packages pub run build_runner build --delete-conflicting-outputs
+
+# Vérifier la configuration Flutter
+flutter doctor
+```
+
+---
+
+## 🚀 Lancement du projet
+
+### 1. Démarrer le serveur Laravel
+
+```bash
+cd backend
+php artisan serve
+```
+
+> Le serveur sera accessible sur `http://localhost:8000`
+
+### 2. Lancer l'application Flutter
+
+#### Pour iOS (Simulateur)
+
+```bash
+cd showroombaby_mobile
+
+# Lister les simulateurs disponibles
+flutter devices
+
+# Lancer sur un simulateur spécifique
+flutter run -d "iPhone 16 Pro"
+```
+
+#### Pour Android
+
+```bash
+cd showroombaby_mobile
+flutter run
+```
+
+---
+
+## 🔧 Configuration avancée
+
+### Variables d'environnement Backend (.env)
+
+```env
+APP_NAME="ShowroomBaby API"
+APP_ENV=local
+APP_KEY=base64:VOTRE_CLE_GENEREE
+APP_DEBUG=true
+APP_URL=http://localhost:8000
+
+DB_CONNECTION=sqlite
+DB_DATABASE=/chemin/vers/database/database.sqlite
+
+CORS_ALLOWED_ORIGINS="*"
+```
+
+### Configuration API Mobile
+
+Fichier: `showroombaby_mobile/lib/app/constants/api_constants.dart`
+
+```dart
+class ApiConstants {
+  static const String baseUrl = 'http://localhost:8000/api';
+  // Pour appareil physique, remplacez par votre IP locale
+  // static const String baseUrl = 'http://192.168.1.X:8000/api';
+}
+```
+
+---
+
+## 📱 Fonctionnalités
+
+### ✅ Fonctionnalités implémentées
+
+- 🔐 **Authentification** (inscription, connexion, token JWT)
+- 🏠 **Homepage** avec produits tendance et filtrage par catégories
+- 📱 **Navigation** fluide entre les écrans
+- 🛍️ **Produits** : liste, détails, images, favoris
+- 🔍 **Recherche** et filtrage avancé
+- ❤️ **Favoris** avec gestion en temps réel
+- 💬 **Messagerie** entre vendeurs et acheteurs
+- 👤 **Profil utilisateur** avec statistiques
+- 📊 **Catégories** avec compteurs de produits
+
+### 🚧 En développement
+
+- 💰 **Système de paiement**
+- 📍 **Géolocalisation** pour recherche locale
+- 🔔 **Notifications push**
+- 📈 **Analytics** et statistiques vendeur
+
+---
+
+## 🎨 Captures d'écran
+
+### Homepage avec pastilles de filtrage
+
+- Barre de recherche transparente
+- Pastilles de catégories cliquables
+- Grille de produits avec favoris fonctionnels
+
+### Détails produit
+
+- Carousel d'images
+- Informations vendeur
+- Boutons contacter/appeler
+- Produits similaires
+
+---
+
+## 🛠️ Dépannage
+
+### Problèmes courants
+
+#### 1. Erreur "Command not found: php"
+
+```bash
+brew install php@8.1
+echo 'export PATH="/opt/homebrew/bin:$PATH"' >> ~/.zshrc
+source ~/.zshrc
+```
+
+#### 2. Erreur Flutter "No devices found"
+
+```bash
+# Pour iOS
+open -a Simulator
+
+# Vérifier les appareils
+flutter devices
+```
+
+#### 3. Erreur de base de données Laravel
+
+```bash
+cd backend
+rm database/database.sqlite
+touch database/database.sqlite
+php artisan migrate:fresh --seed
+```
+
+#### 4. Erreur de génération de code Flutter
+
+```bash
+cd showroombaby_mobile
+flutter clean
+flutter pub get
+flutter packages pub run build_runner clean
+flutter packages pub run build_runner build --delete-conflicting-outputs
+```
+
+#### 5. Erreur CORS ou API non accessible
+
+- Vérifiez que le serveur Laravel est démarré sur `http://localhost:8000`
+- Pour tester sur appareil physique, remplacez `localhost` par votre IP locale dans `api_constants.dart`
+
+---
+
+## 📚 Structure du code
+
+### Backend Laravel
+
+```
+backend/
+├── app/
+│   ├── Http/Controllers/Api/    # Contrôleurs API
+│   ├── Models/                  # Modèles Eloquent
+│   └── Providers/              # Service providers
+├── database/
+│   ├── migrations/             # Migrations DB
+│   └── seeders/               # Données de test
+└── routes/api.php             # Routes API
+```
+
+### Frontend Flutter
+
+```
+showroombaby_mobile/
+├── lib/
+│   ├── core/
+│   │   ├── models/            # Modèles de données
+│   │   ├── providers/         # Providers Riverpod
+│   │   └── services/          # Services API
+│   ├── features/
+│   │   ├── auth/             # Authentification
+│   │   ├── home/             # Page d'accueil
+│   │   ├── products/         # Produits
+│   │   └── ...               # Autres fonctionnalités
+│   └── shared/widgets/       # Widgets partagés
+```
+
+---
+
+## 🤝 Contribution
+
+### Pour contribuer au projet :
+
+1. Fork le repository
+2. Créer une branche feature (`git checkout -b feature/nouvelle-fonctionnalite`)
+3. Commit les changes (`git commit -am 'Ajout nouvelle fonctionnalité'`)
+4. Push la branche (`git push origin feature/nouvelle-fonctionnalite`)
+5. Créer une Pull Request
+
+---
+
+## 📞 Support
+
+### Contacts
+
+- **Développeur principal** : Wissem
+- **Email** : wissemkarboubbb@gmail.com
+
+### Ressources utiles
+
+- [Documentation Laravel](https://laravel.com/docs)
+- [Documentation Flutter](https://flutter.dev/docs)
+- [Documentation Riverpod](https://riverpod.dev/)
+
+---
+
+## 📄 Licence
+
+Ce projet est sous licence privée. Tous droits réservés.
+
+---
+
+## ⚡ Quick Start (TL;DR)
+
+```bash
+# 1. Cloner et installer
+git clone https://github.com/Wissem95/Showroombaby_final.git
+cd Showroombaby_final
+chmod +x setup.sh && ./setup.sh
+
+# 2. Lancer le backend
+cd backend && php artisan serve
+
+# 3. Lancer l'app mobile (nouveau terminal)
+cd showroombaby_mobile && flutter run
+```
+
+🎉 **Voilà ! L'application devrait maintenant fonctionner parfaitement !**
