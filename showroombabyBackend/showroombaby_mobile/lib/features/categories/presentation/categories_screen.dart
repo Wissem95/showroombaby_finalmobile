@@ -180,7 +180,7 @@ class CategoriesScreen extends ConsumerWidget {
 
                         return InkWell(
                           onTap: () {
-                            context.push('/categories/${category.id}/products');
+                            context.push('/category/${category.id}?name=${Uri.encodeComponent(category.name)}');
                           },
                           child: Container(
                             decoration: BoxDecoration(

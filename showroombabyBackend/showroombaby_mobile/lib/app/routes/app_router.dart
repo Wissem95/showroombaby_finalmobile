@@ -89,7 +89,14 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/',
         name: 'home',
-        builder: (context, state) => const HomeScreen(),
+        builder: (context, state) {
+          final searchQuery = state.uri.queryParameters['q'];
+          final categoryId = state.uri.queryParameters['categoryId'];
+          return HomeScreen(
+            initialSearchQuery: searchQuery,
+            initialCategoryId: categoryId != null ? int.tryParse(categoryId) : null,
+          );
+        },
       ),
 
       // === Routes des produits ===

@@ -14,7 +14,14 @@ import '../../../app/theme/app_colors.dart';
 import '../../../core/models/product.dart' show ProductCondition;
 
 class HomeScreen extends ConsumerStatefulWidget {
-  const HomeScreen({super.key});
+  final String? initialSearchQuery;
+  final int? initialCategoryId;
+  
+  const HomeScreen({
+    super.key,
+    this.initialSearchQuery,
+    this.initialCategoryId,
+  });
 
   @override
   ConsumerState<HomeScreen> createState() => _HomeScreenState();
@@ -22,14 +29,44 @@ class HomeScreen extends ConsumerStatefulWidget {
 
 class _HomeScreenState extends ConsumerState<HomeScreen> {
   int? selectedCategoryId; // Pour suivre la catégorie sélectionnée
+  String? currentSearchQuery; // Pour suivre le terme de recherche actuel
+  late TextEditingController _searchController;
+
+  @override
+  void initState() {
+    super.initState();
+    _searchController = TextEditingController();
+    
+    // Initialiser avec les paramètres passés
+    selectedCategoryId = widget.initialCategoryId;
+    currentSearchQuery = widget.initialSearchQuery;
+    
+    if (widget.initialSearchQuery != null) {
+      _searchController.text = widget.initialSearchQuery!;
+    }
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
-    // Si une catégorie est sélectionnée, charger les produits de cette catégorie
-    // Sinon, charger les produits tendance
-    final productsAsync = selectedCategoryId != null
-        ? ref.watch(categoryProductsProvider(selectedCategoryId!))
-        : ref.watch(trendingProductsProvider);
+    // Détermine quel provider utiliser selon l'état actuel
+    final AsyncValue<List<Product>> productsAsync;
+    
+    if (currentSearchQuery != null && currentSearchQuery!.isNotEmpty) {
+      // Si on a un terme de recherche, utiliser le provider de recherche
+      productsAsync = ref.watch(searchProductsListProvider(currentSearchQuery!));
+    } else if (selectedCategoryId != null) {
+      // Sinon si une catégorie est sélectionnée, utiliser le provider de catégorie
+      productsAsync = ref.watch(categoryProductsProvider(selectedCategoryId!));
+    } else {
+      // Sinon, charger les produits tendance par défaut
+      productsAsync = ref.watch(trendingProductsProvider);
+    }
 
     return Scaffold(
       backgroundColor: Colors.transparent,
@@ -50,7 +87,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         child: SafeArea(
                       child: RefreshIndicator(
               onRefresh: () async {
-                if (selectedCategoryId != null) {
+                if (currentSearchQuery != null && currentSearchQuery!.isNotEmpty) {
+                  ref.invalidate(searchProductsListProvider(currentSearchQuery!));
+                } else if (selectedCategoryId != null) {
                   ref.invalidate(categoryProductsProvider(selectedCategoryId!));
                 } else {
                   ref.invalidate(trendingProductsProvider);
@@ -106,22 +145,42 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 ],
               ),
               child: TextField(
-                decoration: const InputDecoration(
-                  hintText: 'Rechercher un produit...',
+                controller: _searchController,
+                decoration: InputDecoration(
+                  hintText: currentSearchQuery != null && currentSearchQuery!.isNotEmpty 
+                      ? 'Recherche: $currentSearchQuery'
+                      : 'Rechercher un produit...',
                   hintStyle: TextStyle(
-                    color: Colors.grey,
+                    color: currentSearchQuery != null && currentSearchQuery!.isNotEmpty 
+                        ? AppColors.primary 
+                        : Colors.grey,
                     fontSize: 16,
+                    fontWeight: currentSearchQuery != null && currentSearchQuery!.isNotEmpty 
+                        ? FontWeight.w600 
+                        : FontWeight.normal,
                   ),
-                  prefixIcon: Icon(
+                  prefixIcon: const Icon(
                     Icons.search,
                     color: Colors.grey,
                     size: 24,
                   ),
+                  suffixIcon: currentSearchQuery != null && currentSearchQuery!.isNotEmpty
+                      ? IconButton(
+                          icon: const Icon(Icons.clear, color: Colors.grey),
+                          onPressed: _clearSearch,
+                        )
+                      : null,
                   border: InputBorder.none,
-                  contentPadding: EdgeInsets.symmetric(horizontal: 20, vertical: 15),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
                 ),
-                onTap: () => context.push('/search'),
-                readOnly: true,
+                onSubmitted: _performSearch,
+                onChanged: (value) {
+                  // Recherche en temps réel si l'utilisateur fait une pause
+                  if (value.isEmpty) {
+                    _clearSearch();
+                  }
+                },
+                textInputAction: TextInputAction.search,
               ),
             ),
           ),
@@ -173,9 +232,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 20),
           child: Text(
-            selectedCategoryId == null 
-                ? 'Surfer sur les tendances !'
-                : 'Produits filtrés',
+            currentSearchQuery != null && currentSearchQuery!.isNotEmpty
+                ? 'Résultats pour "${currentSearchQuery}"'
+                : selectedCategoryId == null 
+                    ? 'Surfer sur les tendances !'
+                    : 'Produits filtrés',
             style: const TextStyle(
               color: AppColors.textPrimary,
               fontSize: 24,
@@ -201,6 +262,27 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         ),
       ],
     );
+  }
+
+  // Méthodes pour la recherche
+  void _performSearch(String query) {
+    if (query.trim().isEmpty) {
+      _clearSearch();
+      return;
+    }
+    
+    setState(() {
+      currentSearchQuery = query.trim();
+      selectedCategoryId = null; // Réinitialiser la catégorie sélectionnée
+      _searchController.text = query.trim();
+    });
+  }
+
+  void _clearSearch() {
+    setState(() {
+      currentSearchQuery = null;
+      _searchController.clear();
+    });
   }
 
   Widget _buildProductGrid(BuildContext context, List<Product> products, WidgetRef ref) {
@@ -257,9 +339,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           
           // Titre principal
           Text(
-            selectedCategoryId == null 
-                ? 'Aucun produit tendance'
-                : 'Aucun produit trouvé',
+            currentSearchQuery != null && currentSearchQuery!.isNotEmpty
+                ? 'Aucun résultat trouvé'
+                : selectedCategoryId == null 
+                    ? 'Aucun produit tendance'
+                    : 'Aucun produit trouvé',
             style: const TextStyle(
               color: AppColors.textPrimary,
               fontSize: 24,
@@ -272,9 +356,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           
           // Message descriptif
           Text(
-            selectedCategoryId == null
-                ? 'Les produits tendance ne sont pas disponibles pour le moment.'
-                : 'Il n\'y a pas encore de produits dans cette catégorie.\nRevenez plus tard ou explorez d\'autres catégories !',
+            currentSearchQuery != null && currentSearchQuery!.isNotEmpty
+                ? 'Aucun produit ne correspond à votre recherche "${currentSearchQuery}".\nEssayez avec d\'autres mots-clés.'
+                : selectedCategoryId == null
+                    ? 'Les produits tendance ne sont pas disponibles pour le moment.'
+                    : 'Il n\'y a pas encore de produits dans cette catégorie.\nRevenez plus tard ou explorez d\'autres catégories !',
             style: TextStyle(
               color: Colors.grey[600],
               fontSize: 16,
@@ -285,8 +371,51 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           
           const SizedBox(height: 32),
           
-          // Bouton pour revenir aux tendances si on est sur une catégorie
-          if (selectedCategoryId != null)
+          // Bouton pour effacer la recherche ou revenir aux tendances
+          if (currentSearchQuery != null && currentSearchQuery!.isNotEmpty)
+            Container(
+              decoration: BoxDecoration(
+                color: AppColors.primary.withOpacity(0.9),
+                borderRadius: BorderRadius.circular(25),
+                boxShadow: [
+                  BoxShadow(
+                    color: AppColors.primary.withOpacity(0.3),
+                    blurRadius: 12,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(25),
+                  onTap: _clearSearch,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: const [
+                        Icon(
+                          Icons.clear,
+                          color: Colors.white,
+                          size: 20,
+                        ),
+                        SizedBox(width: 8),
+                        Text(
+                          'Effacer la recherche',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            )
+          else if (selectedCategoryId != null)
             Container(
               decoration: BoxDecoration(
                 color: AppColors.primary.withOpacity(0.9),
@@ -593,8 +722,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             itemCount: allCategories.length,
             itemBuilder: (context, index) {
               final category = allCategories[index];
-              final isSelected = (category.id == 0 && selectedCategoryId == null) ||
-                               (category.id != 0 && selectedCategoryId == category.id);
+              // Une pastille est sélectionnée seulement si on n'est pas en mode recherche
+              final isSelected = currentSearchQuery == null && 
+                               ((category.id == 0 && selectedCategoryId == null) ||
+                                (category.id != 0 && selectedCategoryId == category.id));
               return _buildCategoryPill(context, ref, category, isSelected);
             },
           ),
@@ -624,6 +755,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           borderRadius: BorderRadius.circular(25),
           onTap: () {
             setState(() {
+              // Effacer la recherche quand on clique sur une catégorie
+              currentSearchQuery = null;
+              _searchController.clear();
+              
               if (category.id == 0) {
                 // Afficher tous les produits (tendances)
                 selectedCategoryId = null;

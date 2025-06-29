@@ -95,8 +95,8 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
       // Sauvegarder la recherche dans les recherches récentes
       ref.read(recentSearchActionsProvider.notifier).addSearch(query.trim());
       
-      // Naviguer vers les résultats de recherche
-      context.push('/search-results?query=${Uri.encodeComponent(query.trim())}');
+      // Rediriger vers la homepage avec le terme de recherche
+      context.go('/?q=${Uri.encodeComponent(query.trim())}');
     }
   }
 
@@ -276,7 +276,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                               
                               return InkWell(
                                 onTap: () {
-                                  context.push('/categories/${category.id}/products');
+                                  context.go('/?categoryId=${category.id}');
                                 },
                                 child: Container(
                                   decoration: BoxDecoration(

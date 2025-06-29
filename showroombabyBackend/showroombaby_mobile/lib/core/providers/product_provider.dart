@@ -71,6 +71,16 @@ Future<List<Product>> categoryProducts(CategoryProductsRef ref, int categoryId) 
 }
 
 @riverpod
+Future<List<Product>> searchProductsList(SearchProductsListRef ref, String query) async {
+  final service = ref.read(productServiceProvider);
+  final filters = ProductFilters(query: query);
+  final result = await service.getProducts(filters: filters);
+  return result.items;
+}
+
+
+
+@riverpod
 class ProductFiltersNotifier extends _$ProductFiltersNotifier {
   @override
   ProductFilters build() {
